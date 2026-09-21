@@ -61,7 +61,12 @@ func main() {
 	// attaching services resolves the cycle without a mutable global.
 	var container *service.Container
 	emit := func(ev *protocol.Event) {
-		app.Event.Emit(protocol.EventName, ev)
+		if ev != nil {
+			// RegisterEvent declares a value payload. Wails rejects a pointer here
+			// even though it marshals to the same JSON shape, which would silently
+			// leave the frontend without any turn or streaming events.
+			app.Event.Emit(protocol.EventName, *ev)
+		}
 	}
 
 	container, err = service.NewContainer(paths, cfgStore, emit)
