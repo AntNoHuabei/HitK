@@ -2,7 +2,7 @@
 //
 // 界面只渲染 Item:模型文本、推理、工具调用、计划、提示、错误都是 Item,所以
 // 这里是一张按 item.type 分派的表,而不是每种内容一段特例逻辑。
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Flex, Image, Tooltip, Typography } from "antd";
 import {
   BulbOutlined,
@@ -59,7 +59,7 @@ export function ConversationMessages({ items, buffers, running, modelLabel, usag
           key={item.id}
           item={item}
           buffers={buffers}
-          streaming={running && index === items.length - 1}
+          streaming={running && item.status === ItemStatus.StatusInProgress}
           modelLabel={modelLabel}
           usage={usage}
           refs={index === lastAssistantIndex ? refs : []}
@@ -108,17 +108,7 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
     case ItemType.ItemReasoning: {
       const body = buffers.reasoning[item.id] ?? item.reasoning ?? "";
       if (!body) return null;
-      return (
-        <details className="hitk-agent-detail">
-          <summary>
-            <BulbOutlined />
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              思考过程
-            </Text>
-          </summary>
-          <div className="hitk-agent-reasoning">{body}</div>
-        </details>
-      );
+      return <ReasoningRow body={body} streaming={streaming} />;
     }
 
     case ItemType.ItemToolCall:
@@ -150,6 +140,30 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
     default:
       return null;
   }
+}
+
+function ReasoningRow({ body, streaming }: { body: string; streaming: boolean }) {
+  const [open, setOpen] = useState(streaming);
+
+  useEffect(() => {
+    setOpen(streaming);
+  }, [streaming]);
+
+  return (
+    <details
+      className="hitk-agent-detail"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        <BulbOutlined />
+        <Text type="secondary" style={{ fontSize: 13 }}>
+          思考过程
+        </Text>
+      </summary>
+      <div className="hitk-agent-reasoning">{body}</div>
+    </details>
+  );
 }
 
 function ToolRow({ item }: { item: Item }) {
