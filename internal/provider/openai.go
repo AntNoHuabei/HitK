@@ -69,16 +69,20 @@ func (c *OpenAICompat) BaseURL() string { return c.baseURL }
 // ---------------------------------------------------------------------------
 
 type oaiRequest struct {
-	Model           string       `json:"model"`
-	Messages        []oaiMessage `json:"messages"`
-	Tools           []oaiTool    `json:"tools,omitempty"`
-	ToolChoice      string       `json:"tool_choice,omitempty"`
-	Stream          bool         `json:"stream"`
-	StreamUsage     bool         `json:"stream_options,omitempty"`
-	Temperature     *float64     `json:"temperature,omitempty"`
-	MaxTokens       int          `json:"max_tokens,omitempty"`
-	ReasoningEffort string       `json:"reasoning_effort,omitempty"`
-	Thinking        *oaiThinking `json:"thinking,omitempty"`
+	Model           string            `json:"model"`
+	Messages        []oaiMessage      `json:"messages"`
+	Tools           []oaiTool         `json:"tools,omitempty"`
+	ToolChoice      string            `json:"tool_choice,omitempty"`
+	Stream          bool              `json:"stream"`
+	StreamOptions   *oaiStreamOptions `json:"stream_options,omitempty"`
+	Temperature     *float64          `json:"temperature,omitempty"`
+	MaxTokens       int               `json:"max_tokens,omitempty"`
+	ReasoningEffort string            `json:"reasoning_effort,omitempty"`
+	Thinking        *oaiThinking      `json:"thinking,omitempty"`
+}
+
+type oaiStreamOptions struct {
+	IncludeUsage bool `json:"include_usage"`
 }
 
 type oaiThinking struct {
@@ -165,7 +169,7 @@ func (c *OpenAICompat) Stream(ctx context.Context, req ChatRequest) (<-chan Chun
 		Model:           req.Model,
 		Messages:        toOAIMessages(req.System, req.Messages),
 		Stream:          true,
-		StreamUsage:     true,
+		StreamOptions:   &oaiStreamOptions{IncludeUsage: true},
 		MaxTokens:       req.MaxTokens,
 		Temperature:     req.Temperature,
 		ReasoningEffort: req.Metadata["reasoning_effort"],

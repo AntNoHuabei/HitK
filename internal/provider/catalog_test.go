@@ -78,6 +78,13 @@ func TestOpenAICompatForwardsReasoningEffort(t *testing.T) {
 	for range stream {
 	}
 	body := <-requests
+	streamOptions, ok := body["stream_options"].(map[string]any)
+	if !ok {
+		t.Fatalf("stream_options = %#v, want object", body["stream_options"])
+	}
+	if got := streamOptions["include_usage"]; got != true {
+		t.Fatalf("stream_options.include_usage = %#v, want true", got)
+	}
 	if got := body["reasoning_effort"]; got != "high" {
 		t.Fatalf("reasoning_effort = %#v, want high", got)
 	}
