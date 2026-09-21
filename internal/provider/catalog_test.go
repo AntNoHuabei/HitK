@@ -90,7 +90,7 @@ func TestOpenAICompatForwardsReasoningEffort(t *testing.T) {
 	}
 }
 
-func TestOpenAICompatForwardsThinkingDisabled(t *testing.T) {
+func TestOpenAICompatOmitsThinkingWhenUnspecified(t *testing.T) {
 	requests := make(chan map[string]any, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
@@ -108,7 +108,6 @@ func TestOpenAICompatForwardsThinkingDisabled(t *testing.T) {
 	})
 	stream, err := client.Stream(context.Background(), ChatRequest{
 		Model: "deepseek-v4-pro", Messages: []Message{UserText("hello")},
-		Metadata: map[string]string{"thinking_type": "disabled"},
 	})
 	if err != nil {
 		t.Fatalf("stream: %v", err)
@@ -116,9 +115,8 @@ func TestOpenAICompatForwardsThinkingDisabled(t *testing.T) {
 	for range stream {
 	}
 	body := <-requests
-	thinking, ok := body["thinking"].(map[string]any)
-	if !ok || thinking["type"] != "disabled" {
-		t.Fatalf("thinking = %#v, want type disabled", body["thinking"])
+	if _, exists := body["thinking"]; exists {
+		t.Fatalf("thinking must be omitted when unspecified: %#v", body)
 	}
 	if _, exists := body["reasoning_effort"]; exists {
 		t.Fatalf("reasoning_effort must be omitted when thinking is disabled: %#v", body)

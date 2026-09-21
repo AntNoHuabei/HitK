@@ -878,6 +878,15 @@ func TestProviderErrorIsReported(t *testing.T) {
 	}
 }
 
+func TestVolcenginePlanOffUsesProviderDefault(t *testing.T) {
+	if got := reasoningMetadata("volcengine-plan", "off"); got != nil {
+		t.Fatalf("off metadata = %#v, want nil", got)
+	}
+	if got := reasoningMetadata("volcengine-plan", ""); got != nil {
+		t.Fatalf("empty metadata = %#v, want nil", got)
+	}
+}
+
 // TestCoordinationBudgetNotice ensures the persisted thread keeps the
 // conversation, so reopening a session shows the same transcript.
 func TestThreadPersistsItems(t *testing.T) {

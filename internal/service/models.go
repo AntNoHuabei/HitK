@@ -601,14 +601,10 @@ func reasoningOptions(providerID string, model provider.ModelRef) []string {
 	case "anthropic":
 		return []string{"off", "low", "medium", "high"}
 	case "volcengine-plan":
-		// Agent Plan uses thinking.type=disabled to turn thinking off. GLM 5.3
-		// and Kimi K3 are explicitly documented as always-thinking models.
-		switch model.ID {
-		case "glm-5.3", "glm-latest", "kimi-k3":
-			return []string{"low", "medium", "high"}
-		default:
-			return []string{"off", "low", "medium", "high"}
-		}
+		// Agent Plan exposes effort levels, but its models do not share a
+		// documented per-request switch for disabling thinking. Omitting the
+		// parameter uses the provider default; never advertise a false toggle.
+		return []string{"low", "medium", "high"}
 	default:
 		return nil
 	}

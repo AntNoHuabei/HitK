@@ -423,7 +423,7 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 			System:   a.systemPrompt(thread, mode, provID, modelID, op),
 			Messages: messages,
 			Tools:    schemas,
-			Metadata: reasoningMetadata(provID, modelID, op.ReasoningEffort),
+			Metadata: reasoningMetadata(provID, op.ReasoningEffort),
 		})
 		if err != nil {
 			msgItem.Status = protocol.StatusFailed
@@ -1141,14 +1141,11 @@ func opCollections(op protocol.Op) []string {
 	return nil
 }
 
-func reasoningMetadata(providerID, modelID, effort string) map[string]string {
+func reasoningMetadata(providerID, effort string) map[string]string {
 	if providerID == "volcengine-plan" && effort == "off" {
-		switch modelID {
-		case "glm-5.3", "glm-latest", "kimi-k3":
-			return nil
-		default:
-			return map[string]string{"thinking_type": "disabled"}
-		}
+		// Agent Plan's catalog only guarantees effort levels. "off" means use
+		// the model default and must not be translated to thinking.type=disabled.
+		return nil
 	}
 	budgets := map[string]string{"low": "1024", "medium": "4096", "high": "8192"}
 	if budget := budgets[effort]; budget != "" {

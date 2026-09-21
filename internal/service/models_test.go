@@ -303,16 +303,15 @@ func hasOption(options []ModelOptionView, providerID, model string) bool {
 }
 
 func TestVolcenginePlanExposesVerifiedReasoningEffort(t *testing.T) {
-	got := reasoningOptions("volcengine-plan", provider.ModelRef{ID: "deepseek-v4-pro", Reasoning: true})
-	want := []string{"off", "low", "medium", "high"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("Agent Plan reasoning options = %#v, want %#v", got, want)
+	want := []string{"low", "medium", "high"}
+	meta, ok := provider.VendorByID("volcengine-plan")
+	if !ok {
+		t.Fatal("Agent Plan is missing from the provider catalog")
 	}
-	for _, modelID := range []string{"glm-5.3", "glm-latest", "kimi-k3"} {
-		got = reasoningOptions("volcengine-plan", provider.ModelRef{ID: modelID, Reasoning: true})
-		want = []string{"low", "medium", "high"}
+	for _, preset := range meta.Models {
+		got := reasoningOptions("volcengine-plan", provider.ModelRef{ID: preset.ID, Reasoning: preset.Reasoning})
 		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("Agent Plan always-thinking model %s options = %#v, want %#v", modelID, got, want)
+			t.Fatalf("Agent Plan model %s options = %#v, want %#v", preset.ID, got, want)
 		}
 	}
 	if got := reasoningOptions("volcengine-plan", provider.ModelRef{}); got != nil {
