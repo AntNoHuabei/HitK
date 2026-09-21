@@ -92,6 +92,7 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
 
     case ItemType.ItemAgentMessage: {
       const body = buffers.text[item.id] ?? item.text ?? "";
+		if (!body && streaming) return null;
       return (
         <div className="hitk-chat-assistant-message">
           <Markdown>{body}</Markdown>

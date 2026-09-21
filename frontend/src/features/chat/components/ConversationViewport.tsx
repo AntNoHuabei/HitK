@@ -12,6 +12,7 @@ interface Props {
   items: Item[];
   buffers: { text: Record<string, string>; reasoning: Record<string, string> };
   sending: boolean;
+  awaitingResponse: boolean;
   running: boolean;
   usage: Usage | null;
   error: string;
@@ -29,6 +30,7 @@ export function ConversationViewport({
   items,
   buffers,
   sending,
+  awaitingResponse,
   running,
   usage,
   error,
@@ -84,13 +86,7 @@ export function ConversationViewport({
               modelLabel={modelLabel}
               usage={usage}
             />
-            {running && items.length === 0 && (
-              <div className="hitk-agent-process">
-                <Text type="secondary" style={{ fontSize: 13 }}>
-                  正在思考…
-                </Text>
-              </div>
-            )}
+            {awaitingResponse && <ResponsePending />}
             {interrupted && (
               <div className="hitk-agent-process">
                 <Text type="secondary" style={{ fontSize: 13 }}>
@@ -117,6 +113,19 @@ export function ConversationViewport({
           onResolve={(approve, remember) => void onResolveApproval(approve, remember)}
         />
       )}
+    </div>
+  );
+}
+
+function ResponsePending() {
+  return (
+    <div className="hitk-chat-response-pending" role="status" aria-live="polite">
+      <span className="hitk-chat-response-pending-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <Text type="secondary">正在思考</Text>
     </div>
   );
 }

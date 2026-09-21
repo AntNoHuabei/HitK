@@ -159,6 +159,7 @@ export default function ChatView() {
             items={runtime.items}
             buffers={runtime.buffers}
             sending={runtime.sending}
+			awaitingResponse={runtime.awaitingResponse}
             running={runtime.running}
             usage={runtime.usage}
             error={runtime.error}

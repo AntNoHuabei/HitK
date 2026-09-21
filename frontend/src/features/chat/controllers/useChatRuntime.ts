@@ -2,7 +2,7 @@
 //
 // 组件只跟这个 hook 打交道,store 只被这里写入,事件订阅也只有这里一份。
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { chatRepository, errorText } from "../../../shared/repositories";
+import { chatRepository, errorText, EventKind, ItemType } from "../../../shared/repositories";
 import { onProtocolEvent } from "../../../shared/wails/events";
 import type { ConversationSummary } from "../../../shared/types/chat";
 import type { Attachment } from "../../../shared/repositories";
@@ -20,6 +20,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+	const [awaitingResponse, setAwaitingResponse] = useState(false);
 	const [sessionCollections, setSessionCollections] = useState<string[]>([]);
 	const [sessionReasoningEffort, setSessionReasoningEffort] = useState("off");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -41,13 +42,28 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
   // 订阅一次即覆盖全部会话:事件里带 threadId,store 会自行过滤。
   useEffect(() => {
     return onProtocolEvent((event) => {
-      useConversationStore.getState().applyEvent(event);
+		const activeThread = useConversationStore.getState().conversationId;
+		const belongsToActiveThread =
+			!event.threadId || !activeThread || event.threadId === activeThread;
+		useConversationStore.getState().applyEvent(event);
+		if (!belongsToActiveThread) return;
+		const itemType = event.item?.type;
+		const responseStarted =
+			(event.kind === EventKind.EvItemDelta && Boolean(event.delta?.text)) ||
+			(event.kind === EventKind.EvItemStarted && Boolean(event.item) &&
+				itemType !== ItemType.ItemUserMessage &&
+				itemType !== ItemType.ItemAgentMessage &&
+				itemType !== ItemType.ItemReasoning) ||
+			(event.kind === EventKind.EvItemCompleted && itemType !== ItemType.ItemUserMessage) ||
+			event.kind === EventKind.EvApprovalNeeded;
+		if (responseStarted) setAwaitingResponse(false);
       if (
         event.kind === "turn.completed" ||
         event.kind === "turn.aborted" ||
         event.kind === "stream.error"
       ) {
         setSending(false);
+			setAwaitingResponse(false);
         options.onTurnFinished?.();
       }
     });
@@ -61,7 +77,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
     if (!stickToBottom.current) return;
     const node = scrollRef.current;
     if (node) node.scrollTop = node.scrollHeight;
-  }, [store.items, store.buffers]);
+  }, [awaitingResponse, store.items, store.buffers]);
 
   const acknowledgeScroll = useCallback(() => {
     const node = scrollRef.current;
@@ -77,6 +93,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
 		setSessionCollections(thread.collections ?? []);
 		setSessionReasoningEffort(thread.reasoningEffort || "off");
       setSending(false);
+		setAwaitingResponse(false);
       stickToBottom.current = true;
     } catch (err) {
       useConversationStore.getState().setError(errorText(err));
@@ -89,6 +106,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
 		setSessionCollections([]);
 		setSessionReasoningEffort("off");
     setSending(false);
+		setAwaitingResponse(false);
     stickToBottom.current = true;
   }, []);
 
@@ -113,6 +131,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
 		setSessionCollections(request.collections ?? []);
 		setSessionReasoningEffort(request.reasoningEffort ?? "off");
       setSending(true);
+		setAwaitingResponse(true);
       const current = useConversationStore.getState();
       try {
         let threadId = current.conversationId;
@@ -135,6 +154,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
         });
       } catch (err) {
         setSending(false);
+		setAwaitingResponse(false);
         useConversationStore.getState().setError(errorText(err));
         return;
       }
@@ -152,6 +172,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
       useConversationStore.getState().setError(errorText(err));
     } finally {
       setSending(false);
+		setAwaitingResponse(false);
     }
   }, []);
 
@@ -209,6 +230,7 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
 		sessionCollections,
 		sessionReasoningEffort,
     sending,
+		awaitingResponse,
     hasContent,
     scrollRef,
     setInput,
