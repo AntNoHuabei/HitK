@@ -4,7 +4,7 @@
 // 上下文用量这类视图专用的类型。
 export type AgentMode = "work" | "coding";
 
-export type ApprovalPolicy = "auto" | "readOnly" | "manual";
+export type ApprovalPolicy = "auto" | "read-only" | "manual";
 
 export interface ConversationSummary {
   id: string;

@@ -8,7 +8,7 @@ import { optionKey } from "../controllers/useModelControls";
 
 const { Text } = Typography;
 const POLICY_OPTIONS = [
-  { value: "auto", label: "自动执行", icon: <ThunderboltOutlined /> },
+  { value: "auto", label: "完全放行", icon: <ThunderboltOutlined /> },
   { value: "manual", label: "手动确认", icon: <SafetyCertificateOutlined /> },
   { value: "read-only", label: "只读", icon: <EyeOutlined /> },
 ] as const;

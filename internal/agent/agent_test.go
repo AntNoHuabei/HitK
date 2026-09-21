@@ -529,6 +529,32 @@ func TestReadOnlyPolicyDeniesMutatingTool(t *testing.T) {
 	}
 }
 
+// TestAutoPolicyRunsMutatingToolWithoutApproval locks down the full-access
+// behavior: mutating tools execute immediately and no approval event is sent.
+func TestAutoPolicyRunsMutatingToolWithoutApproval(t *testing.T) {
+	h := newHarness(t, [][]provider.Chunk{
+		{
+			{Kind: provider.ChunkToolCall, Tool: &provider.ToolCallReq{
+				ID: "call_auto", Name: "echo", Arguments: `{}`,
+			}},
+			{Kind: provider.ChunkDone},
+		},
+		{
+			{Kind: provider.ChunkText, Text: "已完成。"},
+			{Kind: provider.ChunkDone},
+		},
+	})
+	h.echo.mutating = true
+
+	events := h.start(t, "直接执行写操作", protocol.ApprovalAuto)
+	if h.echo.runCount() != 1 {
+		t.Fatalf("mutating tool ran %d times under auto policy, want 1", h.echo.runCount())
+	}
+	if hasKind(events, protocol.EvApprovalNeeded) {
+		t.Fatal("auto policy emitted an approval request")
+	}
+}
+
 // TestApprovalFlowBlocksUntilAnswered drives the consent path: the tool must not
 // run until the UI answers, then it must run when approved.
 func TestApprovalFlowBlocksUntilAnswered(t *testing.T) {

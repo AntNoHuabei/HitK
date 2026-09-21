@@ -773,9 +773,9 @@ func (a *Agent) runTool(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		KnowledgeBases: opCollections(op),
 	}
 	if tool.Mutating() {
-		// Read-only mode refuses mutating tools outright; otherwise consent is
-		// requested before the tool body runs.
-		if op.ApprovalPolicy() == protocol.ApprovalReadOnly {
+		policy := op.ApprovalPolicy()
+		// Read-only mode refuses mutating tools outright.
+		if policy == protocol.ApprovalReadOnly {
 			item.Status = protocol.StatusDenied
 			item.Tool.Success = false
 			item.Tool.Denied = true
@@ -783,23 +783,24 @@ func (a *Agent) runTool(ctx context.Context, h *turnHandle, thread *protocol.Thr
 			a.emitItem(protocol.EvItemCompleted, item)
 			return toolOutcome{item: item}
 		}
-		// The agent owns the consent gate rather than the tool, so a mutating
-		// tool can never change state before the user answers even if its own
-		// approval code is missing or wrong. Tools may still call Approve to
-		// show richer detail (a diff, a resolved path); that call reuses this
-		// answer instead of interrupting the user a second time.
-		tctx.Policy = protocol.ApprovalManual
-		tctx.Approver = a.approver(h, thread.ID, h.turnID, item.ID)
-		if err := a.requestConsent(ctx, h, thread.ID, h.turnID, item.ID, consentFor(tool, call)); err != nil {
-			// A refusal is a conversational outcome, not a crash: the model is
-			// told so it can propose something else.
-			item.Status = protocol.StatusDenied
-			item.Tool.Success = false
-			item.Tool.Denied = true
-			item.Tool.Result = err.Error()
-			item.Error = err.Error()
-			a.emitItem(protocol.EvItemCompleted, item)
-			return toolOutcome{item: item}
+		if policy == protocol.ApprovalManual {
+			// The agent owns the consent gate rather than the tool, so a mutating
+			// tool can never change state before the user answers even if its own
+			// approval code is missing or wrong. Tools may still call Approve to
+			// show richer detail; that call reuses this answer.
+			tctx.Policy = protocol.ApprovalManual
+			tctx.Approver = a.approver(h, thread.ID, h.turnID, item.ID)
+			if err := a.requestConsent(ctx, h, thread.ID, h.turnID, item.ID, consentFor(tool, call)); err != nil {
+				// A refusal is a conversational outcome, not a crash: the model is
+				// told so it can propose something else.
+				item.Status = protocol.StatusDenied
+				item.Tool.Success = false
+				item.Tool.Denied = true
+				item.Tool.Result = err.Error()
+				item.Error = err.Error()
+				a.emitItem(protocol.EvItemCompleted, item)
+				return toolOutcome{item: item}
+			}
 		}
 	} else {
 		tctx.Policy = protocol.ApprovalAuto
