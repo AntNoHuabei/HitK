@@ -13,6 +13,7 @@ import { ConversationViewport } from "../features/chat/components/ConversationVi
 import { useChatRuntime } from "../features/chat/controllers/useChatRuntime";
 import { optionKey, useModelControls } from "../features/chat/controllers/useModelControls";
 import { useShellStore } from "../features/shell/shellStore";
+import { SplitView } from "../shared/components/SplitView";
 
 const QUICK_PROMPTS = [
   "把知识库里跟这个主题相关的资料整理成一份摘要",
@@ -137,8 +138,10 @@ export default function ChatView() {
 	}, []);
 
   return (
-    <div className={`hitk-chat hitk-chat-shell ${sidebarOpen ? "is-sidebar-open" : "is-sidebar-collapsed"}`}>
-      <ConversationSidebar
+    <SplitView
+      className={`hitk-chat hitk-chat-shell ${sidebarOpen ? "is-sidebar-open" : "is-sidebar-collapsed"}`}
+      mainClassName="hitk-chat-main-shell"
+      sidebar={<ConversationSidebar
         activeView="chat"
         mode={mode}
         sending={runtime.sending}
@@ -149,8 +152,8 @@ export default function ChatView() {
         onNewChat={requestNewChat}
         onOpenConversation={requestOpenConversation}
         onDeleteConversation={(id) => void runtime.deleteConversation(id)}
-      />
-      <Flex vertical className="hitk-chat-main-shell" style={{ minWidth: 0, minHeight: 0 }}>
+      />}
+    >
         <Flex vertical className="hitk-chat-main" style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
           <ConversationViewport
             items={runtime.items}
@@ -202,7 +205,6 @@ export default function ChatView() {
             onStop={runtime.stop}
           />
         </Flex>
-      </Flex>
-    </div>
+    </SplitView>
   );
 }

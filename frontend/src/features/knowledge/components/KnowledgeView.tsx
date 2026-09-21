@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { App as AntApp, Button, Segmented, Tooltip, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { errorText } from "../../../shared/repositories";
+import { SplitView } from "../../../shared/components/SplitView";
 import { useKnowledgeStore } from "../model/knowledgeStore";
 import { CollectionPanel } from "./CollectionPanel";
 import { DocumentPanel } from "./DocumentPanel";
@@ -43,8 +44,10 @@ export function KnowledgeView() {
   const active = collections.find((collection) => collection.id === activeId) ?? null;
 
   return (
-    <div className="hitk-kb">
-      <CollectionPanel
+    <SplitView
+      className="hitk-kb"
+      mainClassName="hitk-kb-main"
+      sidebar={<CollectionPanel
         collections={collections}
         activeId={activeId}
         onSelect={(id) => void useKnowledgeStore.getState().selectCollection(id)}
@@ -54,9 +57,8 @@ export function KnowledgeView() {
         }}
         onUpdate={useKnowledgeStore.getState().updateCollection}
         onDelete={useKnowledgeStore.getState().deleteCollection}
-      />
-
-      <div className="hitk-kb-main">
+      />}
+    >
         <div className="hitk-kb-head">
           <div className="hitk-kb-head-text">
             <h2 className="hitk-kb-title">{active?.name ?? "知识库"}</h2>
@@ -138,8 +140,7 @@ export function KnowledgeView() {
             onSearch={(next) => void useKnowledgeStore.getState().search(next)}
           />
         )}
-      </div>
-    </div>
+    </SplitView>
   );
 }
 

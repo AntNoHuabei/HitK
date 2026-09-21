@@ -1,6 +1,7 @@
 .task
 .smoke/
 .workbuddy/
+.idea/
 bin
 frontend/dist
 frontend/node_modules
