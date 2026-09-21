@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "HitK",
+			"FileDescription": "HitK - Agentic Search Knowledge Base",
+			"LegalCopyright": "© 2026 HitK",
+			"ProductName": "HitK",
+			"Comments": "This is a comment"
+		}
+	}
+}

@@ -1,0 +1,294 @@
+.hitk-permission-trigger.ant-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 150px;
+  color: var(--hitk-text-secondary);
+  font-size: 12px;
+}
+
+.hitk-permission-trigger.mode-full { color: #d46b08; }
+.hitk-permission-trigger.mode-auto { color: #1677ff; }
+.hitk-permission-trigger.mode-ask { color: var(--hitk-text-secondary); }
+
+.hitk-permission-panel {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hitk-permission-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--hitk-chat-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hitk-permission-option:hover,
+.hitk-permission-option.is-active {
+  border-color: var(--hitk-chat-border);
+  background: var(--hitk-hover-bg);
+}
+
+.hitk-permission-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.hitk-permission-option-title { font-size: 13px; font-weight: 600; }
+.hitk-permission-option-note { color: var(--hitk-text-secondary); font-size: 11px; line-height: 1.45; }
+
+.hitk-permission-modal {
+  --hitk-approval-surface: #0b0c0a;
+  --hitk-approval-surface-raised: #12130f;
+  --hitk-approval-border: #34362f;
+  --hitk-approval-border-strong: #55584d;
+  --hitk-approval-text: #f0eee7;
+  --hitk-approval-muted: #999c91;
+  --hitk-approval-signal: #ffb800;
+  --hitk-approval-font: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.hitk-permission-modal .ant-modal-content,
+.hitk-permission-modal .ant-modal-container {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--hitk-approval-border-strong);
+  border-radius: 0;
+  color: var(--hitk-approval-text);
+  background: var(--hitk-approval-surface);
+  box-shadow: none;
+  font-family: var(--hitk-approval-font);
+}
+
+.hitk-permission-modal .ant-modal-header {
+  margin: 0;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--hitk-approval-border);
+  border-radius: 0;
+  color: var(--hitk-approval-text);
+  background: transparent;
+  font-family: var(--hitk-approval-font);
+}
+
+.hitk-permission-modal .ant-modal-title {
+  color: inherit;
+  font-family: inherit;
+}
+
+.hitk-permission-dialog-heading {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.hitk-permission-dialog-heading-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.25;
+}
+
+.hitk-permission-dialog-heading-copy strong {
+  overflow-wrap: anywhere;
+  color: var(--hitk-approval-text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hitk-permission-dialog-eyebrow {
+  color: var(--hitk-approval-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.hitk-permission-dialog-icon {
+  color: var(--hitk-approval-signal);
+  font-size: 20px;
+}
+
+.hitk-permission-dialog-risk {
+  padding: 3px 6px;
+  border: 1px solid var(--hitk-approval-signal);
+  border-radius: 0;
+  color: var(--hitk-approval-signal);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hitk-permission-modal .ant-modal-body {
+  padding: 18px 20px 16px;
+}
+
+.hitk-permission-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--hitk-approval-text);
+  font-family: var(--hitk-approval-font);
+}
+
+.hitk-permission-dialog-details {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--hitk-approval-border);
+}
+
+.hitk-permission-dialog-details > div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  min-width: 0;
+  border-bottom: 1px solid var(--hitk-approval-border);
+}
+
+.hitk-permission-dialog-details dt,
+.hitk-permission-dialog-details dd {
+  min-width: 0;
+  margin: 0;
+  padding: 9px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.hitk-permission-dialog-details dt {
+  border-right: 1px solid var(--hitk-approval-border);
+  color: var(--hitk-approval-muted);
+}
+
+.hitk-permission-dialog-details dd {
+  color: var(--hitk-approval-text);
+  font-weight: 600;
+}
+
+.hitk-permission-dialog-details dd.is-outside-workspace {
+  color: var(--hitk-approval-signal);
+  background: color-mix(in srgb, var(--hitk-approval-signal) 8%, transparent);
+}
+
+.hitk-permission-dialog-target {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.hitk-permission-dialog-expiry {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--hitk-approval-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hitk-permission-modal .ant-modal-footer {
+  margin: 0;
+  padding: 0 20px 20px;
+}
+
+.hitk-permission-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.hitk-permission-dialog-actions .ant-btn {
+  min-width: 76px;
+  height: 34px;
+  padding-inline: 13px;
+  border: 1px solid var(--hitk-approval-border-strong);
+  border-radius: 0;
+  color: var(--hitk-approval-text);
+  background: var(--hitk-approval-surface-raised);
+  box-shadow: none;
+  font-family: var(--hitk-approval-font);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hitk-permission-dialog-actions .ant-btn:hover:not(:disabled),
+.hitk-permission-dialog-actions .ant-btn:focus-visible:not(:disabled) {
+  border-color: var(--hitk-approval-signal);
+  color: var(--hitk-approval-signal);
+  background: var(--hitk-approval-surface-raised);
+}
+
+.hitk-permission-dialog-actions .ant-btn-primary,
+.hitk-permission-dialog-actions .ant-btn-primary:hover:not(:disabled),
+.hitk-permission-dialog-actions .ant-btn-primary:focus-visible:not(:disabled) {
+  border-color: var(--hitk-approval-signal);
+  color: #0b0c0a;
+  background: var(--hitk-approval-signal);
+}
+
+.hitk-permission-dialog-actions .ant-btn:focus-visible {
+  outline: 1px solid var(--hitk-approval-signal);
+  outline-offset: 2px;
+}
+
+.hitk-permission-dialog-actions .ant-btn:disabled {
+  border-color: var(--hitk-approval-border);
+  color: #6f7169;
+  background: var(--hitk-approval-surface);
+}
+
+@media (max-width: 560px) {
+.hitk-permission-modal .ant-modal {
+    width: calc(100vw - 20px) !important;
+    max-width: 468px;
+  }
+
+  .hitk-permission-dialog-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .hitk-permission-dialog-actions .ant-btn {
+    min-width: 0;
+    padding-inline: 6px;
+  }
+}
+
+@media (max-width: 380px) {
+.hitk-permission-dialog-heading {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .hitk-permission-dialog-risk {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .hitk-permission-modal .ant-modal-header,
+  .hitk-permission-modal .ant-modal-body {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .hitk-permission-modal .ant-modal-footer {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .hitk-permission-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+}

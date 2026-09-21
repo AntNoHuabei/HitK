@@ -1,0 +1,291 @@
+/* 知识库页面样式。
+ *
+ * 布局沿用外壳的 feature-layer(整块覆盖在对话区之上),所以这里只负责
+ * 「左集合 + 右内容」这一层。颜色全部走主题变量,换皮肤时无需改这里。
+ */
+
+.hitk-kb {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ---------- 左:集合列表 ---------- */
+
+.hitk-kb-collections {
+  display: flex;
+  flex: 0 0 232px;
+  min-height: 0;
+  flex-direction: column;
+  padding: 14px 12px;
+  border-right: 1px solid var(--hitk-divider, #dfe3e8);
+  background: var(--hitk-header-bg, #fff);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.hitk-kb-collections-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 10px;
+}
+
+.hitk-kb-collections-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--hitk-muted, #667085);
+}
+
+.hitk-kb-collection-list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.hitk-kb-collection {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--hitk-control-radius, 8px);
+  color: var(--hitk-text, #1f2329);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.hitk-kb-collection:hover {
+  background: var(--hitk-hover-bg, #f3f4f6);
+}
+
+.hitk-kb-collection.is-active {
+  border-color: color-mix(in srgb, var(--hitk-signal, #1677ff) 26%, transparent);
+  background: var(--hitk-selected-bg, #e8edf3);
+  color: var(--hitk-selected-text, #172033);
+}
+
+.hitk-kb-collection-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.hitk-kb-collection-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.hitk-kb-collection-name {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-kb-collection-meta {
+  display: block;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--hitk-muted, #667085);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 右:内容区 ---------- */
+
+.hitk-kb-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.hitk-kb-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px 12px;
+}
+
+.hitk-kb-head-text {
+  min-width: 0;
+}
+
+.hitk-kb-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--hitk-text, #1f2329);
+}
+
+.hitk-kb-subtitle {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--hitk-muted, #667085);
+}
+
+.hitk-kb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px 14px;
+}
+
+.hitk-kb-body {
+  min-height: 0;
+  flex: 1;
+  padding: 0 24px 22px;
+  overflow-y: auto;
+}
+
+.hitk-kb-searchbar {
+  display: flex;
+  gap: 8px;
+  padding: 0 24px 14px;
+}
+
+/* ---------- 文档 ---------- */
+
+.hitk-kb-doc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--hitk-divider, #dfe3e8);
+  border-radius: var(--hitk-control-radius, 8px);
+  margin-bottom: 6px;
+  background: var(--hitk-header-bg, #fff);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.hitk-kb-doc:hover {
+  border-color: color-mix(in srgb, var(--hitk-signal, #1677ff) 30%, transparent);
+}
+
+.hitk-kb-doc-icon {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--hitk-signal, #1677ff);
+  background: var(--hitk-inset-bg, #f6f8fa);
+}
+
+.hitk-kb-doc-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.hitk-kb-doc-title {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--hitk-text, #1f2329);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-kb-doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--hitk-muted, #667085);
+}
+
+.hitk-kb-doc-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+/* ---------- 检索结果 ---------- */
+
+.hitk-kb-hit {
+  padding: 12px 14px;
+  border: 1px solid var(--hitk-divider, #dfe3e8);
+  border-radius: var(--hitk-control-radius, 8px);
+  margin-bottom: 8px;
+  background: var(--hitk-header-bg, #fff);
+}
+
+.hitk-kb-hit-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.hitk-kb-hit-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hitk-text, #1f2329);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-kb-hit-heading {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--hitk-signal, #1677ff);
+  background: var(--hitk-selected-bg, #e8edf3);
+}
+
+.hitk-kb-hit-score {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hitk-muted, #667085);
+}
+
+.hitk-kb-hit-snippet {
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--hitk-text, #1f2329);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hitk-kb-hit-source {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--hitk-muted, #667085);
+  word-break: break-all;
+}
+
+/* ---------- 空态 ---------- */
+
+.hitk-kb-empty {
+  display: grid;
+  height: 100%;
+  min-height: 220px;
+  place-items: center;
+  text-align: center;
+}

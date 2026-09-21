@@ -1,0 +1,95 @@
+/* HitK 自有样式:引用溯源与代码块。
+ *
+ * 对话区的其余排版沿用 chat.css(主题化变量层),这里只补 BlankMind 没有的
+ * 两类内容 —— 知识库引用与带复制栏的代码块。 */
+
+/* 引用溯源:回答下方的依据列表。
+   没有它,「有依据的回答」和「模型编的」在界面上长得一模一样。 */
+.hitk-chat-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+
+.hitk-chat-refs-label {
+  flex: 0 0 auto;
+  color: var(--hitk-chat-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.hitk-chat-ref {
+  display: inline-flex;
+  max-width: 260px;
+  height: 22px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: var(--hitk-control-radius, 6px);
+  color: var(--hitk-chat-muted);
+  background: var(--hitk-chat-surface-2);
+  font-size: 11px;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.hitk-chat-ref:hover,
+.hitk-chat-ref:focus-visible {
+  border-color: var(--hitk-chat-signal);
+  color: var(--hitk-chat-text);
+}
+
+.hitk-chat-ref-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hitk-chat-ref-score {
+  flex: 0 0 auto;
+  color: var(--hitk-chat-muted);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+/* 代码块:顶部一条语言/操作栏,内容区跟随主题。 */
+.hitk-chat-code-block {
+  position: relative;
+  margin: 10px 0;
+  overflow: hidden;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: var(--hitk-control-radius, 6px);
+}
+
+.hitk-chat-code-block > pre {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.hitk-chat-code-actions {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 10px;
+  border-bottom: 1px solid var(--hitk-chat-border);
+  color: var(--hitk-chat-muted);
+  background: var(--hitk-chat-surface-2);
+  font-size: 10px;
+}
+
+.hitk-chat-code-actions .ant-btn {
+  border: 0 !important;
+  color: var(--hitk-chat-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-code-actions .ant-btn:hover {
+  color: var(--hitk-chat-text) !important;
+}

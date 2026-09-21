@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=HitK
+Comment=HitK - Agentic Search Knowledge Base
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/hitk.exe %u
+Terminal=false
+Type=Application
+Icon=hitk.exe
+Categories=Utility;
+StartupWMClass=hitk.exe
+
+ 

@@ -1,0 +1,1837 @@
+/* ChatView 消息区 Markdown 渲染样式(跟随皮肤 CSS 变量) */
+.hitk-md {
+  font-size: 14px;
+  line-height: 1.7;
+  color: inherit;
+  word-break: break-word;
+}
+
+.hitk-md > *:first-child {
+  margin-top: 0;
+}
+
+.hitk-md > *:last-child {
+  margin-bottom: 0;
+}
+
+.hitk-md p {
+  margin: 6px 0;
+}
+
+.hitk-md h1,
+.hitk-md h2,
+.hitk-md h3,
+.hitk-md h4 {
+  margin: 14px 0 8px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.hitk-md h1 {
+  font-size: 1.35em;
+}
+.hitk-md h2 {
+  font-size: 1.2em;
+}
+.hitk-md h3 {
+  font-size: 1.08em;
+}
+
+.hitk-md ul,
+.hitk-md ol {
+  margin: 6px 0;
+  padding-left: 22px;
+}
+
+.hitk-md li {
+  margin: 3px 0;
+}
+
+.hitk-md code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--hitk-code-bg, var(--hitk-inset-bg));
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.hitk-md pre {
+  background: var(--hitk-code-bg, var(--hitk-inset-bg));
+  border: 1px solid var(--hitk-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.hitk-md pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+.hitk-md blockquote {
+  margin: 8px 0;
+  padding: 2px 12px;
+  border-left: 3px solid var(--hitk-border);
+  color: var(--hitk-text-secondary, inherit);
+  opacity: 0.9;
+}
+
+.hitk-md a {
+  color: var(--hitk-link, #1677ff);
+}
+
+.hitk-md table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  width: 100%;
+  font-size: 0.92em;
+}
+
+.hitk-md th,
+.hitk-md td {
+  border: 1px solid var(--hitk-border);
+  padding: 5px 10px;
+  text-align: left;
+}
+
+.hitk-md th {
+  background: var(--hitk-inset-bg);
+}
+
+.hitk-md hr {
+  border: none;
+  border-top: 1px solid var(--hitk-border);
+  margin: 12px 0;
+}
+
+.hitk-md img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+/* 流式输出光标 */
+.hitk-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  opacity: 0.7;
+  animation: hitk-blink 0.9s steps(2, start) infinite;
+}
+
+.hitk-chat-history-list {
+  min-height: 0;
+  overflow: visible;
+}
+
+.hitk-chat-history-list .ant-btn {
+  color: var(--hitk-text-secondary, inherit);
+}
+
+.hitk-chat-history-list .ant-btn:hover,
+.hitk-chat-history-list .ant-btn.is-active {
+  color: inherit;
+  background: var(--hitk-inset-bg);
+}
+
+.hitk-chat-history-item-label {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  gap: 7px;
+}
+
+.hitk-chat-history-item-label > svg {
+  flex: 0 0 auto;
+  font-size: 13px;
+}
+
+.hitk-chat-history-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes hitk-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.hitk-agent-process {
+  margin: 8px 0 4px;
+  color: var(--hitk-text-secondary, inherit);
+}
+
+.hitk-agent-status {
+  min-height: 28px;
+  font-size: 13px;
+}
+
+.hitk-agent-detail {
+  margin: 3px 0 3px 20px;
+  font-size: 13px;
+}
+
+.hitk-agent-detail summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.hitk-agent-detail summary::-webkit-details-marker {
+  display: none;
+}
+
+.hitk-agent-detail summary::after {
+  content: '›';
+  margin-left: 2px;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+}
+
+.hitk-agent-detail[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.hitk-agent-reasoning,
+.hitk-tool-detail {
+  margin: 3px 0 7px 20px;
+  padding-left: 10px;
+  border-left: 2px solid var(--hitk-border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+.hitk-tool-status {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.hitk-tool-detail code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+}
+
+.hitk-tool-detail pre {
+  max-height: 180px;
+  margin: 6px 0 0;
+  overflow: auto;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+/* Final theme-aware overrides. Keep these last so legacy chat rules cannot
+   override the active skin or the current conversation layout. */
+.hitk-chat {
+  --hitk-chat-content-width: 800px;
+  --hitk-chat-inline-gutter: 18px;
+  --hitk-chat-composer-radius: 18px;
+  --hitk-chat-bg: var(--hitk-content-bg, #f5f6f8);
+  --hitk-chat-surface: var(--hitk-header-bg, #fff);
+  --hitk-chat-surface-2: var(--hitk-inset-bg, #f6f8fa);
+  --hitk-chat-border: var(--hitk-divider, #dfe3e8);
+  --hitk-chat-sidebar: var(--hitk-header-bg, #fff);
+  --hitk-chat-hover: var(--hitk-hover-bg, #f3f4f6);
+  --hitk-chat-selected: var(--hitk-selected-bg, #e8edf3);
+  --hitk-chat-selected-text: var(--hitk-selected-text, #172033);
+  --hitk-chat-text: var(--hitk-text, #1f2329);
+  --hitk-chat-muted: var(--hitk-muted, #667085);
+  --hitk-chat-signal: var(--hitk-signal, #1677ff);
+  --hitk-chat-radius: var(--hitk-control-radius, 8px);
+  color: var(--hitk-chat-text);
+  background: var(--hitk-chat-bg) !important;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.hitk-chat .ant-typography {
+  color: var(--hitk-chat-text);
+  font-family: inherit;
+}
+
+.hitk-chat .ant-typography-secondary {
+  color: var(--hitk-chat-muted) !important;
+}
+
+.hitk-chat-main {
+  min-width: 0;
+  min-height: 0;
+}
+
+.hitk-chat-history-list {
+  padding-top: 2px;
+  overflow: visible;
+}
+
+.hitk-chat-run-error {
+  width: min(680px, 100%);
+  margin: 8px 0 14px;
+  padding: 9px 0 9px 13px;
+  border-left: 3px solid var(--ant-color-error, #d4380d);
+  color: var(--hitk-chat-text);
+}
+
+.hitk-chat-run-error-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ant-color-error, #d4380d);
+  font-size: 14px;
+}
+
+.hitk-chat-run-error-description {
+  margin-top: 4px;
+  color: var(--hitk-chat-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.hitk-chat-run-error-detail {
+  margin-top: 5px;
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+}
+
+.hitk-chat-run-error-detail summary {
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hitk-chat-run-error-detail pre {
+  max-width: 100%;
+  margin: 7px 0 0;
+  padding: 9px 11px;
+  overflow-x: auto;
+  border: 1px solid var(--hitk-border);
+  border-radius: 4px;
+  background: var(--hitk-chat-code-bg, var(--hitk-chat-hover));
+  color: var(--hitk-chat-text);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hitk-chat-history-list .ant-btn {
+  background: transparent !important;
+}
+
+.hitk-chat-history-item-label {
+  color: inherit;
+  font-size: 12px;
+}
+
+.hitk-chat-messages {
+  background: var(--hitk-chat-bg);
+  scrollbar-gutter: stable both-edges;
+}
+
+.hitk-chat-message-track {
+  width: min(
+    var(--hitk-chat-content-width),
+    calc(100% - var(--hitk-chat-inline-gutter) - var(--hitk-chat-inline-gutter))
+  );
+  margin: 0 auto;
+  max-width: none !important;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 36px 0 44px !important;
+}
+
+.hitk-chat-user-message {
+  max-width: 78%;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--hitk-chat-border) 72%, transparent);
+  border-radius: 14px;
+  color: var(--hitk-chat-selected-text);
+  background: var(--hitk-chat-selected);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hitk-chat-user-message-text {
+  white-space: pre-wrap;
+}
+
+.hitk-chat-attachment-strip {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.hitk-chat-user-message .hitk-chat-attachment-strip {
+  padding: 0 0 8px;
+}
+
+.hitk-chat-user-message .hitk-chat-attachment-strip:only-child {
+  padding-bottom: 0;
+}
+
+.hitk-chat-attachment {
+  position: relative;
+  display: flex;
+  width: 116px;
+  height: 54px;
+  flex: 0 0 116px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  overflow: hidden;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: 6px;
+  color: var(--hitk-chat-text);
+  font-size: 11px;
+}
+
+.hitk-chat-attachment > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.hitk-chat-attachment .ant-image,
+.hitk-chat-attachment .ant-image-img {
+  display: block;
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 6px;
+}
+
+.hitk-chat-attachment .ant-image-img {
+  border: 1px solid color-mix(in srgb, var(--hitk-chat-border) 76%, transparent);
+  object-fit: cover;
+}
+
+.hitk-chat-attachment-remove.ant-btn {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 2;
+  width: 20px !important;
+  min-width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  color: var(--hitk-chat-muted) !important;
+  background: var(--hitk-chat-surface) !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-attachment-remove.ant-btn:hover,
+.hitk-chat-attachment-remove.ant-btn:focus-visible {
+  border: 0 !important;
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-attachment-warning {
+  padding: 7px 14px 0;
+  color: var(--ant-color-error, #d4380d);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Composer attachment/menu surfaces intentionally share the existing theme
+   variables so they remain quiet operational controls in every theme. */
+.hitk-chat-composer-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px 0;
+}
+
+.hitk-chat-composer-context .ant-tag {
+  display: inline-flex;
+  max-width: 220px;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  overflow: hidden;
+  border-color: var(--hitk-chat-border);
+  border-radius: 5px;
+  color: var(--hitk-chat-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-chat-add-trigger.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: 50%;
+}
+
+.hitk-chat-attach-popover .ant-popover-inner {
+  width: 260px;
+  padding: 8px !important;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: 8px !important;
+  opacity: 1 !important;
+  background: var(--hitk-header-bg, #ffffff) !important;
+  box-shadow: 0 14px 32px rgb(18 28 32 / 16%) !important;
+}
+
+.hitk-chat-attach-popover,
+.hitk-chat-model-popover { z-index: 3000 !important; }
+
+.hitk-chat-attach-popover .ant-popover-content,
+.hitk-chat-attach-popover .ant-popover-inner-content { opacity: 1 !important; }
+
+.hitk-chat-attach-panel .ant-btn { justify-content: flex-start; }
+.hitk-chat-attach-panel .ant-btn:hover { background: var(--hitk-chat-hover) !important; }
+.hitk-chat-attach-panel .ant-divider { margin: 8px 0; }
+.hitk-chat-attach-heading { display: block; padding: 0 8px 6px; font-size: 12px; }
+.hitk-chat-collection-list { display: flex; max-height: 220px; flex-direction: column; gap: 3px; overflow: auto; padding: 0 8px 4px; }
+.hitk-chat-collection-list .ant-checkbox-wrapper { display: flex; min-width: 0; align-items: center; }
+.hitk-chat-collection-count { margin-left: auto; color: var(--hitk-chat-muted); font-size: 11px; }
+
+.hitk-chat-composer-shell .hitk-chat-configure-model.ant-btn {
+  height: 28px;
+  padding: 0 8px !important;
+  border: 1px solid var(--hitk-chat-border) !important;
+  border-radius: 4px !important;
+  color: var(--hitk-chat-signal) !important;
+  background: transparent !important;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.hitk-chat-composer-shell .hitk-chat-configure-model.ant-btn:hover,
+.hitk-chat-composer-shell .hitk-chat-configure-model.ant-btn:focus-visible {
+  border-color: var(--hitk-chat-signal) !important;
+  color: var(--hitk-chat-surface) !important;
+  background: var(--hitk-chat-signal) !important;
+}
+
+.hitk-artifact-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.hitk-artifact-card { overflow: hidden; border: 1px solid var(--hitk-chat-border); border-radius: 6px; background: var(--hitk-chat-surface); }
+.hitk-artifact-heading { display: flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 8px; font-size: 12px; }
+.hitk-artifact-heading > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hitk-artifact-heading .ant-typography { margin-left: auto; font-size: 11px; }
+.hitk-artifact-preview { max-height: 280px; overflow: auto; border-top: 1px solid var(--hitk-chat-border); padding: 8px; }
+.hitk-artifact-preview pre { margin: 0; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+
+.hitk-chat-assistant-message {
+  margin: 6px 0 14px;
+}
+
+.hitk-plan-message {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--hitk-chat-border);
+  border-left: 3px solid var(--hitk-chat-signal);
+  border-radius: var(--hitk-chat-radius);
+  background: var(--hitk-chat-surface);
+  cursor: pointer;
+}
+
+.hitk-plan-message:focus-visible {
+  outline: 2px solid var(--hitk-chat-signal);
+  outline-offset: 2px;
+}
+
+.hitk-plan-message.is-completed,
+.hitk-plan-message.is-revised,
+.hitk-plan-message.is-abandoned {
+  border-left-color: var(--hitk-chat-muted);
+}
+
+.hitk-plan-message-header,
+.hitk-plan-message-header > div,
+.hitk-plan-actions,
+.hitk-plan-execution-event {
+  display: flex;
+  align-items: center;
+}
+
+.hitk-plan-message-header {
+  min-width: 0;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.hitk-plan-message-header > div {
+  gap: 9px;
+}
+
+.hitk-plan-message-header > .ant-typography {
+  max-width: 48%;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-plan-header-tools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.hitk-plan-header-tools > .ant-typography {
+  max-width: 260px;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-plan-title {
+  display: block;
+  margin: 2px 0 7px;
+  font-size: 15px;
+}
+
+.hitk-plan-summary {
+  position: relative;
+  display: -webkit-box;
+  max-height: 4.8em;
+  overflow: hidden;
+  color: var(--hitk-chat-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.hitk-plan-status {
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.hitk-plan-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.hitk-plan-revise {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.hitk-plan-preview-body { justify-content: flex-start; background: var(--hitk-header-bg, #fff); }
+.hitk-plan-preview-markdown { width: 100%; }
+.hitk-preview-footer .hitk-plan-actions,
+.hitk-preview-footer .hitk-plan-revise { margin-top: 0; }
+
+.hitk-plan-execution-event {
+  gap: 7px;
+  margin: 5px 0 10px;
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+}
+
+.hitk-chat-response-meta {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--hitk-chat-muted);
+}
+
+.hitk-chat-response-stats {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 13px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.hitk-chat-response-stats > span {
+  cursor: default;
+  white-space: nowrap;
+}
+
+.hitk-chat-response-model {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.hitk-chat-response-tooltip {
+  white-space: pre-line;
+}
+
+.hitk-chat-copy-button.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: var(--hitk-chat-radius) !important;
+  color: var(--hitk-chat-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-copy-button.ant-btn:hover,
+.hitk-chat-copy-button.ant-btn:focus-visible {
+  border: 0 !important;
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-messages.is-empty > .ant-flex {
+  justify-content: center;
+}
+
+.hitk-chat-empty-state {
+  position: relative;
+  width: min(760px, 100%);
+  padding: 72px 0 12px 36px;
+}
+
+.hitk-chat-empty-state::before {
+  position: absolute;
+  top: 76px;
+  left: 0;
+  width: 3px;
+  height: 84px;
+  background: var(--hitk-chat-signal);
+  content: '';
+}
+
+.hitk-chat-empty-intro {
+  padding: 0;
+}
+
+.hitk-chat-empty-title {
+  margin: 0 0 12px !important;
+  color: var(--hitk-chat-text) !important;
+  font-size: 36px !important;
+  font-weight: 650 !important;
+  line-height: 1.15 !important;
+}
+
+.hitk-chat-empty-copy {
+  display: block;
+  max-width: 600px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.hitk-chat-quick-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.hitk-chat-quick-item {
+  display: flex !important;
+  width: auto;
+  min-height: 42px;
+  align-items: center;
+  gap: 12px;
+  padding-inline: 16px !important;
+  border: 1px solid var(--hitk-chat-border) !important;
+  border-radius: 2px !important;
+  color: var(--hitk-chat-text) !important;
+  background: transparent !important;
+  text-align: left;
+}
+
+.hitk-chat-quick-item:hover,
+.hitk-chat-quick-item:focus-visible {
+  color: var(--hitk-chat-selected-text) !important;
+  background: var(--hitk-chat-hover) !important;
+  border-color: var(--hitk-chat-signal) !important;
+}
+
+.hitk-chat-quick-arrow {
+  margin-left: 2px;
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+}
+
+.hitk-chat-quick-item:hover .hitk-chat-quick-arrow,
+.hitk-chat-quick-item:focus-visible .hitk-chat-quick-arrow {
+  color: var(--hitk-chat-signal);
+}
+
+.hitk-chat-composer {
+  padding: 12px 0 18px !important;
+  background: var(--hitk-chat-bg) !important;
+}
+
+.hitk-chat-composer-track {
+  width: min(
+    var(--hitk-chat-content-width),
+    calc(100% - var(--hitk-chat-inline-gutter) - var(--hitk-chat-inline-gutter))
+  );
+  margin: 0 auto;
+}
+
+.hitk-chat-composer-shell {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--hitk-chat-border) !important;
+  border-radius: var(--hitk-chat-composer-radius) !important;
+  background: var(--hitk-chat-surface) !important;
+  box-shadow: none !important;
+}
+
+/* An unconfigured installation has one actionable control: model setup.
+   Keep the composer compact and do not render a disabled send affordance. */
+.hitk-chat-composer-shell.is-model-unconfigured {
+  border-color: color-mix(in srgb, var(--hitk-chat-border) 88%, var(--hitk-chat-signal)) !important;
+}
+
+.hitk-chat-composer-shell:focus-within {
+  border-color: var(--hitk-chat-signal) !important;
+}
+
+.hitk-chat-composer-shell .ant-input,
+.hitk-chat-composer-shell .ant-input-textarea,
+.hitk-chat-composer-shell textarea {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: var(--hitk-chat-text) !important;
+  background: transparent !important;
+  font-family: inherit !important;
+}
+
+.hitk-chat-composer-shell .ant-input-textarea-focused,
+.hitk-chat-composer-shell .ant-input:focus,
+.hitk-chat-composer-shell .ant-input-focused {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-composer-shell textarea::placeholder {
+  color: var(--hitk-chat-muted) !important;
+}
+
+.hitk-chat-composer-shell .ant-btn {
+  border-color: transparent !important;
+  color: var(--hitk-chat-muted);
+  font-family: inherit;
+}
+
+.hitk-chat-composer-shell .ant-btn:hover,
+.hitk-chat-composer-shell .ant-btn:focus-visible {
+  color: var(--hitk-chat-signal) !important;
+  background: var(--hitk-chat-surface-2) !important;
+}
+
+.hitk-chat-composer-shell .ant-btn-primary {
+  border-color: var(--hitk-chat-signal) !important;
+  color: var(--hitk-chat-surface) !important;
+  background: var(--hitk-chat-signal) !important;
+}
+
+.hitk-chat-send-btn.ant-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 !important;
+  flex: 0 0 30px;
+  box-shadow: none !important;
+}
+
+/* 生成中的停止按钮: 反色圆钮 + 表面色方块 (发送/停止共用按钮位) */
+
+.ant-btn.hitk-stop-btn {
+  border: 0 !important;
+  color: var(--hitk-header-bg, #fff) !important;
+  background: var(--hitk-text, #1f2329) !important;
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--hitk-text, #1f2329) 30%, transparent);
+}
+
+.hitk-stop-btn-glyph {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2.5px;
+  background: currentColor;
+  transition: transform 140ms ease;
+}
+
+.hitk-chat-command-menu {
+  display: grid;
+  gap: 2px;
+  margin: 6px 10px 0;
+  padding: 4px;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: 8px;
+  background: var(--hitk-chat-surface-2);
+}
+
+.hitk-chat-command-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--hitk-chat-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.hitk-chat-command-item:hover,
+.hitk-chat-command-item.is-active {
+  background: var(--hitk-chat-hover);
+}
+
+.hitk-chat-command-item:disabled {
+  color: var(--hitk-chat-muted);
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.hitk-chat-command-icon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--hitk-chat-signal);
+}
+
+.hitk-chat-command-item strong,
+.hitk-chat-command-item small {
+  display: block;
+}
+
+.hitk-chat-command-item strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.hitk-chat-command-item small {
+  margin-top: 1px;
+  color: var(--hitk-chat-muted);
+  font-size: 11px;
+}
+
+.ant-btn.hitk-stop-btn:focus-visible {
+  outline: 2px solid var(--hitk-signal, #1677ff);
+  outline-offset: 2px;
+}
+
+.hitk-chat-composer-shell .ant-select,
+.hitk-chat-composer-shell .ant-select-selector {
+  color: var(--hitk-chat-muted) !important;
+  background: transparent !important;
+  font-family: inherit !important;
+}
+
+.hitk-chat-composer-shell .ant-select-selector {
+  border: 0 !important;
+}
+
+.hitk-chat-composer-shell .ant-select-selection-item,
+.hitk-chat-composer-shell .ant-select-arrow {
+  color: var(--hitk-chat-muted) !important;
+}
+
+.hitk-chat-composer-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 7px 7px;
+}
+
+.hitk-chat-composer-actions-left,
+.hitk-chat-composer-actions-right {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+}
+
+.hitk-chat-composer-actions-right {
+  max-width: 100%;
+  overflow: hidden;
+  margin-left: auto;
+}
+
+.hitk-chat-policy-trigger.ant-btn {
+  height: 28px;
+  gap: 5px;
+  padding: 0 6px !important;
+  border-radius: 4px !important;
+  color: var(--hitk-chat-muted) !important;
+  background: transparent !important;
+  font-size: 12px;
+}
+
+.hitk-chat-policy-trigger.ant-btn:hover,
+.hitk-chat-policy-trigger.ant-btn:focus-visible {
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+}
+
+.hitk-chat-policy-trigger.ant-btn .anticon {
+  font-size: 13px;
+}
+
+.hitk-chat-policy-popover {
+  z-index: 3000 !important;
+}
+
+.hitk-chat-policy-popover .ant-popover-inner {
+  width: 176px;
+  padding: 5px !important;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: 6px !important;
+  background: var(--hitk-header-bg, #fff) !important;
+  box-shadow: 0 6px 18px rgb(18 28 32 / 10%) !important;
+}
+
+.hitk-chat-policy-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hitk-chat-policy-option {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 32px;
+  grid-template-columns: 18px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  color: var(--hitk-chat-text);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hitk-chat-policy-option:hover,
+.hitk-chat-policy-option:focus-visible {
+  outline: none;
+  background: var(--hitk-chat-hover);
+}
+
+.hitk-chat-policy-option.is-selected {
+  background: var(--hitk-chat-surface-2);
+  font-weight: 600;
+}
+
+.hitk-chat-policy-option.is-selected::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 2px;
+  background: var(--hitk-chat-signal, #002fa7);
+  content: "";
+}
+
+.hitk-chat-policy-option-icon,
+.hitk-chat-policy-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+}
+
+.hitk-chat-policy-option.is-selected .hitk-chat-policy-option-icon,
+.hitk-chat-policy-option-check {
+  color: var(--hitk-chat-signal, #002fa7);
+}
+
+.hitk-chat-active-mode.ant-btn {
+  height: 32px;
+  gap: 6px;
+  padding-inline: 9px !important;
+  border-radius: 16px;
+  color: var(--hitk-chat-muted) !important;
+  background: var(--hitk-chat-hover) !important;
+}
+
+.hitk-chat-active-mode-icon {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+}
+
+.hitk-chat-active-mode-icon .anticon { grid-area: 1 / 1; }
+.hitk-chat-active-mode-icon .is-close { display: none; }
+.hitk-chat-active-mode:hover .is-idle,
+.hitk-chat-active-mode:focus-visible .is-idle { display: none; }
+.hitk-chat-active-mode:hover .is-close,
+.hitk-chat-active-mode:focus-visible .is-close { display: inline-flex; }
+
+.hitk-chat-workspace-trigger.ant-btn {
+  display: flex;
+  min-width: 0;
+  max-width: min(220px, 34vw);
+  height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px !important;
+  color: var(--hitk-chat-muted) !important;
+}
+
+.hitk-chat-workspace-trigger.ant-btn > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-chat-workspace-popover .ant-popover-inner {
+  width: min(380px, calc(100vw - 32px));
+  padding: 10px !important;
+  border: 1px solid var(--hitk-divider, #dfe3e8);
+  border-radius: var(--hitk-control-radius, 8px) !important;
+  background: var(--hitk-header-bg, #fff) !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-workspace-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--hitk-text, #1f2329);
+}
+
+.hitk-chat-workspace-panel > .ant-input-affix-wrapper {
+  border-color: var(--hitk-divider, #dfe3e8) !important;
+  background: var(--hitk-inset-bg, #f6f8fa) !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-workspace-options {
+  display: flex;
+  max-height: 250px;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.hitk-chat-workspace-option {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 4px 5px 7px;
+  border-radius: var(--hitk-control-radius, 8px);
+  cursor: pointer;
+}
+
+.hitk-chat-workspace-option:hover,
+.hitk-chat-workspace-option:focus-visible,
+.hitk-chat-workspace-option.is-current {
+  background: var(--hitk-hover-bg, #f2f4f7);
+}
+
+.hitk-chat-workspace-option-icon {
+  flex: 0 0 auto;
+  color: var(--hitk-muted, #667085);
+  font-size: 19px;
+}
+
+.hitk-chat-workspace-option-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hitk-chat-workspace-option-name {
+  overflow: hidden;
+  color: var(--hitk-text, #1f2329);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-chat-workspace-option-path {
+  overflow: hidden;
+  color: var(--hitk-muted, #667085);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-chat-workspace-option-check {
+  flex: 0 0 auto;
+  color: var(--hitk-signal, #1677ff);
+  font-size: 15px;
+}
+
+.hitk-chat-workspace-option-remove.ant-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0 !important;
+  color: var(--hitk-muted, #667085) !important;
+  opacity: 0;
+}
+
+.hitk-chat-workspace-option:hover .hitk-chat-workspace-option-remove.ant-btn,
+.hitk-chat-workspace-option:focus-within .hitk-chat-workspace-option-remove.ant-btn {
+  opacity: 1;
+}
+
+.hitk-chat-workspace-option-remove.ant-btn:hover,
+.hitk-chat-workspace-option-remove.ant-btn:focus-visible {
+  color: var(--hitk-signal, #1677ff) !important;
+  background: var(--hitk-hover-bg, #f2f4f7) !important;
+}
+
+.hitk-chat-workspace-empty {
+  padding: 10px 8px;
+  font-size: 12px;
+}
+
+.hitk-chat-workspace-divider {
+  height: 1px;
+  background: var(--hitk-divider, #dfe3e8);
+}
+
+.hitk-chat-workspace-action.ant-btn {
+  justify-content: flex-start;
+  width: 100%;
+  height: 34px;
+  padding-inline: 7px !important;
+  color: var(--hitk-text, #1f2329) !important;
+  text-align: left;
+}
+
+.hitk-chat-workspace-action.ant-btn:disabled {
+  color: var(--hitk-muted, #667085) !important;
+}
+
+.hitk-chat-model-trigger.ant-btn {
+  display: flex;
+  max-width: min(240px, 34vw);
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px !important;
+  border: 1px solid var(--hitk-chat-border) !important;
+  border-radius: 4px !important;
+  color: var(--hitk-chat-muted) !important;
+  background: var(--hitk-chat-surface-2) !important;
+}
+
+.hitk-chat-model-trigger.ant-btn:hover,
+.hitk-chat-model-trigger.ant-btn:focus-visible {
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+}
+
+.hitk-chat-model-trigger-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hitk-chat-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-chat-context-meter {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+}
+
+.hitk-chat-context-meter .ant-progress-circle-trail {
+  stroke: var(--hitk-chat-border) !important;
+}
+
+.hitk-chat-context-meter .ant-progress-circle-path {
+  stroke: var(--hitk-chat-signal) !important;
+}
+
+.hitk-chat-model-trigger-reasoning {
+  flex: 0 0 auto;
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+}
+
+.hitk-chat-model-trigger-chevron {
+  flex: 0 0 auto;
+  color: var(--hitk-chat-muted);
+  font-size: 9px;
+}
+
+.hitk-chat-model-popover .ant-popover-inner {
+  width: 292px;
+  padding: 10px !important;
+  border: 1px solid var(--hitk-divider, #dfe3e8);
+  border-radius: var(--hitk-control-radius, 8px) !important;
+  background: var(--hitk-header-bg, #fff) !important;
+  box-shadow: none !important;
+}
+
+.hitk-chat-model-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--hitk-text, #1f2329);
+}
+
+.hitk-chat-model-panel-label {
+  color: var(--hitk-text, #1f2329);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.hitk-chat-model-panel-divider {
+  height: 1px;
+  margin: 4px 0 2px;
+  background: var(--hitk-divider, #dfe3e8);
+}
+
+/* App shell: the chat owns its navigation so the conversation area remains
+   visually continuous when the sidebar is collapsed. */
+.hitk-chat-shell {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--hitk-chat-sidebar) !important;
+  transition: background-color 160ms ease;
+}
+
+.hitk-chat-app-sidebar {
+  display: flex;
+  flex: 0 0 252px;
+  box-sizing: border-box;
+  flex-direction: column;
+  width: 252px;
+  min-width: 252px;
+  padding: 18px 12px 12px;
+  overflow: hidden;
+  border-right: 0;
+  background: var(--hitk-chat-sidebar) !important;
+  transition:
+    width 180ms ease,
+    flex-basis 180ms ease,
+    min-width 180ms ease,
+    padding 180ms ease,
+    opacity 140ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.is-sidebar-collapsed .hitk-chat-app-sidebar {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+  padding-inline: 0;
+  border-right-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hitk-chat-new-session {
+  flex: 0 0 auto;
+}
+
+.hitk-chat-profile-trigger.ant-btn {
+  display: flex;
+  width: fit-content;
+  min-width: 92px;
+  height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding-inline: 12px !important;
+  color: var(--hitk-chat-text) !important;
+  font-size: 18px;
+  border-radius: 8px;
+}
+
+.hitk-chat-profile-trigger:hover,
+.hitk-chat-profile-trigger:focus-visible { background: var(--hitk-chat-hover) !important; }
+
+.hitk-chat-profile-option {
+  display: flex;
+  min-width: 230px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 4px 2px;
+}
+
+.hitk-chat-profile-option > span:first-child { display: grid; gap: 2px; }
+.hitk-chat-profile-option strong { color: var(--hitk-chat-text); font-size: 14px; }
+.hitk-chat-profile-option small { color: var(--hitk-chat-muted); font-size: 12px; }
+
+.hitk-chat-new-session:hover,
+.hitk-chat-new-session:focus-visible {
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+}
+
+.hitk-chat-sidebar-scroll {
+  min-height: 0;
+  flex: 1;
+  margin-top: 3px;
+  padding-top: 0;
+  overflow-y: auto;
+  border-top: 0.5px solid transparent;
+  box-shadow: none !important;
+  scrollbar-color: var(--hitk-chat-border) transparent;
+  scrollbar-width: thin;
+  transition: border-color 120ms ease;
+}
+
+.hitk-chat-sidebar-scroll.is-scrolled {
+  border-top-color: color-mix(in srgb, var(--hitk-chat-border) 62%, transparent);
+}
+
+.hitk-chat-app-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 12px;
+}
+
+.hitk-chat-new-session,
+.hitk-chat-app-nav .ant-btn,
+.hitk-chat-workspace-item,
+.hitk-chat-sidebar-footer .ant-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding-inline: 10px;
+  border: 0 !important;
+  color: var(--hitk-chat-muted);
+  font-size: 13px;
+  text-align: left;
+}
+
+.hitk-chat-new-session .anticon,
+.hitk-chat-app-nav .ant-btn .anticon,
+.hitk-chat-workspace-item .anticon,
+.hitk-chat-sidebar-footer .anticon {
+  font-size: 15px;
+}
+
+.hitk-chat-nav-count {
+  min-width: 18px;
+  margin-left: auto;
+  color: var(--hitk-chat-muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+.hitk-chat-app-nav .ant-btn:hover,
+.hitk-chat-app-nav .ant-btn:focus-visible,
+.hitk-chat-sidebar-footer .ant-btn:hover,
+.hitk-chat-sidebar-footer .ant-btn:focus-visible {
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+}
+
+.hitk-chat-workspace-item {
+  cursor: pointer;
+}
+
+.hitk-chat-workspace-chevron {
+  color: var(--hitk-chat-muted);
+  font-size: 10px !important;
+  transition: transform 160ms ease;
+}
+
+.hitk-chat-workspace-item[aria-expanded='true'] .hitk-chat-workspace-chevron {
+  transform: rotate(90deg);
+}
+
+.hitk-chat-workspace-item:hover,
+.hitk-chat-workspace-item:focus-visible {
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+}
+
+.hitk-chat-app-nav .ant-btn.is-active,
+.hitk-chat-sidebar-footer .ant-btn.is-active {
+  color: var(--hitk-chat-selected-text) !important;
+  background: var(--hitk-chat-selected) !important;
+  font-weight: 600;
+  box-shadow: none !important;
+}
+
+.hitk-chat-app-nav .ant-btn.is-active .anticon,
+.hitk-chat-sidebar-footer .ant-btn.is-active .anticon {
+  color: var(--hitk-chat-signal);
+}
+
+.hitk-chat-workspace-list {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 10px;
+}
+
+.hitk-chat-sidebar-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 5px;
+  color: var(--hitk-chat-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hitk-chat-history-list {
+  margin-left: 26px;
+  padding: 3px 0;
+  overflow: visible;
+}
+
+.hitk-chat-history-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  min-height: 34px;
+  margin: 1px 0;
+  border-radius: var(--hitk-chat-radius);
+}
+
+.hitk-chat-history-item.is-active {
+  background: var(--hitk-chat-selected);
+}
+
+.hitk-chat-history-open.ant-btn {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 34px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 0 !important;
+  color: var(--hitk-chat-muted);
+  text-align: left;
+}
+
+.hitk-chat-history-open.ant-btn:hover,
+.hitk-chat-history-open.ant-btn:focus-visible {
+  color: var(--hitk-chat-text) !important;
+  background: transparent !important;
+}
+
+.hitk-chat-history-item.is-active .hitk-chat-history-open {
+  color: var(--hitk-chat-selected-text) !important;
+  font-weight: 600;
+  box-shadow: none !important;
+}
+
+.hitk-chat-history-item.is-active .hitk-chat-history-open .anticon {
+  color: var(--hitk-chat-signal);
+}
+
+.hitk-chat-history-delete.ant-btn {
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0 !important;
+  color: var(--hitk-chat-muted);
+  background: transparent !important;
+}
+
+.hitk-chat-history-delete.ant-btn:hover,
+.hitk-chat-history-delete.ant-btn:focus-visible {
+  color: var(--hitk-chat-text) !important;
+  background: var(--hitk-chat-hover) !important;
+}
+
+.hitk-chat-history-item-label {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.hitk-chat-history-item-label > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-chat-empty-history {
+  display: block;
+  padding: 9px 8px;
+  font-size: 12px;
+}
+
+.hitk-chat-sidebar-footer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: row;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 0.5px solid color-mix(in srgb, var(--hitk-chat-border) 62%, transparent);
+}
+
+.hitk-chat-sidebar-footer .ant-btn {
+  flex: 1 1 0;
+  justify-content: center;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding-inline: 8px;
+}
+
+.hitk-theme-panel {
+  width: 176px;
+  max-height: min(420px, calc(100vh - 96px));
+  overflow-y: auto;
+  scrollbar-color: var(--hitk-border) transparent;
+  scrollbar-width: thin;
+}
+
+.hitk-theme-panel-title {
+  padding: 0 8px 5px;
+  font-size: 12px;
+}
+
+.hitk-theme-option {
+  justify-content: flex-start;
+  width: 100%;
+  height: 34px;
+  padding-inline: 8px !important;
+  border: 0 !important;
+}
+
+.hitk-theme-option:hover,
+.hitk-theme-option:focus-visible {
+  background: var(--hitk-hover-bg) !important;
+}
+
+.hitk-theme-option.is-active {
+  color: var(--hitk-selected-text) !important;
+  background: var(--hitk-selected-bg) !important;
+  font-weight: 600;
+}
+
+.hitk-theme-swatch {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 3px !important;
+}
+
+.hitk-theme-swatch > span {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50% !important;
+}
+
+.hitk-theme-option-label {
+  flex: 1;
+  text-align: left;
+}
+
+.hitk-theme-option-check {
+  color: var(--hitk-signal);
+  font-size: 13px;
+}
+
+.hitk-chat-main-shell {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-top-left-radius: 18px;
+  background: var(--hitk-chat-bg);
+}
+
+@media (max-width: 680px) {
+.hitk-chat-app-sidebar {
+    flex-basis: 220px;
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .hitk-chat-empty-title {
+    font-size: 30px !important;
+  }
+}
+
+@media (max-width: 560px) {
+.hitk-chat {
+    --hitk-chat-inline-gutter: 10px;
+  }
+
+  .hitk-chat-app-sidebar {
+    flex-basis: 196px;
+    width: 196px;
+    min-width: 196px;
+    padding-inline: 8px;
+  }
+
+  .hitk-chat-message-track {
+    padding: 22px 0 28px !important;
+  }
+
+  .hitk-chat-composer {
+    padding: 10px 0 12px !important;
+  }
+
+  .hitk-chat-model-trigger.ant-btn {
+    max-width: 34vw;
+  }
+
+  .hitk-plan-message {
+    padding: 12px;
+  }
+
+  .hitk-plan-message-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .hitk-plan-message-header > .ant-typography {
+    max-width: 100%;
+  }
+
+  .hitk-chat-policy-trigger.ant-btn span:last-child {
+    display: none;
+  }
+}
+
+.hitk-chat-model-list {
+  max-height: 248px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.hitk-chat-model-group + .hitk-chat-model-group {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--hitk-divider, #dfe3e8);
+}
+
+.hitk-chat-model-provider {
+  display: block;
+  padding: 2px 7px 4px;
+  color: var(--hitk-muted, #667085);
+  font-size: 11px;
+}
+
+.hitk-chat-model-option {
+  display: grid;
+  width: 100%;
+  min-height: 32px;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--hitk-text, #1f2329);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hitk-chat-model-option > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-chat-model-option:hover,
+.hitk-chat-model-option:focus-visible {
+  outline: 0;
+  background: var(--hitk-hover-bg, #f3f4f6);
+}
+
+.hitk-chat-model-option.is-selected {
+  color: var(--hitk-selected-text, #172033);
+  background: var(--hitk-selected-bg, #e8edf3);
+  font-weight: 600;
+}
+
+.hitk-chat-model-option .anticon {
+  color: var(--hitk-signal, #1677ff);
+}
+
+.hitk-chat-reasoning-control {
+  min-height: 28px;
+}

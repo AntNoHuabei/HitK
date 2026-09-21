@@ -1,0 +1,228 @@
+.hitk-window-shell {
+  --hitk-shell-hairline: color-mix(
+    in srgb,
+    var(--hitk-divider, #dfe3e8) 48%,
+    transparent
+  );
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--hitk-text, #1f2329);
+  background: var(--hitk-app-bg, #f5f6f8);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.hitk-window-titlebar {
+  display: flex;
+  flex: 0 0 40px;
+  box-sizing: border-box;
+  align-items: stretch;
+  border-bottom: 0;
+  background: var(--hitk-header-bg, #fff);
+  user-select: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.hitk-window-title-actions,
+.hitk-window-controls {
+  display: flex;
+  align-items: center;
+}
+
+.hitk-window-title-actions {
+  padding-left: 6px;
+  --wails-draggable: no-drag;
+}
+
+.hitk-window-title-actions .ant-btn,
+.hitk-window-controls .ant-btn {
+  display: grid;
+  width: 42px;
+  height: 39px;
+  padding: 0;
+  place-items: center;
+  appearance: none;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  color: var(--hitk-text, #1f2329);
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.hitk-window-title-actions .ant-btn:hover,
+.hitk-window-title-actions .ant-btn:active {
+  border: 0 !important;
+  outline: 0 !important;
+  color: var(--hitk-text, #1f2329) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hitk-window-title-actions .ant-btn .ant-btn-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.hitk-window-title-actions .ant-btn:hover .ant-btn-icon {
+  background: var(--hitk-hover-bg, #f3f4f6);
+}
+
+.hitk-window-title-actions .ant-btn:active .ant-btn-icon {
+  background: var(--hitk-selected-bg, #e8edf3);
+}
+
+.hitk-window-controls .ant-btn:hover,
+.hitk-window-controls .ant-btn:active {
+  border: 0 !important;
+  outline: 0 !important;
+  color: var(--hitk-text, #1f2329) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hitk-window-controls .ant-btn .ant-btn-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.hitk-window-controls .ant-btn:hover .ant-btn-icon {
+  background: var(--hitk-hover-bg, #f3f4f6);
+}
+
+.hitk-window-controls .ant-btn:active .ant-btn-icon {
+  background: var(--hitk-selected-bg, #e8edf3);
+}
+
+.hitk-window-controls .ant-btn:focus-visible {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hitk-window-controls .ant-btn:focus-visible .ant-btn-icon {
+  background: var(--hitk-hover-bg, #f3f4f6);
+  box-shadow: inset 0 0 0 1px var(--hitk-signal, #1677ff);
+}
+
+.hitk-window-title-actions .ant-btn:focus-visible {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.hitk-window-title-actions .ant-btn:focus-visible .ant-btn-icon {
+  background: var(--hitk-hover-bg, #f3f4f6);
+  box-shadow: inset 0 0 0 1px var(--hitk-signal, #1677ff);
+}
+
+.hitk-window-title-name {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hitk-window-title-drag {
+  flex: 1;
+  min-width: 40px;
+  --wails-draggable: drag;
+  --wails-non-client-region: caption;
+}
+
+.hitk-window-controls {
+  --wails-draggable: no-drag;
+}
+
+.hitk-window-controls .is-close:hover,
+.hitk-window-controls .is-close:active {
+  color: #fff !important;
+  background: transparent !important;
+}
+
+.hitk-window-controls .is-close:hover .ant-btn-icon,
+.hitk-window-controls .is-close:active .ant-btn-icon {
+  background: #c42b1c;
+}
+
+.hitk-window-body {
+  min-height: 0;
+  flex: 1;
+}
+
+.hitk-app-shell,
+.hitk-shell-viewport,
+.hitk-shell-primary,
+.hitk-shell-chat-layer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.hitk-shell-viewport { display: flex; }
+.hitk-shell-primary { flex: 1; }
+.hitk-shell-chat-layer { display: flex; }
+
+.hitk-shell-feature-layer {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-top-left-radius: 18px;
+  color: var(--hitk-text, #1f2329);
+  background: var(--hitk-content-bg, #f5f6f8);
+  transition: left 180ms ease;
+}
+
+.hitk-shell-feature-layer.is-sidebar-open {
+  left: 252px;
+}
+
+.hitk-feature-header {
+  display: flex;
+  flex: 0 0 56px;
+  align-items: center;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--hitk-divider, #dfe3e8);
+  background: var(--hitk-content-bg, #f5f6f8);
+}
+
+.hitk-feature-header .ant-typography {
+  font-size: 14px;
+}
+
+.hitk-feature-content {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  background: var(--hitk-content-bg, #f5f6f8);
+}
+
+@media (max-width: 720px) {
+.hitk-shell-feature-layer.is-sidebar-open {
+    left: min(252px, 72vw);
+  }
+}
