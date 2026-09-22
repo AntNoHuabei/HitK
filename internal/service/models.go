@@ -120,6 +120,7 @@ type ModelOptionView struct {
 	Model        string   `json:"model"`
 	Label        string   `json:"label"`
 	Vision       bool     `json:"vision,omitempty"`
+	Tools        bool     `json:"tools,omitempty"`
 	Reasoning    []string `json:"reasoning,omitempty"`
 	Context      int      `json:"context,omitempty"`
 }
@@ -580,10 +581,14 @@ func (s *ModelService) ModelOptions() []ModelOptionView {
 		meta, _ := vc.Meta()
 		name := firstNonEmpty(vc.Name, meta.Label, vc.ID)
 		for _, m := range vc.EnabledModels {
+			if preset, ok := provider.ModelPresetByID(vc.ID, m.ID); ok && !m.Custom {
+				m.Reasoning, m.Vision, m.Tools, m.Context = preset.Reasoning, preset.Vision, preset.Tools, preset.Context
+				m.Label = firstNonEmpty(preset.Label, m.Label)
+			}
 			out = append(out, ModelOptionView{
 				Provider: vc.ID, ProviderName: name,
 				Model: m.ID, Label: firstNonEmpty(m.Label, m.ID),
-				Vision: m.Vision, Context: m.Context, Reasoning: reasoningOptions(vc.ID, m),
+				Vision: m.Vision, Tools: m.Tools, Context: m.Context, Reasoning: reasoningOptions(vc.ID, m),
 			})
 		}
 	}

@@ -152,6 +152,7 @@ type Item struct {
 	Error       string         `json:"error,omitempty"`
 	Attachments []Attachment   `json:"attachments,omitempty"`
 	Artifacts   []Artifact     `json:"artifacts,omitempty"`
+	Usage       *Usage         `json:"usage,omitempty"`
 	Meta        map[string]any `json:"meta,omitempty"`
 }
 
@@ -186,12 +187,15 @@ type Delta struct {
 
 // Usage reports token accounting for a turn or a single model call.
 type Usage struct {
-	InputTokens  int `json:"inputTokens"`
-	OutputTokens int `json:"outputTokens"`
-	CachedTokens int `json:"cachedTokens,omitempty"`
-	TotalTokens  int `json:"totalTokens"`
-	ContextLimit int `json:"contextLimit,omitempty"`
-	Steps        int `json:"steps,omitempty"`
+	InputTokens      int     `json:"inputTokens"`
+	OutputTokens     int     `json:"outputTokens"`
+	CachedTokens     int     `json:"cachedTokens,omitempty"`
+	TotalTokens      int     `json:"totalTokens"`
+	ContextLimit     int     `json:"contextLimit,omitempty"`
+	Steps            int     `json:"steps,omitempty"`
+	CacheHitRatio    float64 `json:"cacheHitRatio,omitempty"`
+	PromptPrefixHash string  `json:"promptPrefixHash,omitempty"`
+	DynamicTokens    int     `json:"dynamicTokens,omitempty"`
 }
 
 // ApprovalRequest blocks a tool call until the client answers with an

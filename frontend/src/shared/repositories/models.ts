@@ -167,6 +167,7 @@ export const modelRepository = {
       model: option.model,
       label: option.label,
       vision: option.vision ?? false,
+		tools: option.tools ?? false,
 		reasoning: list(option.reasoning),
       context: option.context ?? 0,
     })),

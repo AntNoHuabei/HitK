@@ -61,7 +61,7 @@ export function ConversationMessages({ items, buffers, running, modelLabel, usag
           buffers={buffers}
           streaming={running && item.status === ItemStatus.StatusInProgress}
           modelLabel={modelLabel}
-          usage={usage}
+          usage={item.usage ?? (index === lastAssistantIndex ? usage : null)}
           refs={index === lastAssistantIndex ? refs : []}
         />
       ))}
@@ -277,6 +277,7 @@ function ResponseMeta({ body, model, usage }: { body: string; model: string; usa
           <>
             <span>输入 {usage.inputTokens.toLocaleString()}</span>
             <span>输出 {usage.outputTokens.toLocaleString()}</span>
+            {usage.cachedTokens ? <Tooltip title={`前缀 ${usage.promptPrefixHash || "未记录"}`}><span>缓存 {usage.cachedTokens.toLocaleString()} ({Math.round((usage.cacheHitRatio ?? 0) * 100)}%)</span></Tooltip> : null}
             {usage.steps ? <span>{usage.steps} 步</span> : null}
           </>
         )}

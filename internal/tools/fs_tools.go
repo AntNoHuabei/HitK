@@ -683,6 +683,14 @@ func previewDiff(abs, content string) string {
 	return makeDiff(firstRunes(string(prev), 1200), firstRunes(content, 1200))
 }
 
+func firstRunes(s string, n int) string {
+	runes := []rune(strings.TrimSpace(s))
+	if len(runes) <= n {
+		return string(runes)
+	}
+	return string(runes[:n]) + "…"
+}
+
 // makeDiff renders a compact unified-ish diff of two strings.
 func makeDiff(oldStr, newStr string) string {
 	oldLines := strings.Split(oldStr, "\n")

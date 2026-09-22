@@ -362,7 +362,12 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 	thread.Mode = mode
 	thread.Provider = provID
 	thread.Model = modelID
-	thread.Collections = opCollections(op)
+	collections := opCollections(op)
+	if len(collections) == 0 {
+		collections = append([]string(nil), thread.Collections...)
+	}
+	thread.Collections = collections
+	op.Collections = append([]string(nil), collections...)
 	thread.ReasoningEffort = op.ReasoningEffort
 	if err := a.sessions.Save(thread); err != nil {
 		a.emitError(thread.ID, h.turnID, fmt.Sprintf("会话保存失败：%v", err))
@@ -398,6 +403,11 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		}
 
 		schemas := a.registry.ForMode(mode)
+		if supports, known := a.providers.ModelSupportsTools(provID, modelID); known && !supports {
+			schemas = nil
+		}
+		system := a.systemPrompt(thread, mode, provID, modelID, op)
+		dynamicTokens := estimateMessages(messages)
 
 		// --- stream the model -------------------------------------------------
 		msgItem := &protocol.Item{
@@ -419,11 +429,13 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		msgStarted, reasonStarted := false, false
 
 		stream, err := providerClient.Stream(ctx, provider.ChatRequest{
-			Model:    modelID,
-			System:   a.systemPrompt(thread, mode, provID, modelID, op),
-			Messages: messages,
-			Tools:    schemas,
-			Metadata: reasoningMetadata(provID, op.ReasoningEffort),
+			Model:            modelID,
+			System:           system,
+			Messages:         messages,
+			Tools:            schemas,
+			Metadata:         reasoningMetadata(provID, op.ReasoningEffort),
+			PromptPrefixHash: promptPrefixHash(provID, modelID, mode),
+			DynamicTokens:    dynamicTokens,
 		})
 		if err != nil {
 			msgItem.Status = protocol.StatusFailed
@@ -463,7 +475,7 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 				}
 			case provider.ChunkUsage:
 				if chunk.Usage != nil {
-					stepUse = *chunk.Usage
+					mergeProviderUsage(&stepUse, *chunk.Usage)
 				}
 			case provider.ChunkError:
 				aborted = true
@@ -495,19 +507,24 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		if stepUse.InputTokens > 0 {
 			usage.InputTokens = stepUse.InputTokens
 		} else {
-			usage.InputTokens = estimateMessages(messages) + estimateTokens(a.systemPrompt(thread, mode, provID, modelID, op))
+			usage.InputTokens = dynamicTokens + estimateTokens(system)
 		}
 		if stepUse.OutputTokens > 0 {
 			usage.OutputTokens += stepUse.OutputTokens
 		} else {
 			usage.OutputTokens += estimateTokens(textBuf.String()) + estimateTokens(reasonBu.String())
 		}
-		if stepUse.CachedTokens > 0 {
+		if stepUse.InputTokens > 0 || stepUse.CachedTokens > 0 {
 			usage.CachedTokens = stepUse.CachedTokens
 		}
 		usage.Steps = step
 		usage.TotalTokens = usage.InputTokens + usage.OutputTokens
 		usage.ContextLimit = a.ctxLimit
+		usage.PromptPrefixHash = promptPrefixHash(provID, modelID, mode)
+		usage.DynamicTokens = dynamicTokens
+		if usage.InputTokens > 0 {
+			usage.CacheHitRatio = float64(usage.CachedTokens) / float64(usage.InputTokens)
+		}
 
 		if reasonStarted {
 			reasonItem.Reasoning = reasonBu.String()
@@ -582,6 +599,7 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		a.emitItem(protocol.EvItemCompleted, notice)
 	}
 
+	attachTurnUsage(thread, h.turnID, usage)
 	a.publishUsage(thread.ID, h.turnID, usage)
 	_ = a.sessions.Save(thread)
 
@@ -772,7 +790,7 @@ func (a *Agent) runTool(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		TurnID:         h.turnID,
 		KnowledgeBases: opCollections(op),
 	}
-	if tool.Mutating() {
+	if tools.MutatingCall(tool, json.RawMessage(call.Arguments)) {
 		policy := op.ApprovalPolicy()
 		// Read-only mode refuses mutating tools outright.
 		if policy == protocol.ApprovalReadOnly {
@@ -1018,23 +1036,11 @@ func (a *Agent) recordToolResult(thread *protocol.Thread, h *turnHandle, call pr
 // ---------------------------------------------------------------------------
 
 func (a *Agent) systemPrompt(thread *protocol.Thread, mode protocol.Mode, provID, modelID string, op protocol.Op) string {
-	var names []string
-	if a.kb != nil {
-		if cols, err := a.kb.Collections(); err == nil {
-			for _, c := range cols {
-				names = append(names, fmt.Sprintf("%s（%d 文档 / %d 分块）", c.Name, c.DocCount, c.ChunkCount))
-			}
-		}
-	}
-	return buildSystemPrompt(promptContext{
-		Mode:           mode,
-		Workspace:      a.Workspace(),
-		KnowledgeBases: opCollections(op),
-		Collections:    names,
-		Provider:       provID,
-		Model:          modelID,
-		Now:            time.Now(),
-	})
+	_ = thread
+	_ = provID
+	_ = modelID
+	_ = op
+	return buildSystemPrompt(promptContext{Mode: mode})
 }
 
 // ---------------------------------------------------------------------------
@@ -1129,6 +1135,33 @@ func joinInput(parts []protocol.InputPart) string {
 		}
 	}
 	return b.String()
+}
+
+func mergeProviderUsage(dst *provider.Usage, src provider.Usage) {
+	if src.InputTokens > 0 {
+		dst.InputTokens = src.InputTokens
+		dst.CachedTokens = src.CachedTokens
+	}
+	if src.OutputTokens > 0 {
+		dst.OutputTokens = src.OutputTokens
+	}
+	if src.CachedTokens > 0 {
+		dst.CachedTokens = src.CachedTokens
+	}
+	if src.TotalTokens > 0 {
+		dst.TotalTokens = src.TotalTokens
+	}
+}
+
+func attachTurnUsage(thread *protocol.Thread, turnID string, usage *protocol.Usage) {
+	for i := len(thread.Items) - 1; i >= 0; i-- {
+		item := thread.Items[i]
+		if item.TurnID == turnID && item.Type == protocol.ItemAgentMessage {
+			copy := *usage
+			item.Usage = &copy
+			return
+		}
+	}
 }
 
 func opCollections(op protocol.Op) []string {

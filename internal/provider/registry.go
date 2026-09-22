@@ -143,6 +143,25 @@ func (r *Registry) Config(id string) (VendorConfig, bool) {
 	return c, ok
 }
 
+// ModelSupportsTools reports a saved model capability. The second return value
+// is false when no authoritative saved model entry exists (for example a test
+// provider), so callers can preserve compatibility without guessing.
+func (r *Registry) ModelSupportsTools(providerID, modelID string) (bool, bool) {
+	c, ok := r.Config(providerID)
+	if !ok {
+		return false, false
+	}
+	for _, model := range c.EnabledModels {
+		if model.ID == modelID {
+			if preset, ok := ModelPresetByID(providerID, modelID); ok && !model.Custom {
+				return preset.Tools, true
+			}
+			return model.Tools, true
+		}
+	}
+	return false, false
+}
+
 // Configs returns a copy of every saved configuration.
 func (r *Registry) Configs() []VendorConfig {
 	r.mu.RLock()

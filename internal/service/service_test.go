@@ -186,15 +186,15 @@ func TestKnowledgeBaseRoundTrip(t *testing.T) {
 }
 
 // TestTurnRunsSearchToolEndToEnd drives a full turn through the service layer:
-// the model asks for kb_search, the real tool retrieves from the real index,
+// the model asks for the knowledge Skill, the real tool retrieves from the real index,
 // and the final answer is persisted to the thread.
 func TestTurnRunsSearchToolEndToEnd(t *testing.T) {
 	fake := &fakeProvider{steps: [][]provider.Chunk{
 		{
 			{Kind: provider.ChunkToolCall, Tool: &provider.ToolCallReq{
 				ID:        "call_search",
-				Name:      "kb_search",
-				Arguments: `{"queries":["退款政策","退货规则"],"limit":3}`,
+				Name:      "skill_run",
+				Arguments: `{"skill":"knowledge","command":"search","args":["--query","退款政策","--query","退货规则","--limit","3"]}`,
 			}},
 			{Kind: provider.ChunkUsage, Usage: &provider.Usage{InputTokens: 210, OutputTokens: 24}},
 			{Kind: provider.ChunkDone},
@@ -282,7 +282,7 @@ func TestTurnRunsSearchToolEndToEnd(t *testing.T) {
 		t.Errorf("tool call status = %q, want completed (result: %s)", toolItem.Status, toolItem.Tool.Result)
 	}
 	if toolItem.Tool == nil || !strings.Contains(toolItem.Tool.Result, "退款") {
-		t.Errorf("kb_search did not return the ingested text: %+v", toolItem.Tool)
+		t.Errorf("knowledge search did not return the ingested text: %+v", toolItem.Tool)
 	}
 	if answer == "" {
 		t.Fatal("the model's answer was not persisted")

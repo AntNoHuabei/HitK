@@ -22,6 +22,11 @@ func TestVolcenginePlanCatalogAndClient(t *testing.T) {
 	if meta.SupportsModelList {
 		t.Fatal("Agent Plan must not call its unsupported /models endpoint")
 	}
+	for _, model := range meta.Models {
+		if !model.Tools {
+			t.Fatalf("Agent Plan model %s must expose its verified tool capability", model.ID)
+		}
+	}
 
 	client, err := Build(VendorConfig{ID: meta.ID, APIKey: "test-key"})
 	if err != nil {

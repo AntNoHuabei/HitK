@@ -101,6 +101,10 @@ type ChatRequest struct {
 	// Metadata is passed through to the vendor when it supports it (OpenAI
 	// `user`, OpenRouter `transforms`, …). Unknown keys are ignored.
 	Metadata map[string]string
+	// Cache telemetry is internal request metadata. Adapters must not serialize
+	// these fields unless that vendor's cache contract is explicitly supported.
+	PromptPrefixHash string
+	DynamicTokens    int
 }
 
 // ChunkKind discriminates stream chunks.

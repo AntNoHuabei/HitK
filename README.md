@@ -15,9 +15,9 @@ HitK 走的是 Agentic Search：检索本身是**模型可以反复调用的工�
 ```
 用户提问
    ↓
-模型决定：先看看有哪些知识库         → kb_collections
-模型决定：用 3 个改写式检索          → kb_search（混合检索，带分数）
-模型决定：第 2 条命中可疑，展开上下文  → kb_open
+模型决定：先看看有哪些知识库         → skill_run knowledge collections
+模型决定：用 3 个改写式检索          → skill_run knowledge search（短证据）
+模型决定：第 2 条命中可疑，展开上下文  → skill_run knowledge open
 模型决定：信息够了，组织答案并标注来源
    ↓
 回答携带引用（标题 / 分块 / 可跳转原文）
@@ -170,10 +170,11 @@ features/chat/
 
 | 工具 | 说明 |
 | --- | --- |
-| `kb_collections` | 列出知识库及其文档数量（检索前先调用，避免空搜） |
-| `kb_search` | 混合检索（BM25 + 向量融合排序），支持一次传 2–4 个改写式 |
-| `kb_open` | 按 chunkId 展开上下文，或查看文档目录 |
-| `kb_add` | 把 URL 或纯文本写入知识库，写入即可检索 |
+| `skill_run` | 按需运行 Skill；知识库能力由 Cobra 的 `knowledge` 子命令承载 |
+| `knowledge collections` | 列出当前会话范围内知识库的必要摘要 |
+| `knowledge search` | 混合检索并返回有上限的短证据与引用 |
+| `knowledge open` | 按 chunkId 展开上下文，或查看文档目录 |
+| `knowledge add` | 把 URL 或纯文本写入当前会话允许的知识库 |
 | `fetch_url` | 抓取网页正文并转成可读文本 |
 | `todo_write` | 维护本轮任务清单，界面实时渲染进度 |
 | `read_file` / `list_dir` / `glob_find` / `grep_search` | 代码仓库导航 |

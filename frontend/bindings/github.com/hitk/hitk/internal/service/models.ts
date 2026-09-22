@@ -118,6 +118,7 @@ export interface ModelOptionView {
     "model": string;
     "label": string;
     "vision"?: boolean;
+    "tools"?: boolean;
     "reasoning"?: string[] | null;
     "context"?: number;
 }

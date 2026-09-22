@@ -96,6 +96,18 @@ type Tool interface {
 	Run(ctx *Context, args json.RawMessage) (Result, error)
 }
 
+type callMutationDetector interface {
+	MutatingCall(args json.RawMessage) bool
+}
+
+// MutatingCall reports whether one invocation can change external state.
+func MutatingCall(tool Tool, args json.RawMessage) bool {
+	if detector, ok := tool.(callMutationDetector); ok {
+		return detector.MutatingCall(args)
+	}
+	return tool.Mutating()
+}
+
 // Registry holds every known tool and resolves the surface for a mode.
 type Registry struct {
 	tools map[string]Tool
@@ -159,17 +171,12 @@ func (r *Registry) ForMode(mode protocol.Mode) []provider.ToolSchema {
 // skipped, so a partially wired build still starts.
 var toolSets = map[protocol.Mode][]string{
 	protocol.ModeWork: {
-		"kb_collections",
-		"kb_search",
-		"kb_open",
-		"kb_add",
+		"skill_run",
 		"fetch_url",
 		"todo_write",
 	},
 	protocol.ModeCoding: {
-		"kb_search",
-		"kb_open",
-		"kb_collections",
+		"skill_run",
 		"read_file",
 		"write_file",
 		"edit_file",
@@ -180,10 +187,7 @@ var toolSets = map[protocol.Mode][]string{
 		"todo_write",
 	},
 	protocol.ModeAuto: {
-		"kb_collections",
-		"kb_search",
-		"kb_open",
-		"kb_add",
+		"skill_run",
 		"fetch_url",
 		"read_file",
 		"write_file",
@@ -200,10 +204,7 @@ var toolSets = map[protocol.Mode][]string{
 func NewDefaultRegistry() *Registry {
 	r := NewRegistry()
 	r.Register(
-		&KBCollections{},
-		&KBSearch{},
-		&KBOpen{},
-		&KBAdd{},
+		&SkillRun{},
 		&FetchURL{},
 		&TodoWrite{},
 		&ReadFile{},

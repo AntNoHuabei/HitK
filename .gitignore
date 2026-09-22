@@ -3,6 +3,7 @@
 .workbuddy/
 .idea/
 bin
+wails_*.syso
 frontend/dist
 frontend/node_modules
 build/linux/appimage/build

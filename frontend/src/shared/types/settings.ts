@@ -78,7 +78,8 @@ export interface ModelOptionLite {
   model: string;
   label: string;
   vision: boolean;
-	/** Only adapter-verified effort values are exposed. */
+  tools: boolean;
+  /** Only adapter-verified effort values are exposed. */
 	reasoning: string[];
   context: number;
 }

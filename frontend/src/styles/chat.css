@@ -1837,9 +1837,29 @@
 }
 
 .hitk-chat-model-option > span:first-child {
+	min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.hitk-chat-model-option-main {
+	display: flex;
+	align-items: baseline;
+	gap: 7px;
+}
+
+.hitk-chat-model-option-main > span:first-child {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hitk-chat-model-capability {
+	flex: none;
+	color: var(--hitk-muted, #667085);
+	font-size: 10px;
+	font-weight: 400;
+	white-space: nowrap;
 }
 
 .hitk-chat-model-option:hover,

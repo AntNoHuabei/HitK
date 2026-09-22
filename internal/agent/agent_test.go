@@ -313,7 +313,7 @@ func TestTurnWithoutToolsIsCompleted(t *testing.T) {
 	h := newHarness(t, [][]provider.Chunk{{
 		{Kind: provider.ChunkText, Text: "这是"},
 		{Kind: provider.ChunkText, Text: "回答。"},
-		{Kind: provider.ChunkUsage, Usage: &provider.Usage{InputTokens: 120, OutputTokens: 8}},
+		{Kind: provider.ChunkUsage, Usage: &provider.Usage{InputTokens: 120, OutputTokens: 8, CachedTokens: 30}},
 		{Kind: provider.ChunkDone},
 	}})
 
@@ -360,6 +360,15 @@ func TestTurnWithoutToolsIsCompleted(t *testing.T) {
 	}
 	if deltas != 2 {
 		t.Errorf("expected 2 delta events, got %d", deltas)
+	}
+	var usage *protocol.Usage
+	for _, ev := range events {
+		if ev.Kind == protocol.EvTurnCompleted {
+			usage = ev.Usage
+		}
+	}
+	if usage == nil || usage.CacheHitRatio != 0.25 || usage.PromptPrefixHash == "" || usage.DynamicTokens == 0 {
+		t.Fatalf("missing cache telemetry: %+v", usage)
 	}
 }
 
@@ -418,6 +427,20 @@ func TestToolCallRoundTrip(t *testing.T) {
 	// The second request must contain the assistant tool call and the tool
 	// result, otherwise the provider cannot accept the conversation.
 	reqs := h.scripted.requests()
+	if len(reqs) != 2 {
+		t.Fatalf("provider requests = %d, want 2", len(reqs))
+	}
+	if reqs[0].System != reqs[1].System {
+		t.Fatal("system prompt changed across tool rounds")
+	}
+	firstTools, _ := json.Marshal(reqs[0].Tools)
+	secondTools, _ := json.Marshal(reqs[1].Tools)
+	if string(firstTools) != string(secondTools) {
+		t.Fatal("tool schema prefix changed across tool rounds")
+	}
+	if reqs[0].PromptPrefixHash == "" || reqs[0].PromptPrefixHash != reqs[1].PromptPrefixHash {
+		t.Fatal("prompt prefix hash is empty or unstable")
+	}
 	second := reqs[1]
 	var sawAssistantCall, sawToolResult bool
 	for _, m := range second.Messages {
@@ -441,6 +464,25 @@ func TestToolCallRoundTrip(t *testing.T) {
 	}
 }
 
+func TestModelWithoutToolCapabilityGetsNoToolSchemas(t *testing.T) {
+	h := newHarness(t, [][]provider.Chunk{{
+		{Kind: provider.ChunkText, Text: "普通回答"},
+		{Kind: provider.ChunkDone},
+	}})
+	h.agent.providers.SetOne(provider.VendorConfig{
+		ID: "scripted", Enabled: true,
+		EnabledModels: []provider.ModelRef{{ID: "test-model", Tools: false}},
+	})
+	h.start(t, "不要调用工具", protocol.ApprovalAuto)
+	reqs := h.scripted.requests()
+	if len(reqs) != 1 {
+		t.Fatalf("provider requests = %d, want 1", len(reqs))
+	}
+	if len(reqs[0].Tools) != 0 {
+		t.Fatalf("model without tool capability received %d tools", len(reqs[0].Tools))
+	}
+}
+
 // TestKnowledgeSearchProducesCitations verifies that the built-in retrieval tool
 // works through the loop and that its hits reach the UI as references.
 func TestKnowledgeSearchProducesCitations(t *testing.T) {
@@ -448,8 +490,8 @@ func TestKnowledgeSearchProducesCitations(t *testing.T) {
 		{
 			{Kind: provider.ChunkToolCall, Tool: &provider.ToolCallReq{
 				ID:        "call_kb",
-				Name:      "kb_search",
-				Arguments: `{"queries":["agent 协议 提交 事件"],"limit":5}`,
+				Name:      "skill_run",
+				Arguments: `{"skill":"knowledge","command":"search","args":["--query","agent 协议 提交 事件","--limit","5"]}`,
 			}},
 			{Kind: provider.ChunkDone},
 		},
@@ -464,28 +506,28 @@ func TestKnowledgeSearchProducesCitations(t *testing.T) {
 	var kbItem *protocol.Item
 	for _, ev := range events {
 		if ev.Item != nil && ev.Item.Type == protocol.ItemToolCall &&
-			ev.Item.Tool != nil && ev.Item.Tool.Name == "kb_search" &&
+			ev.Item.Tool != nil && ev.Item.Tool.Name == "skill_run" &&
 			ev.Kind == protocol.EvItemCompleted {
 			kbItem = ev.Item
 		}
 	}
 	if kbItem == nil {
-		t.Fatal("kb_search item not found")
+		t.Fatal("skill_run item not found")
 	}
 	if !kbItem.Tool.Success {
-		t.Fatalf("kb_search failed: %s", kbItem.Tool.Result)
+		t.Fatalf("knowledge search failed: %s", kbItem.Tool.Result)
 	}
 	if !strings.Contains(kbItem.Tool.Result, "协议") {
 		t.Errorf("search result does not mention the ingested document:\n%s", kbItem.Tool.Result)
 	}
 	if len(kbItem.Refs) == 0 {
-		t.Fatal("kb_search returned no references")
+		t.Fatal("knowledge search returned no references")
 	}
 	if kbItem.Refs[0].DocTitle != "协议说明" {
 		t.Errorf("reference doc title = %q, want 协议说明", kbItem.Refs[0].DocTitle)
 	}
 	if kbItem.Refs[0].ChunkID == "" {
-		t.Error("reference is missing a chunk id, so kb_open cannot expand it")
+		t.Error("reference is missing a chunk id, so knowledge open cannot expand it")
 	}
 }
 

@@ -163,6 +163,7 @@ export interface Item {
     "error"?: string;
     "attachments"?: Attachment[] | null;
     "artifacts"?: Artifact[] | null;
+    "usage"?: Usage | null;
     "meta"?: { [_ in string]?: any } | null;
 }
 
@@ -370,4 +371,7 @@ export interface Usage {
     "totalTokens": number;
     "contextLimit"?: number;
     "steps"?: number;
+    "cacheHitRatio"?: number;
+    "promptPrefixHash"?: string;
+    "dynamicTokens"?: number;
 }

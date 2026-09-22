@@ -55,7 +55,7 @@ function ModelPanel(props: Props) {
         {group.options.map((option) => {
           const selected = optionKey(option.provider, option.model) === props.activeModelKey;
           return <button type="button" role="option" aria-selected={selected} className={`hitk-chat-model-option${selected ? " is-selected" : ""}`} key={option.model} disabled={props.sending} onClick={() => void props.onSwitchModel(option.provider, option.model)}>
-            <span>{option.label || option.model}</span>
+            <span className="hitk-chat-model-option-main"><span>{option.label || option.model}</span>{!option.tools && <span className="hitk-chat-model-capability">无工具 / 知识库 Skill</span>}</span>
             {selected && <CheckOutlined />}
           </button>;
         })}
