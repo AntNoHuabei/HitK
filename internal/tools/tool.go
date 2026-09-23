@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/hitk/hitk/internal/document"
 	"github.com/hitk/hitk/internal/kb"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/provider"
@@ -27,6 +28,9 @@ type Result struct {
 	Display string
 	// Refs are knowledge-base citations surfaced by this call.
 	Refs []protocol.Reference
+	// Artifacts are files created by the capability and are validated before
+	// they reach the UI.
+	Artifacts []protocol.Artifact
 	// Plan is set by plan-management tools to update the UI checklist.
 	Plan []protocol.TodoEntry
 	// Truncated records that Content was clipped to fit the context budget.
@@ -65,6 +69,8 @@ type Context struct {
 	Plan []protocol.TodoEntry
 	// KnowledgeBases scopes a work-mode turn to one or more collections.
 	KnowledgeBases []string
+	// Documents is the shared file parsing/conversion boundary.
+	Documents *document.Engine
 }
 
 // Approve runs the approver when one is configured, otherwise it denies

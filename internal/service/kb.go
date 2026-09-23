@@ -78,11 +78,20 @@ func (s *KBService) AddFiles(collectionID string, paths []string) (ImportResult,
 		if p == "" {
 			continue
 		}
-		if !kb.Supported(p) {
+		if !s.c.Documents.Supported(p) {
 			res.Skipped++
 			continue
 		}
-		if _, err := s.c.KB.AddFile(ctx, collectionID, p, kb.IngestOptions{Replace: true}); err != nil {
+		parsed, parseErr := s.c.Documents.Extract(ctx, p, s.c.Agent.Workspace())
+		if parseErr != nil {
+			res.Failed = append(res.Failed, fmt.Sprintf("%s: %v", p, parseErr))
+			continue
+		}
+		if parsed.SkippedReason != "" {
+			res.Failed = append(res.Failed, fmt.Sprintf("%s: %s", p, parsed.SkippedReason))
+			continue
+		}
+		if _, err := s.c.KB.AddParsed(ctx, collectionID, &kb.ParsedDocument{Title: parsed.Title, Text: parsed.Text, Mime: parsed.Mime}, p, "file", kb.IngestOptions{Replace: true}); err != nil {
 			res.Failed = append(res.Failed, fmt.Sprintf("%s: %v", p, err))
 			continue
 		}
@@ -222,7 +231,7 @@ func (s *KBService) Reindex() error {
 
 // SupportedExtensions lists the ingestable file types for the import dialog.
 func (s *KBService) SupportedExtensions() []string {
-	return kb.SupportedExtensions
+	return s.c.Documents.SupportedExtensions()
 }
 
 func summarizeImport(res ImportResult) string {

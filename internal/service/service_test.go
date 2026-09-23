@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -182,6 +183,33 @@ func TestKnowledgeBaseRoundTrip(t *testing.T) {
 	stats := kbSvc.Stats()
 	if stats.Collections < 1 || stats.Documents < 1 || stats.Chunks < 1 {
 		t.Errorf("stats do not reflect the ingested data: %+v", stats)
+	}
+}
+
+func TestArtifactPreviewRejectsWorkspaceEscape(t *testing.T) {
+	container, _, _ := newTestContainer(t, nil)
+	workspace := t.TempDir()
+	container.Agent.SetWorkspace(workspace)
+	inside := filepath.Join(workspace, "artifact.md")
+	if err := os.WriteFile(inside, []byte("inside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside.md")
+	if err := os.WriteFile(outside, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	service := NewAppService(container)
+	if preview, err := service.PreviewArtifact(inside); err != nil || preview.Content != "inside" {
+		t.Fatalf("inside artifact rejected: %#v, %v", preview, err)
+	}
+	if _, err := service.PreviewArtifact(outside); err == nil {
+		t.Fatal("artifact outside workspace was accepted")
+	}
+	link := filepath.Join(workspace, "escape.md")
+	if err := os.Symlink(outside, link); err == nil {
+		if _, err := service.PreviewArtifact(link); err == nil {
+			t.Fatal("symlinked artifact outside workspace was accepted")
+		}
 	}
 }
 

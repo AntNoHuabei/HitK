@@ -29,5 +29,7 @@ export const appRepository = {
 
   reveal: (path: string): Promise<void> => App.RevealInFileManager(path),
 
+  revealArtifact: (path: string): Promise<void> => App.RevealArtifact(path),
+
   previewArtifact: (path: string) => App.PreviewArtifact(path),
 };

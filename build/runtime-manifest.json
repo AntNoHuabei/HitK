@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "bundleVersion": "1",
+  "platform": "windows-amd64",
+  "payloadDigest": "",
+  "runtimes": [
+    {
+      "name": "python",
+      "version": "3.12.14",
+      "download": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "7c45c9622400d578709a9b2cddbe8124cc21d382409d9f13406d706d28e31b14",
+        "archiveRoot": "python",
+        "archiveType": "tar.gz",
+        "licenseUrl": "https://docs.python.org/3.12/license.html"
+      }
+    },
+    {
+      "name": "node",
+      "version": "24.21.0",
+      "download": {
+        "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip",
+        "sha256": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+        "archiveRoot": "node-v24.21.0-win-x64",
+        "archiveType": "zip",
+        "licenseUrl": "https://github.com/nodejs/node/blob/v24.21.0/LICENSE"
+      }
+    },
+    {
+      "name": "uv",
+      "version": "0.12.13",
+      "download": {
+        "url": "https://github.com/astral-sh/uv/releases/download/0.12.13/uv-x86_64-pc-windows-msvc.zip",
+        "sha256": "a86c9dc7bad9b03f388583b7187c05fe9951c2e0d392217e8fd43d97787f6ec2",
+        "archiveRoot": ".",
+        "archiveType": "zip",
+        "licenseUrl": "https://github.com/astral-sh/uv/blob/0.12.13/LICENSE-APACHE"
+      }
+    },
+    {
+      "name": "pnpm",
+      "version": "11.19.0",
+      "download": {
+        "url": "https://registry.npmjs.org/pnpm/-/pnpm-11.19.0.tgz",
+        "sha256": "b9e49603540d04107b98e93917a30e6114970d403c23e40309a44ea9c2bca7fd",
+        "archiveRoot": "package",
+        "archiveType": "tar.gz",
+        "licenseUrl": "https://github.com/pnpm/pnpm/blob/v11.19.0/LICENSE"
+      }
+    }
+  ]
+}

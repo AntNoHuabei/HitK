@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hitk/hitk/internal/document"
 	"github.com/hitk/hitk/internal/kb"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/provider"
@@ -43,6 +44,7 @@ const maxTurnRefs = 12
 // Options configures an Agent.
 type Options struct {
 	KB        *kb.Store
+	Documents *document.Engine
 	Tools     *tools.Registry
 	Providers *provider.Registry
 	Sessions  *SessionStore
@@ -60,6 +62,7 @@ type Options struct {
 // Agent runs turns.
 type Agent struct {
 	kb        *kb.Store
+	documents *document.Engine
 	registry  *tools.Registry
 	providers *provider.Registry
 	sessions  *SessionStore
@@ -105,6 +108,7 @@ func New(opts Options) *Agent {
 	}
 	return &Agent{
 		kb:        opts.KB,
+		documents: opts.Documents,
 		registry:  opts.Tools,
 		providers: opts.Providers,
 		sessions:  opts.Sessions,
@@ -345,8 +349,16 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 	// Record user input in the thread before anything can fail, so the message
 	// is never lost even if the provider errors out immediately.
 	userText := joinInput(op.Input)
-	if userText != "" {
-		item := &protocol.Item{
+	var userItem *protocol.Item
+	if userText != "" || len(op.Attachments) > 0 {
+		for i := range op.Attachments {
+			if op.Attachments[i].Kind == "image" {
+				op.Attachments[i].ParseState = "ready"
+			} else {
+				op.Attachments[i].ParseState = "pending"
+			}
+		}
+		userItem = &protocol.Item{
 			ID:          newItemID(),
 			TurnID:      h.turnID,
 			ThreadID:    thread.ID,
@@ -356,8 +368,8 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 			Text:        userText,
 			Attachments: op.Attachments,
 		}
-		thread.Items = append(thread.Items, item)
-		a.emitItem(protocol.EvItemCompleted, item)
+		thread.Items = append(thread.Items, userItem)
+		a.emitItem(protocol.EvItemCompleted, userItem)
 	}
 	thread.Mode = mode
 	thread.Provider = provID
@@ -377,6 +389,11 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 	start.ThreadID = thread.ID
 	start.TurnID = h.turnID
 	a.publish(start)
+	if userItem != nil && len(userItem.Attachments) > 0 {
+		a.prepareAttachments(ctx, userItem, workspace)
+		op.Attachments = userItem.Attachments
+		_ = a.sessions.Save(thread)
+	}
 
 	usage := &protocol.Usage{}
 	step := 0
@@ -637,10 +654,14 @@ func (a *Agent) buildMessages(thread *protocol.Thread, mode protocol.Mode, provI
 	for i, it := range items {
 		switch it.Type {
 		case protocol.ItemUserMessage:
-			if strings.TrimSpace(it.Text) == "" {
+			text := strings.TrimSpace(it.Text)
+			if text == "" && len(it.Attachments) == 0 {
 				continue
 			}
-			parts := []provider.Part{provider.TextPart(it.Text)}
+			parts := make([]provider.Part, 0, 1+len(it.Attachments))
+			if text != "" {
+				parts = append(parts, provider.TextPart(it.Text))
+			}
 			// Only the newest user message is the active turn. Older attachments
 			// remain visible in history but must never be re-sent to a model.
 			if i == lastUserItem(items) {
@@ -789,6 +810,7 @@ func (a *Agent) runTool(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		ThreadID:       thread.ID,
 		TurnID:         h.turnID,
 		KnowledgeBases: opCollections(op),
+		Documents:      a.documents,
 	}
 	if tools.MutatingCall(tool, json.RawMessage(call.Arguments)) {
 		policy := op.ApprovalPolicy()
@@ -857,6 +879,9 @@ func (a *Agent) runTool(ctx context.Context, h *turnHandle, thread *protocol.Thr
 	if res.Meta != nil {
 		item.Meta = res.Meta
 		item.Artifacts = artifactsFromMeta(res.Meta)
+	}
+	if len(res.Artifacts) > 0 {
+		item.Artifacts = append(item.Artifacts, res.Artifacts...)
 	}
 	a.emitItem(protocol.EvItemCompleted, item)
 	return toolOutcome{item: item}
@@ -1213,13 +1238,45 @@ func attachmentParts(attachments []protocol.Attachment) []provider.Part {
 			parts = append(parts, provider.Part{Type: "image", MimeType: attachment.Mime, Data: base64.StdEncoding.EncodeToString(data)})
 			continue
 		}
-		doc, err := kb.ParseFile(attachment.Path)
-		if err != nil || strings.TrimSpace(doc.Text) == "" {
+		if attachment.ParseState == "failed" {
+			parts = append(parts, provider.TextPart(fmt.Sprintf("\n\n[附件 %s 解析失败：%s]", attachment.Name, attachment.ParseError)))
 			continue
 		}
-		parts = append(parts, provider.TextPart(fmt.Sprintf("\n\n[附件：%s]\n%s", filepath.Base(attachment.Path), doc.Text)))
+		if strings.TrimSpace(attachment.Context) == "" {
+			continue
+		}
+		parts = append(parts, provider.TextPart(fmt.Sprintf("\n\n[附件：%s]\n%s", filepath.Base(attachment.Path), attachment.Context)))
 	}
 	return parts
+}
+
+func (a *Agent) prepareAttachments(ctx context.Context, item *protocol.Item, workspace string) {
+	for i := range item.Attachments {
+		attachment := &item.Attachments[i]
+		if attachment.Kind == "image" {
+			continue
+		}
+		attachment.ParseState = "parsing"
+		a.emitItem(protocol.EvItemCompleted, item)
+		if a.documents == nil {
+			attachment.ParseState, attachment.ParseError = "failed", "文档引擎不可用"
+			a.emitItem(protocol.EvItemCompleted, item)
+			continue
+		}
+		result, err := a.documents.Extract(ctx, attachment.Path, workspace)
+		if err != nil {
+			attachment.ParseState, attachment.ParseError = "failed", err.Error()
+			a.emitItem(protocol.EvItemCompleted, item)
+			continue
+		}
+		attachment.ParseState = "ready"
+		attachment.Format = result.Format
+		attachment.Context = result.Text
+		for _, artifact := range result.Artifacts {
+			attachment.Artifacts = append(attachment.Artifacts, protocol.Artifact{Path: artifact.Path, Name: artifact.Name, Mime: artifact.Mime, Size: artifact.Size, Operation: artifact.Operation})
+		}
+		a.emitItem(protocol.EvItemCompleted, item)
+	}
 }
 
 func artifactsFromMeta(meta map[string]any) []protocol.Artifact {

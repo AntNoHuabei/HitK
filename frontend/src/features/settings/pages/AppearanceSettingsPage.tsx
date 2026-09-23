@@ -11,7 +11,7 @@ export function AppearanceSettingsPage() {
     <section className="hitk-settings-panel" aria-labelledby="settings-appearance-title">
       <header className="hitk-settings-page-heading">
         <div>
-          <span className="hitk-settings-section-number">03</span>
+          <span className="hitk-settings-section-number">04</span>
           <Title id="settings-appearance-title" level={3}>
             外观与主题
           </Title>

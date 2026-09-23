@@ -45,6 +45,15 @@ export function PreviewArtifact(path: string): $CancellablePromise<$models.Artif
 }
 
 /**
+ * RevealArtifact locates a workspace-confined artifact in the system file
+ * manager. It is intentionally separate from the general data-directory
+ * action so artifact paths cannot escape through junctions or symlinks.
+ */
+export function RevealArtifact(path: string): $CancellablePromise<void> {
+    return $Call.ByID(4008175624, path);
+}
+
+/**
  * RevealInFileManager opens the data directory in the OS file browser.
  */
 export function RevealInFileManager(path: string): $CancellablePromise<void> {

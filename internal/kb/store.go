@@ -43,6 +43,8 @@ type Store struct {
 	// vectors must be persisted; the local hash embedder is cheap enough to
 	// recompute and is not written to disk.
 	embedRemote bool
+	parseFile   func(context.Context, string) (*ParsedDocument, error)
+	supported   func(string) bool
 }
 
 // Embedder is the subset of provider.Embedder the store needs. It is declared
@@ -111,6 +113,14 @@ func (s *Store) SetEmbedder(e Embedder) {
 		s.index.Reset()
 		_ = s.rebuildIndex()
 	}
+}
+
+// SetFileParser installs the application document boundary. Defaults remain
+// available for standalone kb package users and tests.
+func (s *Store) SetFileParser(parse func(context.Context, string) (*ParsedDocument, error), supported func(string) bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.parseFile, s.supported = parse, supported
 }
 
 // EmbedderID reports the active embedding model.
@@ -499,7 +509,15 @@ func (s *Store) AddFile(ctx context.Context, collectionID, path string, opts Ing
 	if err != nil {
 		abs = path
 	}
-	parsed, err := ParseFile(abs)
+	s.mu.RLock()
+	parser := s.parseFile
+	s.mu.RUnlock()
+	var parsed *ParsedDocument
+	if parser != nil {
+		parsed, err = parser(ctx, abs)
+	} else {
+		parsed, err = ParseFile(abs)
+	}
 	if err != nil {
 		return Document{}, err
 	}
@@ -532,7 +550,10 @@ func (s *Store) AddDirectory(ctx context.Context, collectionID, dir string, recu
 		if strings.HasPrefix(d.Name(), ".") {
 			return nil
 		}
-		if !Supported(path) {
+		s.mu.RLock()
+		supports := s.supported
+		s.mu.RUnlock()
+		if (supports != nil && !supports(path)) || (supports == nil && !Supported(path)) {
 			return nil
 		}
 		files = append(files, path)

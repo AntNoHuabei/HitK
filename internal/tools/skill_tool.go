@@ -14,12 +14,12 @@ type SkillRun struct{}
 func (*SkillRun) Name() string        { return "skill_run" }
 func (*SkillRun) DisplayName() string { return "运行 Skill" }
 func (*SkillRun) Description() string {
-	return "按需运行 Skill。知识库使用 skill=knowledge；command 可选 collections、search、open、add。args 是分开的 Cobra 参数，例如 [\"--query\",\"关键词\"]。search 返回短证据，需阅读全文时再调用 open。"
+	return "按需运行 Skill。knowledge 用于知识库检索，command 为 collections/search/open/add；document 用于文件解析，command 为 inspect/extract/open/convert。args 必须拆成独立字符串。"
 }
 func (*SkillRun) Schema() json.RawMessage {
 	return SchemaFor([]string{"skill", "command"}, map[string]string{
-		"skill":   `{"type":"string","enum":["knowledge"],"description":"Skill 名称"}`,
-		"command": `{"type":"string","enum":["collections","search","open","add"],"description":"Cobra 子命令"}`,
+		"skill":   `{"type":"string","enum":["knowledge","document"],"description":"Skill 名称"}`,
+		"command": `{"type":"string","enum":["collections","search","open","add","inspect","extract","convert"],"description":"Cobra 子命令"}`,
 		"args":    `{"type":"array","items":{"type":"string"},"description":"参数及其值，必须拆成独立字符串"}`,
 	})
 }
@@ -41,19 +41,26 @@ func (*SkillRun) Run(ctx *Context, raw json.RawMessage) (Result, error) {
 	if err := json.Unmarshal(raw, &req); err != nil {
 		return Result{}, err
 	}
-	if !strings.EqualFold(strings.TrimSpace(req.Skill), "knowledge") {
-		return Result{}, errors.New("未知 Skill；当前仅支持 knowledge")
-	}
-	res, err := skills.RunKnowledge(&skills.Context{
+	base := &skills.Context{
 		Ctx:            ctx.Ctx,
 		KB:             ctx.KB,
 		KnowledgeBases: append([]string(nil), ctx.KnowledgeBases...),
 		Approve: func(title, detail string) error {
 			return ctx.Approve(ApprovalRequest{ToolName: "skill_run", Title: title, Detail: detail})
 		},
-	}, req.Command, req.Args)
+	}
+	var res skills.Result
+	var err error
+	switch strings.ToLower(strings.TrimSpace(req.Skill)) {
+	case "knowledge":
+		res, err = skills.RunKnowledge(base, req.Command, req.Args)
+	case "document":
+		res, err = skills.RunDocument(&skills.DocumentContext{Context: base, Documents: ctx.Documents, Workspace: ctx.Workspace}, req.Command, req.Args)
+	default:
+		return Result{}, errors.New("未知 Skill；当前支持 knowledge、document")
+	}
 	if err != nil {
 		return Result{}, err
 	}
-	return Result{Content: res.Content, Display: res.Display, Refs: res.Refs, Truncated: res.Truncated, Meta: res.Meta}, nil
+	return Result{Content: res.Content, Display: res.Display, Refs: res.Refs, Artifacts: res.Artifacts, Truncated: res.Truncated, Meta: res.Meta}, nil
 }

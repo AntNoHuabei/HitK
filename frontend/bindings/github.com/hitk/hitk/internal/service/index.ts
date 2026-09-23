@@ -5,12 +5,14 @@ import * as AppService from "./appservice.js";
 import * as ChatService from "./chatservice.js";
 import * as KBService from "./kbservice.js";
 import * as ModelService from "./modelservice.js";
+import * as RuntimeService from "./runtimeservice.js";
 import * as SettingsService from "./settingsservice.js";
 export {
     AppService,
     ChatService,
     KBService,
     ModelService,
+    RuntimeService,
     SettingsService
 };
 

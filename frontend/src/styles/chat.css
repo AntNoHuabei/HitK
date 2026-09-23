@@ -452,6 +452,10 @@
   line-height: 1.4;
 }
 
+.hitk-chat-attachment small { color: var(--hitk-chat-muted); font-size: 9px; text-transform: uppercase; }
+.hitk-chat-attachment.is-parsing { border-color: var(--hitk-chat-signal); }
+.hitk-chat-attachment.is-failed { border-color: var(--ant-color-error, #d4380d); color: var(--ant-color-error, #d4380d); }
+
 /* Composer attachment/menu surfaces intentionally share the existing theme
    variables so they remain quiet operational controls in every theme. */
 .hitk-chat-composer-context {

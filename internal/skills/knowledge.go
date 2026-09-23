@@ -35,6 +35,7 @@ type Result struct {
 	Content   string
 	Display   string
 	Refs      []protocol.Reference
+	Artifacts []protocol.Artifact
 	Truncated bool
 	Meta      map[string]any
 }

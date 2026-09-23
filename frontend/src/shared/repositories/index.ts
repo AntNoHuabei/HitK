@@ -6,6 +6,7 @@ export { appRepository } from "./app";
 export { chatRepository } from "./chat";
 export { knowledgeRepository } from "./knowledge";
 export { modelRepository } from "./models";
+export { runtimeRepository } from "./runtime";
 export { settingsRepository } from "./settings";
 
 export { errorText, list, stringMap, text, toError } from "./helpers";
@@ -23,6 +24,8 @@ export type {
   TodoEntry,
   ToolCall,
   Usage,
+  RuntimeStatus,
+  SkillEnvironmentStatus,
 } from "./bindings";
 export {
   ApprovalPolicy as ApprovalPolicyEnum,

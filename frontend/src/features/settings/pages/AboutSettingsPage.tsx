@@ -21,7 +21,7 @@ export function AboutSettingsPage() {
     <section className="hitk-settings-panel" aria-labelledby="settings-about-title">
       <header className="hitk-settings-page-heading">
         <div>
-          <span className="hitk-settings-section-number">05</span>
+          <span className="hitk-settings-section-number">06</span>
           <Title id="settings-about-title" level={3}>
             关于
           </Title>

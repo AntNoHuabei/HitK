@@ -7,6 +7,7 @@ import { KnowledgeSettingsPage } from "../features/settings/pages/KnowledgeSetti
 import { AppearanceSettingsPage } from "../features/settings/pages/AppearanceSettingsPage";
 import { DataSettingsPage } from "../features/settings/pages/DataSettingsPage";
 import { AboutSettingsPage } from "../features/settings/pages/AboutSettingsPage";
+import { RuntimeSettingsPage } from "../features/settings/pages/RuntimeSettingsPage";
 import { SplitView } from "../shared/components/SplitView";
 
 export default function SettingsView() {
@@ -20,6 +21,7 @@ export default function SettingsView() {
     >
         {section === "models" && <ModelsSettingsPage />}
         {section === "knowledge" && <KnowledgeSettingsPage />}
+        {section === "runtime" && <RuntimeSettingsPage />}
         {section === "appearance" && <AppearanceSettingsPage />}
         {section === "data" && <DataSettingsPage />}
         {section === "about" && <AboutSettingsPage />}

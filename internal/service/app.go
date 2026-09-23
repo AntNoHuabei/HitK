@@ -18,9 +18,11 @@ import (
 
 	"github.com/hitk/hitk/internal/agent"
 	"github.com/hitk/hitk/internal/config"
+	"github.com/hitk/hitk/internal/document"
 	"github.com/hitk/hitk/internal/kb"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/provider"
+	"github.com/hitk/hitk/internal/skillruntime"
 	"github.com/hitk/hitk/internal/tools"
 )
 
@@ -33,6 +35,8 @@ type Container struct {
 	Providers *provider.Registry
 	Registry  *tools.Registry
 	Sessions  *agent.SessionStore
+	Runtime   *skillruntime.Manager
+	Documents *document.Engine
 
 	// emit publishes protocol events to the frontend.
 	emit func(*protocol.Event)
@@ -61,12 +65,21 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 	}
 
 	registry := tools.NewDefaultRegistry()
+	runtimeManager := skillruntime.NewManager(skillruntime.DefaultRuntimeRoot(), paths.DataDir)
+	documents := document.NewEngine(runtimeManager)
 	workspace := cfg.Workspace
 	if workspace == "" || !dirExists(workspace) {
 		if wd, err := os.Getwd(); err == nil {
 			workspace = wd
 		}
 	}
+	kbStore.SetFileParser(func(ctx context.Context, path string) (*kb.ParsedDocument, error) {
+		parsed, parseErr := documents.Extract(ctx, path, workspace)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		return &kb.ParsedDocument{Title: parsed.Title, Text: parsed.Text, Mime: parsed.Mime, SkippedReason: parsed.SkippedReason}, nil
+	}, documents.Supported)
 
 	c := &Container{
 		Paths:     paths,
@@ -75,10 +88,13 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 		Providers: providers,
 		Registry:  registry,
 		Sessions:  sessions,
+		Runtime:   runtimeManager,
+		Documents: documents,
 		emit:      emit,
 	}
 	c.Agent = agent.New(agent.Options{
 		KB:           kbStore,
+		Documents:    documents,
 		Tools:        registry,
 		Providers:    providers,
 		Sessions:     sessions,
@@ -262,14 +278,9 @@ func (s *AppService) RevealInFileManager(path string) error {
 // PreviewArtifact returns a small preview only for files under the active
 // workspace. The UI never gets arbitrary local-file read access.
 func (s *AppService) PreviewArtifact(path string) (ArtifactPreview, error) {
-	abs, err := filepath.Abs(strings.TrimSpace(path))
+	abs, err := s.resolveWorkspaceArtifact(path)
 	if err != nil {
 		return ArtifactPreview{}, err
-	}
-	workspace := s.c.Agent.Workspace()
-	rel, err := filepath.Rel(workspace, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return ArtifactPreview{}, fmt.Errorf("产物不在当前工作区内")
 	}
 	data, err := os.ReadFile(abs)
 	if err != nil {
@@ -288,6 +299,48 @@ func (s *AppService) PreviewArtifact(path string) (ArtifactPreview, error) {
 		preview.Content = string(data)
 	}
 	return preview, nil
+}
+
+// RevealArtifact locates a workspace-confined artifact in the system file
+// manager. It is intentionally separate from the general data-directory
+// action so artifact paths cannot escape through junctions or symlinks.
+func (s *AppService) RevealArtifact(path string) error {
+	abs, err := s.resolveWorkspaceArtifact(path)
+	if err != nil {
+		return err
+	}
+	switch runtime.GOOS {
+	case "windows":
+		return exec.Command("explorer", "/select,"+abs).Start()
+	case "darwin":
+		return exec.Command("open", "-R", abs).Start()
+	default:
+		return exec.Command("xdg-open", filepath.Dir(abs)).Start()
+	}
+}
+
+func (s *AppService) resolveWorkspaceArtifact(path string) (string, error) {
+	abs, err := filepath.Abs(strings.TrimSpace(path))
+	if err != nil {
+		return "", err
+	}
+	workspace, err := filepath.EvalSymlinks(s.c.Agent.Workspace())
+	if err != nil {
+		return "", fmt.Errorf("工作区不可用: %w", err)
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(workspace, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("产物不在当前工作区内")
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || info.IsDir() {
+		return "", fmt.Errorf("产物文件不可用")
+	}
+	return resolved, nil
 }
 
 func artifactMime(path string) string {

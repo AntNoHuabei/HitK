@@ -7,8 +7,14 @@ import * as Chat from "../../../bindings/github.com/hitk/hitk/internal/service/c
 import * as KB from "../../../bindings/github.com/hitk/hitk/internal/service/kbservice";
 import * as Model from "../../../bindings/github.com/hitk/hitk/internal/service/modelservice";
 import * as Settings from "../../../bindings/github.com/hitk/hitk/internal/service/settingsservice";
+import * as Runtime from "../../../bindings/github.com/hitk/hitk/internal/service/runtimeservice";
 
-export { App, Chat, KB, Model, Settings };
+export { App, Chat, KB, Model, Runtime, Settings };
+
+export type {
+  RuntimeStatus,
+  SkillEnvironmentStatus,
+} from "../../../bindings/github.com/hitk/hitk/internal/skillruntime/models";
 
 // 服务层模型
 export type {

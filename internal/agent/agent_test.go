@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hitk/hitk/internal/document"
 	"github.com/hitk/hitk/internal/kb"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/provider"
@@ -268,6 +269,47 @@ func (h *harness) start(t *testing.T, text string, policy protocol.ApprovalPolic
 	})
 	h.awaitIdle(t)
 	return events
+}
+
+func TestAttachmentOnlyInputIsInjectedForCurrentTurnOnly(t *testing.T) {
+	h := newHarness(t, [][]provider.Chunk{
+		{{Kind: provider.ChunkText, Text: "收到附件"}, {Kind: provider.ChunkDone}},
+		{{Kind: provider.ChunkText, Text: "第二轮"}, {Kind: provider.ChunkDone}},
+	})
+	h.agent.documents = document.NewEngine(nil)
+	path := filepath.Join(h.agent.workspace, "attachment.txt")
+	if err := os.WriteFile(path, []byte("CURRENT_TURN_ATTACHMENT_MARKER"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.agent.StartTurn(protocol.Op{
+		Kind: protocol.OpTurnStart, ThreadID: h.thread.ID, Mode: protocol.ModeWork,
+		Provider: "scripted", Model: "test-model", Policy: protocol.ApprovalManual,
+		Attachments: []protocol.Attachment{{Path: path, Name: "attachment.txt", Kind: "file", Mime: "text/plain"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	h.events.waitFor(t, "attachment turn", func(events []*protocol.Event) bool { return hasKind(events, protocol.EvTurnCompleted) })
+	h.awaitIdle(t)
+
+	h.start(t, "下一轮", protocol.ApprovalManual)
+	requests := h.scripted.requests()
+	if len(requests) != 2 {
+		t.Fatalf("requests = %d", len(requests))
+	}
+	if !strings.Contains(messagesText(requests[0].Messages), "CURRENT_TURN_ATTACHMENT_MARKER") {
+		t.Fatal("attachment was not injected into its active turn")
+	}
+	if strings.Contains(messagesText(requests[1].Messages), "CURRENT_TURN_ATTACHMENT_MARKER") {
+		t.Fatal("attachment leaked into a later turn")
+	}
+}
+
+func messagesText(messages []provider.Message) string {
+	var out strings.Builder
+	for _, message := range messages {
+		out.WriteString(message.Text())
+	}
+	return out.String()
 }
 
 // awaitIdle blocks until the agent no longer reports the thread as running.

@@ -73,6 +73,14 @@ export interface Attachment {
      */
     "kind": string;
     "size"?: number;
+
+    /**
+     * pending | parsing | ready | failed
+     */
+    "parseState"?: string;
+    "format"?: string;
+    "parseError"?: string;
+    "artifacts"?: Artifact[] | null;
 }
 
 /**

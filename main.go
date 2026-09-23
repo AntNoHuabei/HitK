@@ -87,6 +87,8 @@ func main() {
 		service.NewSettingsService(container), application.ServiceOptions{Name: "Settings"}))
 	app.RegisterService(application.NewServiceWithOptions(
 		service.NewModelService(container), application.ServiceOptions{Name: "Model"}))
+	app.RegisterService(application.NewServiceWithOptions(
+		service.NewRuntimeService(container), application.ServiceOptions{Name: "Runtime"}))
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     "HitK",

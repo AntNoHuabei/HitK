@@ -84,7 +84,7 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
       return (
         <Flex justify="flex-end" style={{ margin: "10px 0" }}>
           <div className="hitk-chat-user-message">
-            {item.attachments?.length ? <div className="hitk-chat-attachment-strip">{item.attachments.map((attachment) => <Tooltip key={attachment.path} title={attachment.path}><span className="hitk-chat-attachment"><FileTextOutlined /><span>{attachment.name}</span></span></Tooltip>)}</div> : null}
+            {item.attachments?.length ? <div className="hitk-chat-attachment-strip">{item.attachments.map((attachment) => <Tooltip key={attachment.path} title={attachment.parseError || attachment.path}><span className={`hitk-chat-attachment is-${attachment.parseState || "ready"}`}><FileTextOutlined /><span>{attachment.name}</span>{attachment.parseState === "parsing" && <LoadingOutlined spin />}{attachment.parseState === "failed" && <WarningFilled />}{attachment.format && <small>{attachment.format}</small>}</span></Tooltip>)}</div> : null}
             <span className="hitk-chat-user-message-text">{item.text}</span>
           </div>
         </Flex>
@@ -215,7 +215,7 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
     setLoading(true);
     try { setPreview(await appRepository.previewArtifact(artifact.path)); } finally { setLoading(false); }
   };
-  return <div className="hitk-artifact-card"><div className="hitk-artifact-heading"><FileTextOutlined /><span>{artifact.name}</span><Text type="secondary">{artifact.operation === "created" ? "新建" : "已修改"}</Text><Button type="text" size="small" onClick={() => void appRepository.reveal(artifact.path)}>打开</Button><Button type="text" size="small" onClick={() => void showPreview()}>{loading ? "加载中" : "预览"}</Button></div>{preview && <div className="hitk-artifact-preview">{image ? <Image src={image} preview /> : <pre>{preview.content}</pre>}{preview.truncated && <Text type="secondary">预览已截断</Text>}</div>}</div>;
+  return <div className="hitk-artifact-card"><div className="hitk-artifact-heading"><FileTextOutlined /><span>{artifact.name}</span><Text type="secondary">{artifact.operation === "created" ? "新建" : "已修改"}</Text><Button type="text" size="small" onClick={() => void appRepository.revealArtifact(artifact.path)}>打开</Button><Button type="text" size="small" onClick={() => void showPreview()}>{loading ? "加载中" : "预览"}</Button></div>{preview && <div className="hitk-artifact-preview">{image ? <Image src={image} preview /> : <pre>{preview.content}</pre>}{preview.truncated && <Text type="secondary">预览已截断</Text>}</div>}</div>;
 }
 
 function PlanRow({ entries }: { entries: TodoEntry[] }) {

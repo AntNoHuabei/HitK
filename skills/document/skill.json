@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "name": "document",
+  "version": "1.0.0",
+  "builtin": true,
+  "runtime": {
+    "kind": "python",
+    "constraint": "==3.12.*"
+  },
+  "entry": "main.py",
+  "assets": [
+    "site-packages/docling",
+    "site-packages/docling_pp_ocrv6",
+    "models-cache/models/PPOCRv6/det/inference.onnx",
+    "models-cache/models/PPOCRv6/rec/inference.onnx",
+    "models-cache/models/PPOCRv6/rec/ppocrv6_keys.txt",
+    "models-cache/models/docling-project--docling-layout-heron",
+    "models-cache/models/docling-project--docling-models"
+  ],
+  "packageManager": {
+    "name": "uv",
+    "dependencyFile": "pyproject.toml",
+    "lockfile": "uv.lock"
+  },
+  "permissions": {
+    "installNetwork": false,
+    "runtimeNetwork": false
+  },
+  "budget": {
+    "timeoutSeconds": 1200,
+    "maxOutputBytes": 1048576,
+    "memoryBytes": 2147483648
+  }
+}

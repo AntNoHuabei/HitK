@@ -117,6 +117,7 @@ tasks:
     dir: build/windows/nsis
     deps:
       - task: build
+      - task: stage:runtime
     preconditions:
       - sh: '[ "{{.INSTALL_SCOPE}}" = "user" ] || [ "{{.INSTALL_SCOPE}}" = "machine" ]'
         msg: "INSTALL_SCOPE must be 'user' or 'machine', got '{{.INSTALL_SCOPE}}'"
@@ -133,6 +134,12 @@ tasks:
       ARCH: '{{.ARCH | default ARCH}}'
       ARG_FLAG: '{{if eq .ARCH "amd64"}}AMD64{{else}}ARM64{{end}}'
       INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
+
+  stage:runtime:
+    summary: Downloads, verifies and stages the bundled Skill runtimes
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.ROOT_DIR}}/build/scripts/fetch-runtime.ps1" -Action Stage
 
   create:msix:package:
     summary: Creates an MSIX package

@@ -1,0 +1,11 @@
+[project]
+name = "hitk-document-skill"
+version = "1.0.0"
+requires-python = "==3.12.*"
+dependencies = [
+  "docling==2.107.0",
+  "docling-pp-ocrv6[cpu]==0.1.0",
+]
+
+[tool.uv]
+package = false

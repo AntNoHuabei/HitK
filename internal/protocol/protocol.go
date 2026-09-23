@@ -101,11 +101,18 @@ type Reference struct {
 // retained in the transcript for display, but their contents are not replayed
 // into later model requests.
 type Attachment struct {
-	Path string `json:"path"`
-	Name string `json:"name"`
-	Mime string `json:"mime,omitempty"`
-	Kind string `json:"kind"` // image | file
-	Size int64  `json:"size,omitempty"`
+	Path       string     `json:"path"`
+	Name       string     `json:"name"`
+	Mime       string     `json:"mime,omitempty"`
+	Kind       string     `json:"kind"` // image | file
+	Size       int64      `json:"size,omitempty"`
+	ParseState string     `json:"parseState,omitempty"` // pending | parsing | ready | failed
+	Format     string     `json:"format,omitempty"`
+	ParseError string     `json:"parseError,omitempty"`
+	Artifacts  []Artifact `json:"artifacts,omitempty"`
+	// Context is populated for the active turn only. It is deliberately not
+	// persisted, so attachment contents cannot leak into later model requests.
+	Context string `json:"-"`
 }
 
 // Artifact is a file created or changed by an agent tool.

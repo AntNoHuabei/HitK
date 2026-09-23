@@ -59,7 +59,7 @@ export function DataSettingsPage() {
     <section className="hitk-settings-panel" aria-labelledby="settings-data-title">
       <header className="hitk-settings-page-heading">
         <div>
-          <span className="hitk-settings-section-number">04</span>
+          <span className="hitk-settings-section-number">05</span>
           <Title id="settings-data-title" level={3}>
             数据与导出
           </Title>
