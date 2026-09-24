@@ -96,8 +96,10 @@ func TestStagedRuntimeIfConfigured(t *testing.T) {
 			t.Errorf("runtime %s is not verified: %#v", status.Name, status)
 		}
 	}
-	if status := m.GetSkillEnvironment("document"); status.State != "ready" {
-		t.Fatalf("document skill is not ready: %#v", status)
+	if status := m.GetSkillEnvironment("document"); status.State != "ready" && status.State != "approval_required" {
+		t.Fatalf("document skill has unexpected state: %#v", status)
+	} else if status.State == "approval_required" && (status.ComponentVersion == "" || status.BytesTotal <= 0) {
+		t.Fatalf("document component metadata is incomplete: %#v", status)
 	}
 }
 

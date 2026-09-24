@@ -52,6 +52,8 @@ tasks:
         vars:
           ARCH: '{{.ARCH}}'
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o "{{.BIN_DIR}}/{{.APP_NAME}}.exe"'
+      - cmd: powershell -NoProfile -Command "if (Test-Path -LiteralPath '{{.ROOT_DIR}}\build\windows\runtime-stage') { New-Item -ItemType Directory -Force -Path '{{.ROOT_DIR}}\{{.BIN_DIR}}\runtime' | Out-Null; Copy-Item -Path '{{.ROOT_DIR}}\build\windows\runtime-stage\*' -Destination '{{.ROOT_DIR}}\{{.BIN_DIR}}\runtime' -Recurse -Force }"
+        platforms: [windows]
       - cmd: powershell Remove-item *.syso
         platforms: [windows]
       - cmd: rm -f *.syso
@@ -136,10 +138,24 @@ tasks:
       INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "machine"}}'
 
   stage:runtime:
-    summary: Downloads, verifies and stages the bundled Skill runtimes
+    summary: Downloads, verifies and stages the base Skill runtimes
     platforms: [windows]
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.ROOT_DIR}}/build/scripts/fetch-runtime.ps1" -Action Stage
+
+  package:runtime-component:
+    summary: Packages the optional Document Skill dependencies and models
+    platforms: [windows]
+    deps:
+      - task: stage:runtime
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.ROOT_DIR}}/build/scripts/fetch-runtime.ps1" -Action Component
+
+  publish:runtime-component:
+    summary: Uploads the packaged Document Skill component to ModelScope
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File "{{.ROOT_DIR}}/build/scripts/fetch-runtime.ps1" -Action Publish
 
   create:msix:package:
     summary: Creates an MSIX package

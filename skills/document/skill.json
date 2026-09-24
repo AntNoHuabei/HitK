@@ -29,6 +29,6 @@
   "budget": {
     "timeoutSeconds": 1200,
     "maxOutputBytes": 1048576,
-    "memoryBytes": 2147483648
+    "memoryBytes": 4294967296
   }
 }

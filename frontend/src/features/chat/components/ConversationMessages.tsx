@@ -84,7 +84,7 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
       return (
         <Flex justify="flex-end" style={{ margin: "10px 0" }}>
           <div className="hitk-chat-user-message">
-            {item.attachments?.length ? <div className="hitk-chat-attachment-strip">{item.attachments.map((attachment) => <Tooltip key={attachment.path} title={attachment.parseError || attachment.path}><span className={`hitk-chat-attachment is-${attachment.parseState || "ready"}`}><FileTextOutlined /><span>{attachment.name}</span>{attachment.parseState === "parsing" && <LoadingOutlined spin />}{attachment.parseState === "failed" && <WarningFilled />}{attachment.format && <small>{attachment.format}</small>}</span></Tooltip>)}</div> : null}
+            {item.attachments?.length ? <div className="hitk-chat-attachment-strip">{item.attachments.map((attachment) => <Tooltip key={attachment.path} title={attachment.parseError || attachment.path}><span className={`hitk-chat-attachment is-${attachment.parseState || "ready"}`}><FileTextOutlined /><span>{attachment.name}</span>{(attachment.parseState === "parsing" || attachment.parseState === "waiting") && <LoadingOutlined spin />}{attachment.parseState === "failed" && <WarningFilled />}{attachment.format && <small>{attachment.format}</small>}</span></Tooltip>)}</div> : null}
             <span className="hitk-chat-user-message-text">{item.text}</span>
           </div>
         </Flex>

@@ -83,6 +83,9 @@ func (e *Engine) Extract(ctx context.Context, path, workspace string) (Result, e
 		if runErr == nil {
 			return fromSkill(result, abs), nil
 		}
+		if errors.Is(runErr, skillruntime.ErrNetworkApprovalRequired) || errors.Is(runErr, skillruntime.ErrComponentCancelled) {
+			return Result{}, runErr
+		}
 		// Existing PDF/DOCX parsing remains available when a development build
 		// has not staged the bundled runtime yet.
 		if ext := strings.ToLower(filepath.Ext(abs)); ext != ".pdf" && ext != ".docx" {
@@ -127,6 +130,9 @@ func (e *Engine) Convert(ctx context.Context, path, workspace string) (Result, e
 		result, runErr := e.runtime.Execute(ctx, "document", skillruntime.SkillRequest{Command: "convert", Args: []string{"--path", abs}, Workspace: workspace})
 		if runErr == nil {
 			return fromSkill(result, abs), nil
+		}
+		if errors.Is(runErr, skillruntime.ErrNetworkApprovalRequired) || errors.Is(runErr, skillruntime.ErrComponentCancelled) {
+			return Result{}, runErr
 		}
 		if ext := strings.ToLower(filepath.Ext(abs)); ext != ".pdf" && ext != ".docx" {
 			return Result{}, runErr

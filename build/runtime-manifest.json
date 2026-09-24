@@ -48,5 +48,23 @@
         "licenseUrl": "https://github.com/pnpm/pnpm/blob/v11.19.0/LICENSE"
       }
     }
+  ],
+  "components": [
+    {
+      "id": "document-docling",
+      "skill": "document",
+      "version": "1.0.0",
+      "platform": "windows-amd64",
+      "source": "ModelScope - AntNoHuabei/HitKEnv",
+      "url": "https://www.modelscope.cn/datasets/AntNoHuabei/HitKEnv/resolve/master/runtime/document-windows-amd64-1.0.0.zip",
+      "sha256": "e94c66bf0cfd2d50ca40f3a7c5ce56bcd41940a1c1d40802a59931a98ff3c14e",
+      "archiveType": "zip",
+      "compressedBytes": 1101732781,
+      "unpackedBytes": 1957314899,
+      "installDirectory": "site-packages",
+      "requiredRuntimes": {
+        "python": "3.12.14"
+      }
+    }
   ]
 }

@@ -10,7 +10,9 @@ from typing import Any
 
 
 SKILL_ROOT = Path(__file__).resolve().parent
-VENDOR = SKILL_ROOT / "site-packages"
+PAYLOAD_VALUE = os.environ.get("HITK_SKILL_PAYLOAD", "").strip()
+PAYLOAD_ROOT = Path(PAYLOAD_VALUE).resolve() if PAYLOAD_VALUE else SKILL_ROOT
+VENDOR = PAYLOAD_ROOT / "site-packages"
 if VENDOR.is_dir():
     sys.path.insert(0, str(VENDOR))
 
@@ -39,7 +41,7 @@ def converter():
     pipeline = PdfPipelineOptions(do_ocr=True)
     pipeline.ocr_options = PPOCRv6Options(lang=["zh", "en"])
     pipeline.allow_external_plugins = True
-    pipeline.artifacts_path = SKILL_ROOT / "models-cache" / "models"
+    pipeline.artifacts_path = PAYLOAD_ROOT / "models-cache" / "models"
     return DocumentConverter(
         format_options={
             InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline),

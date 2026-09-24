@@ -33,7 +33,7 @@ func (s *RuntimeService) PrepareSkillEnvironment(name string, allowNetwork bool)
 	if s.c.Runtime == nil {
 		return skillruntime.SkillEnvironmentStatus{}, errors.New("运行时管理器不可用")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
 	return s.c.Runtime.PrepareSkillEnvironment(ctx, name, allowNetwork)
 }
@@ -52,4 +52,13 @@ func (s *RuntimeService) RemoveSkillEnvironment(name string) error {
 		return errors.New("运行时管理器不可用")
 	}
 	return s.c.Runtime.RemoveSkillEnvironment(name)
+}
+
+// CancelSkillEnvironment cancels a component download owned by the runtime
+// manager. It is safe to call while the original Prepare RPC is still waiting.
+func (s *RuntimeService) CancelSkillEnvironment(name string) error {
+	if s.c.Runtime == nil {
+		return errors.New("运行时管理器不可用")
+	}
+	return s.c.Runtime.CancelSkillEnvironment(name)
 }

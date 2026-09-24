@@ -8,6 +8,7 @@ import { AppearanceSettingsPage } from "../features/settings/pages/AppearanceSet
 import { DataSettingsPage } from "../features/settings/pages/DataSettingsPage";
 import { AboutSettingsPage } from "../features/settings/pages/AboutSettingsPage";
 import { RuntimeSettingsPage } from "../features/settings/pages/RuntimeSettingsPage";
+import { SkillsSettingsPage } from "../features/skills/components/SkillsSettingsPage";
 import { SplitView } from "../shared/components/SplitView";
 
 export default function SettingsView() {
@@ -22,6 +23,7 @@ export default function SettingsView() {
         {section === "models" && <ModelsSettingsPage />}
         {section === "knowledge" && <KnowledgeSettingsPage />}
         {section === "runtime" && <RuntimeSettingsPage />}
+        {section === "skills" && <SkillsSettingsPage />}
         {section === "appearance" && <AppearanceSettingsPage />}
         {section === "data" && <DataSettingsPage />}
         {section === "about" && <AboutSettingsPage />}

@@ -19,6 +19,7 @@ import (
 	"github.com/hitk/hitk/internal/config"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/service"
+	"github.com/hitk/hitk/internal/skillruntime"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -29,6 +30,7 @@ func init() {
 	// Registering the event type lets the binding generator emit a typed
 	// listener signature for the frontend instead of `any`.
 	application.RegisterEvent[protocol.Event](protocol.EventName)
+	application.RegisterEvent[skillruntime.RuntimeProgress](skillruntime.RuntimeProgressEventName)
 }
 
 func main() {
@@ -73,6 +75,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("hitk: %v", err)
 	}
+	container.SetRuntimeProgressEmitter(func(progress *skillruntime.RuntimeProgress) {
+		if progress != nil {
+			app.Event.Emit(skillruntime.RuntimeProgressEventName, *progress)
+		}
+	})
 	defer container.Close()
 
 	// Services are registered through the app's service registry so that the

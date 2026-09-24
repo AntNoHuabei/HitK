@@ -12,9 +12,29 @@ import * as Runtime from "../../../bindings/github.com/hitk/hitk/internal/servic
 export { App, Chat, KB, Model, Runtime, Settings };
 
 export type {
+  RuntimeProgress,
   RuntimeStatus,
   SkillEnvironmentStatus,
 } from "../../../bindings/github.com/hitk/hitk/internal/skillruntime/models";
+
+export type {
+  AnalysisPlan,
+  DependencyCandidate,
+  ResolvedPlan,
+  SkillSummary,
+} from "../../../bindings/github.com/hitk/hitk/internal/skillmodel/models";
+
+export {
+  SkillKind,
+  SourceKind,
+  TrustLevel,
+} from "../../../bindings/github.com/hitk/hitk/internal/skillmodel/models";
+
+export type {
+  InstallRequest,
+  SkillHubEntry,
+  SkillHubFeed,
+} from "../../../bindings/github.com/hitk/hitk/internal/skillcatalog/models";
 
 // 服务层模型
 export type {

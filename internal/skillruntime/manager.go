@@ -8,21 +8,60 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
+
+	"github.com/hitk/hitk/internal/downloader"
 )
 
 type Manager struct {
 	runtimeRoot string
 	dataRoot    string
+	downloader  *downloader.HTTPDownloader
+
+	mu                sync.Mutex
+	progress          func(RuntimeProgress)
+	componentOps      map[string]*componentOperation
+	componentStatuses map[string]SkillEnvironmentStatus
+	componentWaiters  map[string][]chan SkillEnvironmentStatus
+	componentVersions map[string]uint64
+	componentSequence uint64
+	planOps           map[string]context.CancelFunc
 }
 
 func NewManager(runtimeRoot, dataRoot string) *Manager {
-	return &Manager{runtimeRoot: filepath.Clean(runtimeRoot), dataRoot: filepath.Clean(dataRoot)}
+	cacheRoot := filepath.Join(filepath.Clean(dataRoot), "runtime-cache", "downloads")
+	return &Manager{
+		runtimeRoot: filepath.Clean(runtimeRoot),
+		dataRoot:    filepath.Clean(dataRoot),
+		downloader: downloader.NewHTTPDownloader(downloader.Options{
+			ConcurrentDownloads: 4,
+			MaxRetries:          3,
+			Timeout:             2 * 60 * 60,
+			ParallelThreshold:   100 << 20,
+			Logger:              slog.Default(),
+			CacheDir:            cacheRoot,
+		}),
+		componentOps:      make(map[string]*componentOperation),
+		componentStatuses: make(map[string]SkillEnvironmentStatus),
+		componentWaiters:  make(map[string][]chan SkillEnvironmentStatus),
+		componentVersions: make(map[string]uint64),
+		planOps:           make(map[string]context.CancelFunc),
+	}
+}
+
+// SetProgressPublisher wires runtime component updates into the application
+// event stream. The callback is invoked without Manager locks held.
+func (m *Manager) SetProgressPublisher(publish func(RuntimeProgress)) {
+	m.mu.Lock()
+	m.progress = publish
+	m.mu.Unlock()
 }
 
 func DefaultRuntimeRoot() string {
@@ -210,6 +249,11 @@ func (m *Manager) GetSkillEnvironment(name string) SkillEnvironmentStatus {
 		return SkillEnvironmentStatus{Skill: manifest.Name, State: "failed", Error: err.Error(), UpdatedAt: nowMillis()}
 	}
 	if manifest.Builtin {
+		if component, ok, componentErr := m.componentForSkill(manifest.Name); componentErr != nil {
+			return SkillEnvironmentStatus{Skill: manifest.Name, State: "failed", Error: componentErr.Error(), UpdatedAt: nowMillis()}
+		} else if ok {
+			return m.componentSkillStatus(manifest, component, hash)
+		}
 		entry := filepath.Join(skillDir, filepath.FromSlash(manifest.Entry))
 		python := m.executable(manifest.Runtime.Kind)
 		complete := fileExists(entry) && fileExists(python)
@@ -242,6 +286,11 @@ func (m *Manager) PrepareSkillEnvironment(ctx context.Context, name string, allo
 		return SkillEnvironmentStatus{}, err
 	}
 	if manifest.Builtin {
+		if component, ok, componentErr := m.componentForSkill(manifest.Name); componentErr != nil {
+			return SkillEnvironmentStatus{}, componentErr
+		} else if ok {
+			return m.prepareComponent(ctx, manifest, component, allowNetwork)
+		}
 		status := m.GetSkillEnvironment(name)
 		if status.State != "ready" {
 			return status, errors.New(status.Error)
@@ -292,6 +341,9 @@ func (m *Manager) RepairSkillEnvironment(ctx context.Context, name string, allow
 
 func (m *Manager) RemoveSkillEnvironment(name string) error {
 	name = normalizeName(name)
+	if err := m.removeComponent(name); err != nil {
+		return err
+	}
 	root := filepath.Join(m.dataRoot, "skill-environments")
 	target := filepath.Join(root, name)
 	if name == "" || !within(root, target) {
@@ -349,6 +401,7 @@ func (m *Manager) install(ctx context.Context, manifest SkillManifest, skillDir,
 
 func installerEnv(runtimeRoot, cacheRoot string, network bool) []string {
 	env := minimalHostEnv(filepath.Join(runtimeRoot, "node"), filepath.Join(runtimeRoot, "python"), filepath.Join(runtimeRoot, "uv"))
+	env = append(env, managedHomeEnv(cacheRoot)...)
 	env = append(env,
 		"UV_PYTHON="+runtimeExecutable(runtimeRoot, "python"),
 		"UV_NO_MANAGED_PYTHON=true", "UV_PYTHON_DOWNLOADS=never",
@@ -490,4 +543,31 @@ func minimalHostEnv(paths ...string) []string {
 		env = append(env, "LANG=C.UTF-8")
 	}
 	return env
+}
+
+// managedHomeEnv gives runtimes a writable home without exposing the user's
+// real profile. Some Python packages, including Docling's model stack, call
+// platformdirs during import and crash when no home can be resolved.
+func managedHomeEnv(cacheRoot string) []string {
+	home := filepath.Join(cacheRoot, "home")
+	paths := []string{
+		home,
+		filepath.Join(home, "AppData", "Local"),
+		filepath.Join(home, "AppData", "Roaming"),
+		filepath.Join(home, ".cache"),
+		filepath.Join(home, ".config"),
+		filepath.Join(home, ".local", "share"),
+	}
+	for _, path := range paths {
+		_ = os.MkdirAll(path, 0o700)
+	}
+	return []string{
+		"HOME=" + home,
+		"USERPROFILE=" + home,
+		"APPDATA=" + filepath.Join(home, "AppData", "Roaming"),
+		"LOCALAPPDATA=" + filepath.Join(home, "AppData", "Local"),
+		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
+		"XDG_CONFIG_HOME=" + filepath.Join(home, ".config"),
+		"XDG_DATA_HOME=" + filepath.Join(home, ".local", "share"),
+	}
 }

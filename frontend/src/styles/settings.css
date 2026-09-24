@@ -137,11 +137,44 @@
 .hitk-runtime-path { min-width: 0; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .hitk-runtime-state { display: inline-flex; justify-content: flex-end; align-items: center; gap: 6px; font-size: 11px; white-space: nowrap; }
 .hitk-runtime-state.is-ready { color: var(--hitk-signal); }
+.hitk-runtime-state.is-pending { color: var(--hitk-signal); }
 .hitk-runtime-state.is-error, .hitk-runtime-error { color: var(--ant-color-error, #d4380d); }
 .hitk-runtime-skill-row { display: grid; min-height: 72px; grid-template-columns: minmax(0, 1fr) 92px auto; align-items: center; gap: 18px; border-bottom: 1px solid var(--hitk-divider); }
 .hitk-runtime-skill-row > div { display: flex; flex-direction: column; gap: 3px; }
 .hitk-runtime-skill-row .ant-btn { border-radius: 0; }
+.hitk-runtime-transfer { padding: 14px 0 16px; border-bottom: 1px solid var(--hitk-divider); }
+.hitk-runtime-transfer .ant-progress { margin: 0; }
+.hitk-runtime-transfer-meta { display: flex; justify-content: space-between; gap: 16px; padding-top: 8px; font-size: 11px; font-variant-numeric: tabular-nums; }
 .hitk-runtime-error { display: block; padding: 12px 0; font-size: 11px; }
+
+.hitk-skill-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hitk-skill-identity > .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-skill-dependencies {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 18px;
+}
+
+.hitk-skill-dependencies > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--hitk-divider);
+}
 
 @media (max-width: 760px) {
   .hitk-runtime-row { grid-template-columns: 32px minmax(120px, 1fr) 88px; }

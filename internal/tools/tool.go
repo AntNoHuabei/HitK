@@ -224,6 +224,15 @@ func NewDefaultRegistry() *Registry {
 	return r
 }
 
+// NewDefaultRegistryWithSkills builds the standard registry with the
+// compatibility Skill dependencies injected. Keeping the no-argument
+// constructor preserves existing tests and embedded callers.
+func NewDefaultRegistryWithSkills(deps SkillRunDependencies) *Registry {
+	r := NewDefaultRegistry()
+	r.Register(&SkillRun{Dependencies: deps})
+	return r
+}
+
 // SchemaFor builds a JSON Schema object from property definitions. Every tool
 // schema is an object with named properties, so this removes the repetition of
 // writing the same JSON by hand.

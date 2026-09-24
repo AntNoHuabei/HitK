@@ -9,6 +9,8 @@ frontend/node_modules
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 build/windows/runtime-stage/
+build/windows/component-stage/
+build/output/
 # Mobile generated (per-machine; overlays hold absolute paths)
 build/ios/xcode/overlay.json
 build/ios/xcode/gen/

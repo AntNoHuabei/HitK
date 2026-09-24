@@ -33,6 +33,7 @@ import (
 	"github.com/hitk/hitk/internal/kb"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/provider"
+	"github.com/hitk/hitk/internal/skillruntime"
 	"github.com/hitk/hitk/internal/tools"
 )
 
@@ -45,6 +46,7 @@ const maxTurnRefs = 12
 type Options struct {
 	KB        *kb.Store
 	Documents *document.Engine
+	Runtime   *skillruntime.Manager
 	Tools     *tools.Registry
 	Providers *provider.Registry
 	Sessions  *SessionStore
@@ -63,6 +65,7 @@ type Options struct {
 type Agent struct {
 	kb        *kb.Store
 	documents *document.Engine
+	runtime   *skillruntime.Manager
 	registry  *tools.Registry
 	providers *provider.Registry
 	sessions  *SessionStore
@@ -109,6 +112,7 @@ func New(opts Options) *Agent {
 	return &Agent{
 		kb:        opts.KB,
 		documents: opts.Documents,
+		runtime:   opts.Runtime,
 		registry:  opts.Tools,
 		providers: opts.Providers,
 		sessions:  opts.Sessions,
@@ -1238,10 +1242,6 @@ func attachmentParts(attachments []protocol.Attachment) []provider.Part {
 			parts = append(parts, provider.Part{Type: "image", MimeType: attachment.Mime, Data: base64.StdEncoding.EncodeToString(data)})
 			continue
 		}
-		if attachment.ParseState == "failed" {
-			parts = append(parts, provider.TextPart(fmt.Sprintf("\n\n[附件 %s 解析失败：%s]", attachment.Name, attachment.ParseError)))
-			continue
-		}
 		if strings.TrimSpace(attachment.Context) == "" {
 			continue
 		}
@@ -1263,7 +1263,7 @@ func (a *Agent) prepareAttachments(ctx context.Context, item *protocol.Item, wor
 			a.emitItem(protocol.EvItemCompleted, item)
 			continue
 		}
-		result, err := a.documents.Extract(ctx, attachment.Path, workspace)
+		result, err := a.extractAttachment(ctx, item, i, workspace)
 		if err != nil {
 			attachment.ParseState, attachment.ParseError = "failed", err.Error()
 			a.emitItem(protocol.EvItemCompleted, item)
@@ -1277,6 +1277,26 @@ func (a *Agent) prepareAttachments(ctx context.Context, item *protocol.Item, wor
 		}
 		a.emitItem(protocol.EvItemCompleted, item)
 	}
+}
+
+func (a *Agent) extractAttachment(ctx context.Context, item *protocol.Item, index int, workspace string) (document.Result, error) {
+	attachment := &item.Attachments[index]
+	result, err := a.documents.Extract(ctx, attachment.Path, workspace)
+	if !errors.Is(err, skillruntime.ErrNetworkApprovalRequired) {
+		return result, err
+	}
+	attachment.ParseState = "waiting"
+	attachment.ParseError = "等待初始化文档组件"
+	a.emitItem(protocol.EvItemCompleted, item)
+	if a.runtime == nil {
+		return document.Result{}, err
+	}
+	if _, waitErr := a.runtime.WaitSkillEnvironment(ctx, "document"); waitErr != nil {
+		return document.Result{}, waitErr
+	}
+	attachment.ParseState = "parsing"
+	attachment.ParseError = ""
+	return a.documents.Extract(ctx, attachment.Path, workspace)
 }
 
 func artifactsFromMeta(meta map[string]any) []protocol.Artifact {

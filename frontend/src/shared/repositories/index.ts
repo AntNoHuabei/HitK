@@ -26,6 +26,12 @@ export type {
   Usage,
   RuntimeStatus,
   SkillEnvironmentStatus,
+  ResolvedPlan,
+  SkillSummary,
+  InstallRequest,
+  SkillHubFeed,
+  SkillHubEntry,
+  DependencyCandidate,
 } from "./bindings";
 export {
   ApprovalPolicy as ApprovalPolicyEnum,
@@ -34,4 +40,7 @@ export {
   ItemType,
   Mode as ModeEnum,
   OpKind,
+  SkillKind,
+  SourceKind,
+  TrustLevel,
 } from "./bindings";

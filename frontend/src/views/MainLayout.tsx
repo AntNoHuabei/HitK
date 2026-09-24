@@ -16,6 +16,7 @@ import { Window as WailsWindow } from "@wailsio/runtime";
 import ChatView from "./ChatView";
 import SettingsView from "./SettingsView";
 import { KnowledgeView } from "../features/knowledge/components/KnowledgeView";
+import { RuntimeInitializationModal } from "../features/runtime/components/RuntimeInitializationModal";
 import { useShellStore } from "../features/shell/shellStore";
 import type { ViewKey } from "../features/shell/shellStore";
 
@@ -107,6 +108,7 @@ export default function MainLayout() {
           </div>
         </main>
       </div>
+      <RuntimeInitializationModal />
     </div>
   );
 }

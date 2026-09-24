@@ -47,10 +47,14 @@ func (m *Manager) Execute(ctx context.Context, name string, request SkillRequest
 	if manifest.Runtime.Kind == "node" {
 		args = []string{entry}
 	}
+	venvEnvironment, payloadEnvironment := "", ""
 	if !manifest.Builtin {
+		venvEnvironment = status.Environment
 		if manifest.Runtime.Kind == "python" {
-			command = filepath.Join(status.Environment, "Scripts", "python.exe")
+			command = filepath.Join(venvEnvironment, "Scripts", "python.exe")
 		}
+	} else {
+		payloadEnvironment = status.Environment
 	}
 	stdoutLimit := manifest.Budget.MaxOutputBytes
 	if stdoutLimit <= 0 {
@@ -62,7 +66,7 @@ func (m *Manager) Execute(ctx context.Context, name string, request SkillRequest
 	cmd.Stdin = bytes.NewReader(payload)
 	cmd.Stdout = &limitedWriter{Writer: &stdout, Remaining: stdoutLimit}
 	cmd.Stderr = &limitedWriter{Writer: &stderr, Remaining: 256 << 10}
-	cmd.Env = executionEnv(m.runtimeRoot, m.dataRoot, skillDir, status.Environment, manifest.Permissions.RuntimeNetwork)
+	cmd.Env = executionEnv(m.runtimeRoot, m.dataRoot, skillDir, venvEnvironment, payloadEnvironment, manifest.Permissions.RuntimeNetwork)
 	job, err := startManagedProcess(cmd, manifest.Budget.MemoryBytes)
 	if err != nil {
 		return SkillExecutionResult{}, err
@@ -131,21 +135,28 @@ func decodeExecutionResult(data []byte) (SkillExecutionResult, error) {
 	return result, nil
 }
 
-func executionEnv(runtimeRoot, dataRoot, skillDir, environment string, network bool) []string {
+func executionEnv(runtimeRoot, dataRoot, skillDir, venvEnvironment, payloadEnvironment string, network bool) []string {
 	paths := []string{filepath.Join(runtimeRoot, "node"), filepath.Join(runtimeRoot, "python")}
-	if environment != "" {
-		paths = append([]string{filepath.Join(environment, "Scripts"), filepath.Join(environment, "node_modules", ".bin")}, paths...)
+	if venvEnvironment != "" {
+		paths = append([]string{filepath.Join(venvEnvironment, "Scripts"), filepath.Join(venvEnvironment, "node_modules", ".bin")}, paths...)
 	}
 	env := minimalHostEnv(paths...)
 	temp := filepath.Join(dataRoot, "runtime-cache", "tmp")
 	_ = os.MkdirAll(temp, 0o700)
+	cacheRoot := skillDir
+	if payloadEnvironment != "" {
+		cacheRoot = payloadEnvironment
+	}
+	env = append(env, managedHomeEnv(filepath.Join(dataRoot, "runtime-cache"))...)
 	env = append(env,
 		"HITK_SKILL_ROOT="+skillDir,
+		"HITK_SKILL_PAYLOAD="+payloadEnvironment,
 		"HITK_RUNTIME_ROOT="+runtimeRoot,
 		"HITK_RUNTIME_CACHE="+filepath.Join(dataRoot, "runtime-cache"),
 		"TEMP="+temp, "TMP="+temp,
+		"PYTHONUTF8=1", "PYTHONIOENCODING=utf-8",
 		"HF_HUB_OFFLINE=1", "TRANSFORMERS_OFFLINE=1",
-		"DOCLING_CACHE_DIR="+filepath.Join(skillDir, "models-cache"),
+		"DOCLING_CACHE_DIR="+filepath.Join(cacheRoot, "models-cache"),
 	)
 	if network {
 		for _, key := range []string{"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"} {

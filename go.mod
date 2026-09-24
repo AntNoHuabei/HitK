@@ -8,12 +8,15 @@ go 1.25.0
 ignore ./build
 
 require (
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
+	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/spf13/cobra v1.10.2
 	github.com/wailsapp/wails/v3 v3.0.0-beta.10
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/sys v0.46.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

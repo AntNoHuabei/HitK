@@ -82,16 +82,7 @@ func (s *KBService) AddFiles(collectionID string, paths []string) (ImportResult,
 			res.Skipped++
 			continue
 		}
-		parsed, parseErr := s.c.Documents.Extract(ctx, p, s.c.Agent.Workspace())
-		if parseErr != nil {
-			res.Failed = append(res.Failed, fmt.Sprintf("%s: %v", p, parseErr))
-			continue
-		}
-		if parsed.SkippedReason != "" {
-			res.Failed = append(res.Failed, fmt.Sprintf("%s: %s", p, parsed.SkippedReason))
-			continue
-		}
-		if _, err := s.c.KB.AddParsed(ctx, collectionID, &kb.ParsedDocument{Title: parsed.Title, Text: parsed.Text, Mime: parsed.Mime}, p, "file", kb.IngestOptions{Replace: true}); err != nil {
+		if _, err := s.c.KB.AddFile(ctx, collectionID, p, kb.IngestOptions{Replace: true}); err != nil {
 			res.Failed = append(res.Failed, fmt.Sprintf("%s: %v", p, err))
 			continue
 		}

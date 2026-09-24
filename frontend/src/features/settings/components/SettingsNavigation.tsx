@@ -13,6 +13,7 @@ export type SettingsSection =
   | "models"
   | "knowledge"
   | "runtime"
+  | "skills"
   | "appearance"
   | "data"
   | "about";
@@ -21,6 +22,7 @@ const items = [
   { key: "models", icon: <CloudServerOutlined />, label: "模型服务商" },
   { key: "knowledge", icon: <DatabaseOutlined />, label: "知识库" },
   { key: "runtime", icon: <CodeOutlined />, label: "Skill 运行时" },
+  { key: "skills", icon: <CloudServerOutlined />, label: "Skills" },
   { key: "appearance", icon: <BgColorsOutlined />, label: "外观与主题" },
   { key: "data", icon: <FolderOpenOutlined />, label: "数据与导出" },
   { key: "about", icon: <InfoCircleOutlined />, label: "关于" },

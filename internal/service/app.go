@@ -9,6 +9,7 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,6 +23,7 @@ import (
 	"github.com/hitk/hitk/internal/kb"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/provider"
+	"github.com/hitk/hitk/internal/skillcatalog"
 	"github.com/hitk/hitk/internal/skillruntime"
 	"github.com/hitk/hitk/internal/tools"
 )
@@ -37,6 +39,10 @@ type Container struct {
 	Sessions  *agent.SessionStore
 	Runtime   *skillruntime.Manager
 	Documents *document.Engine
+	Catalog   *skillcatalog.Catalog
+	Resolver  *skillcatalog.Resolver
+	PlanStore skillcatalog.PlanStore
+	Installer *skillcatalog.Installer
 
 	// emit publishes protocol events to the frontend.
 	emit func(*protocol.Event)
@@ -64,7 +70,6 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 		kbStore.SetEmbedder(remoteEmbedder{inner: emb})
 	}
 
-	registry := tools.NewDefaultRegistry()
 	runtimeManager := skillruntime.NewManager(skillruntime.DefaultRuntimeRoot(), paths.DataDir)
 	documents := document.NewEngine(runtimeManager)
 	workspace := cfg.Workspace
@@ -73,8 +78,17 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 			workspace = wd
 		}
 	}
+	catalog := skillcatalog.NewCatalog(skillruntime.DefaultRuntimeRoot(), paths.DataDir)
+	catalog.SetWorkspace(workspace)
+	resolver := skillcatalog.NewResolver(skillruntime.DefaultRuntimeRoot())
+	installer := skillcatalog.NewInstaller(paths.DataDir)
+	registry := tools.NewDefaultRegistryWithSkills(tools.SkillRunDependencies{
+		Catalog:  catalog,
+		Resolver: resolver,
+		Executor: runtimeManager,
+	})
 	kbStore.SetFileParser(func(ctx context.Context, path string) (*kb.ParsedDocument, error) {
-		parsed, parseErr := documents.Extract(ctx, path, workspace)
+		parsed, parseErr := extractDocumentWithRuntime(ctx, documents, runtimeManager, path, workspace)
 		if parseErr != nil {
 			return nil, parseErr
 		}
@@ -90,11 +104,16 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 		Sessions:  sessions,
 		Runtime:   runtimeManager,
 		Documents: documents,
+		Catalog:   catalog,
+		Resolver:  resolver,
+		PlanStore: skillcatalog.NewPlanStore(paths.DataDir),
+		Installer: installer,
 		emit:      emit,
 	}
 	c.Agent = agent.New(agent.Options{
 		KB:           kbStore,
 		Documents:    documents,
+		Runtime:      runtimeManager,
 		Tools:        registry,
 		Providers:    providers,
 		Sessions:     sessions,
@@ -109,6 +128,33 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 	return c, nil
 }
 
+type documentExtractor interface {
+	Extract(context.Context, string, string) (document.Result, error)
+}
+
+type skillEnvironmentWaiter interface {
+	WaitSkillEnvironment(context.Context, string) (skillruntime.SkillEnvironmentStatus, error)
+}
+
+func extractDocumentWithRuntime(
+	ctx context.Context,
+	extractor documentExtractor,
+	waiter skillEnvironmentWaiter,
+	path, workspace string,
+) (document.Result, error) {
+	result, err := extractor.Extract(ctx, path, workspace)
+	if !errors.Is(err, skillruntime.ErrNetworkApprovalRequired) {
+		return result, err
+	}
+	if waiter == nil {
+		return result, err
+	}
+	if _, err := waiter.WaitSkillEnvironment(ctx, "document"); err != nil {
+		return document.Result{}, err
+	}
+	return extractor.Extract(ctx, path, workspace)
+}
+
 // Close releases backend resources.
 // Close releases the container's resources. It stops the agent first: turns run
 // in the background and keep writing as they finish, so closing the knowledge
@@ -117,9 +163,25 @@ func (c *Container) Close() {
 	if c.Agent != nil {
 		c.Agent.Shutdown()
 	}
+	if c.Runtime != nil {
+		c.Runtime.Close()
+	}
 	if c.KB != nil {
 		_ = c.KB.Close()
 	}
+}
+
+// SetRuntimeProgressEmitter wires Skill component download updates to a
+// dedicated typed Wails event.
+func (c *Container) SetRuntimeProgressEmitter(emit func(*skillruntime.RuntimeProgress)) {
+	if c.Runtime == nil {
+		return
+	}
+	c.Runtime.SetProgressPublisher(func(progress skillruntime.RuntimeProgress) {
+		if emit != nil {
+			emit(&progress)
+		}
+	})
 }
 
 // remoteEmbedder bridges provider.Embedder to kb.Embedder without the kb
@@ -237,6 +299,9 @@ func (s *AppService) SetWorkspace(dir string) error {
 		return fmt.Errorf("目录不存在: %s", abs)
 	}
 	s.c.Agent.SetWorkspace(abs)
+	if s.c.Catalog != nil {
+		s.c.Catalog.SetWorkspace(abs)
+	}
 	return s.c.Config.AddRecentWorkspace(abs)
 }
 

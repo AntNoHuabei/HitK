@@ -55,6 +55,55 @@ go build -o bin/hitk.exe .
 
 `go.mod` 中的 `ignore ./build` 排除了 Wails 的移动端存根目录，因此 `go build ./...` 可以直接使用。
 
+基础 Python / Node 运行时随安装包发布，Docling 与 PP-OCRv6 模型不进入默认安装器。维护发布组件时使用：
+
+```bash
+wails3 task windows:package:runtime-component
+MODELSCOPE_API_TOKEN=... wails3 task windows:publish:runtime-component
+```
+
+组件包生成后会同步写入 `build/runtime-manifest.json` 的 URL、SHA256 和体积；运行时按需下载到用户数据目录。
+
+### SkillHub / WorkBuddy Skill 兼容
+
+HitK 可以发现原生 `skill.json`、WorkBuddy/CodeBuddy/Claude 的 `SKILL.md`，以及
+`.codebuddy-plugin` / `.workbuddy-plugin` / `.claude-plugin` 插件。发现顺序固定为：
+
+```text
+内置 > 项目 > 用户 > 插件 > SkillHub
+```
+
+纯提示型 Skill 不创建运行时环境；脚本型 Skill 会先做只读依赖分析，再把锁文件和
+隔离环境放入 `%APPDATA%\HitK\skill-plans` 与 `%APPDATA%\HitK\skill-environments`。
+依赖安装使用随包发布的 uv/pnpm，不在系统 Python/Node 中执行全局安装。
+
+兼容模式通过 `HITK_SKILL_COMPAT` 控制：
+
+| 值 | 行为 |
+| --- | --- |
+| `off` | 关闭外部 Skill 兼容 |
+| `prompt` | 只加载纯提示 Skill |
+| `resolve` | 加载脚本并允许分析、展示和准备依赖 |
+| `full` | 允许 agent 执行已锁定的脚本 Skill |
+
+设置页的 `Skills` 可以导入本地目录、ZIP URL、Git URL，查看依赖计划和来源信息，
+并执行重新扫描、初始化、回滚和清理。ZIP 会校验路径穿越、符号链接、大小和可选
+SHA256；插件 metadata 中的 hooks/MCP 会被解析保留，但默认不执行。
+
+真实 SkillHub 包回归可以使用集成测试：
+
+```powershell
+$env:HITK_WATERMARK_ZIP='D:\path\to\watermarkskill-1.0.0.zip'
+$env:HITK_RUNTIME_ROOT='D:\code\HitK\build\windows\runtime-stage'
+$env:HITK_DATA_ROOT="$env:APPDATA\HitK"
+$env:HITK_WATERMARK_OUTPUT="$([Environment]::GetFolderPath('Desktop'))\HitK_Watermarked"
+$env:HITK_WATERMARK_LIMIT='0'
+go test -tags=integration ./internal/skillruntime -run TestSkillHubWatermarkIntegration -v
+```
+
+该测试会覆盖 ZIP 导入、`SKILL.md` 入口推导、Pillow 依赖锁定、argv CLI 调用、
+中文路径 stdout、产物回传和输出文件校验。
+
 ### 测试
 
 ```bash
@@ -191,7 +240,7 @@ features/chat/
 | macOS | `~/Library/Application Support/HitK/` |
 | Linux | `$XDG_CONFIG_HOME/HitK/` 或 `~/.config/HitK/` |
 
-目录内容：`config.json`（设置与厂商凭据）、`knowledge.db`（bbolt 知识库）、`threads/*.json`（每会话一个文件，先写临时文件再重命名，崩溃不会留下半截文件）、`hitk.log`。
+目录内容：`config.json`（设置与厂商凭据）、`knowledge.db`（bbolt 知识库）、`threads/*.json`（每会话一个文件，先写临时文件再重命名，崩溃不会留下半截文件）、`runtime-components/`（按需下载并校验的 Skill 组件）、`hitk.log`。
 
 设置环境变量 `HITK_DATA_DIR` 可覆盖数据目录（便于多套配置并存或做本地调试）。
 
