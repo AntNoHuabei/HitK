@@ -1,4 +1,7 @@
 .task
+.env
+.env.*
+!.env.example
 .smoke/
 .workbuddy/
 .idea/

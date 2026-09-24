@@ -1,5 +1,7 @@
 version: '3'
 
+dotenv: ['.env']
+
 vars:
   APP_NAME: "hitk"
   BIN_DIR: "bin"
@@ -37,7 +39,18 @@ tasks:
   dev:
     summary: Runs the application in development mode
     cmds:
-      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File "{{.ROOT_DIR}}/build/scripts/dev.ps1" -VitePort {{.VITE_PORT}}
+        platforms: [windows]
+      - cmd: wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+        platforms: [linux, darwin]
+
+  dev:check:
+    summary: Loads .env and validates the staged Skill runtimes
+    cmds:
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File "{{.ROOT_DIR}}/build/scripts/dev.ps1" -ValidateOnly
+        platforms: [windows]
+      - cmd: 'echo "dev:check is currently implemented for Windows"'
+        platforms: [linux, darwin]
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)

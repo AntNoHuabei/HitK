@@ -42,7 +42,29 @@ HitK 走的是 Agentic Search：检索本身是**模型可以反复调用的工�
 
 ```bash
 cd HitK
-wails3 dev            # 前端热更新 + 后端自动重启
+Copy-Item .env.example .env
+wails3 task dev       # 读取 .env + 检查 Skill runtime + 前端热更新
+```
+
+`.env` 只保存本机开发配置，已被 `.gitignore` 排除。可以提交的模板是
+`.env.example`。启动器会先加载 `.env`，但不会覆盖当前 PowerShell 中已经
+设置的环境变量，因此临时覆盖可以直接写在命令前。
+
+开发环境常用变量：
+
+- `HITK_SKILL_COMPAT=full`：允许执行 SkillHub/WorkBuddy 的脚本类 Skill。
+- `HITK_DATA_DIR`：可选，隔离开发数据，不影响正式知识库和会话。
+- `HITK_RUNTIME_ROOT`：可选，覆盖内置运行时位置，正常不需要设置。
+- `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY`：可选，用于依赖和组件下载。
+- `MODELSCOPE_API_TOKEN`：只有发布运行时组件时需要。
+
+`HITK_SKILL_ROOT`、`HITK_SKILL_PAYLOAD`、`HITK_RUNTIME_CACHE` 等变量由
+Skill 运行时按环境注入，不应写进 `.env`，否则可能破坏隔离环境。
+
+只检查环境，不启动应用：
+
+```powershell
+wails3 task dev:check
 ```
 
 ### 生产构建
