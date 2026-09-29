@@ -30,7 +30,9 @@ import type {
   ProviderModelLite,
 } from "../../../shared/types/settings";
 
-const CUSTOM_KIND = "";
+// 自定义服务商在表单里的哨兵值。提交时必须转成空 catalogId 才走后端的自定义分支,
+// 所以这里不能直接用空串:antd 的 required 校验会把空串判成“未填”。
+const CUSTOM_KIND = "custom";
 
 /** 自定义服务商要选一个线协议族;内置服务商的协议由目录决定。 */
 const WIRE_KINDS = [
@@ -75,6 +77,17 @@ export function ProviderFormModal({ open, catalog, existing, onCancel, onSaved }
   const presets = useMemo(
     () => (entry?.models ?? []).filter((model) => !model.embedding),
     [entry],
+  );
+
+  // 目录自带一条“自定义”项,这里去重后统一由 CUSTOM_KIND 表达,下拉里只留一个入口。
+  const typeOptions = useMemo(
+    () => [
+      ...catalog
+        .filter((item) => item.kind !== CUSTOM_KIND)
+        .map((item) => ({ value: item.kind, label: item.label })),
+      { value: CUSTOM_KIND, label: "自定义（OpenAI 兼容）" },
+    ],
+    [catalog],
   );
 
   // 打开时初始化:编辑回填已启用模型,新增用首个目录项的默认模型预置一个。
@@ -130,7 +143,8 @@ export function ProviderFormModal({ open, catalog, existing, onCancel, onSaved }
     const v = form.getFieldsValue(true) as FormValues;
     return {
       id: existing?.id ?? "",
-      catalogId: v.catalogId ?? CUSTOM_KIND,
+      // 后端以空 catalogId 判定“自定义服务商”,哨兵值不能原样提交。
+      catalogId: isCustom ? "" : (v.catalogId ?? ""),
       name: (v.name ?? "").trim(),
       kind: isCustom ? v.wireKind : "",
       baseUrl: (v.baseUrl ?? "").trim(),
@@ -263,19 +277,24 @@ export function ProviderFormModal({ open, catalog, existing, onCancel, onSaved }
       }
     >
       <Form<FormValues> form={form} layout="vertical">
-        <Form.Item label="服务商类型" name="catalogId" rules={[{ required: true }]}>
+        <Form.Item
+          label="服务商类型"
+          name="catalogId"
+          rules={[{ required: true, message: "请选择服务商类型" }]}
+        >
           <Select
             onChange={(value) => applyCatalog(String(value))}
             popupMatchSelectWidth={false}
-            options={[
-              ...catalog.map((item) => ({ value: item.kind, label: item.label })),
-              { value: CUSTOM_KIND, label: "自定义（OpenAI 兼容）" },
-            ]}
+            options={typeOptions}
           />
         </Form.Item>
 
         {isCustom && (
-          <Form.Item label="接口类型" name="wireKind" rules={[{ required: true }]}>
+          <Form.Item
+            label="接口类型"
+            name="wireKind"
+            rules={[{ required: true, message: "请选择接口类型" }]}
+          >
             <Select options={WIRE_KINDS} />
           </Form.Item>
         )}

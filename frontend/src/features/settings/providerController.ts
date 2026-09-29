@@ -37,7 +37,8 @@ export function useProviderController() {
   /** catalogFor 返回该服务商对应的内置目录项(自定义服务商没有)。 */
   const catalogFor = useCallback(
     (provider: ProviderLite): CatalogProviderLite | undefined =>
-      catalog.find((entry) => entry.kind === provider.kind),
+      // 自定义服务商的 kind 只是线协议(openai 等),直接按 kind 匹配会误命中内置目录项。
+      provider.custom ? undefined : catalog.find((entry) => entry.kind === provider.kind),
     [catalog],
   );
 
