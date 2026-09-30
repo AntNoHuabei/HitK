@@ -194,15 +194,6 @@ export function CompanionView() {
     }
   }, []);
 
-  const cancelTask = useCallback(async (taskID: string) => {
-    try {
-      await companionRepository.cancelTask(taskID);
-      await refresh();
-    } catch (err) {
-      message.error(errorText(err));
-    }
-  }, [message, refresh]);
-
   const forceReply = useCallback(async (taskID: string) => {
     try {
       await companionRepository.forceReply(taskID);
@@ -387,7 +378,6 @@ export function CompanionView() {
                 characterName={profile.name}
                 task={overview.activeTask}
                 onForce={(taskID) => void forceReply(taskID)}
-                onCancel={(taskID) => void cancelTask(taskID)}
               />
             )}
             {store.interrupted && <div className="hitk-companion-inline-note">本轮已经停下。</div>}

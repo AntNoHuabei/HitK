@@ -18,12 +18,10 @@ export function BusyNotice({
   characterName,
   task,
   onForce,
-  onCancel,
 }: {
   characterName: string;
   task: CompanionTurnTaskView;
   onForce: (taskID: string) => void;
-  onCancel: (taskID: string) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -61,8 +59,9 @@ export function BusyNotice({
           )}
         </Text>
       </div>
-      <div className="hitk-companion-busy-actions">
-        {!task.forced && (
+      {/* 只有还没叫人的时候有得选；叫过之后这张卡只是回执。 */}
+      {!task.forced && (
+        <div className="hitk-companion-busy-actions">
           <Button
             type="primary"
             size="small"
@@ -71,11 +70,8 @@ export function BusyNotice({
           >
             让她现在回
           </Button>
-        )}
-        <Button type="text" size="small" onClick={() => onCancel(task.id)}>
-          取消等待
-        </Button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
