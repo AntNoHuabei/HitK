@@ -52,7 +52,11 @@ func (m *Manager) submitUserTurnAt(ctx context.Context, threadID, text, provider
 	if err != nil {
 		return TurnTask{}, err
 	}
-	available, activity, notBefore := taskAvailability(profile, now)
+	state, err := m.store.State(m.id)
+	if err != nil {
+		return TurnTask{}, err
+	}
+	available, activity, notBefore := taskAvailability(profile, state, now)
 	task := TurnTask{
 		ID:                 "task_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12],
 		ThreadID:           threadID,
@@ -142,7 +146,11 @@ func (m *Manager) submitProactiveTurnAt(ctx context.Context, now time.Time) (Tur
 	if err != nil {
 		return TurnTask{}, false, err
 	}
-	available, activity, notBefore := taskAvailability(profile, now)
+	state, err := m.store.State(m.id)
+	if err != nil {
+		return TurnTask{}, false, err
+	}
+	available, activity, notBefore := taskAvailability(profile, state, now)
 	if !available {
 		return TurnTask{}, false, nil
 	}
@@ -217,8 +225,25 @@ func (m *Manager) processDueTurnTasks(ctx context.Context, now time.Time) {
 	if err != nil {
 		return
 	}
+	profile, profileErr := m.store.Profile(m.id)
+	state, stateErr := m.store.State(m.id)
 	for _, task := range tasks {
-		if task.Status == TaskWaiting && task.NotBefore <= now.UnixMilli() {
+		if task.Status != TaskWaiting {
+			continue
+		}
+		// 等待途中场景可能才起来，或者日程刚好空出来。每分钟重判一次并往前挪，
+		// 别让人守着一个早已过期的 notBefore 干等。
+		if task.NotBefore > now.UnixMilli() && profileErr == nil && stateErr == nil {
+			if available, activity, _ := taskAvailability(profile, state, now); available {
+				task.NotBefore = now.UnixMilli()
+				task.CurrentActivity = activity
+				task.AvailabilityReason = ""
+				if err := m.store.SaveTurnTask(task); err != nil {
+					continue
+				}
+			}
+		}
+		if task.NotBefore <= now.UnixMilli() {
 			m.kickTurnTask(ctx, task)
 		}
 	}
@@ -271,7 +296,8 @@ func (m *Manager) processTurnTaskAt(ctx context.Context, taskID string, now time
 		m.failTurnTask(task, err)
 		return
 	}
-	available, activity, nextAt := taskAvailability(profile, now)
+	// 复用上面已经按真实时间衰减过的那份 state。
+	available, activity, nextAt := taskAvailability(profile, state, now)
 	if !available {
 		task.Status = TaskWaiting
 		task.NotBefore = nextAt

@@ -10,12 +10,44 @@ import (
 func TestTaskAvailabilityWaitsForNextFreeBlock(t *testing.T) {
 	profile := DefaultProfile(time.Now().UnixMilli())
 	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
-	available, activity, notBefore := taskAvailability(profile, at)
+	available, activity, notBefore := taskAvailability(profile, DefaultState(at.UnixMilli()), at)
 	if available {
 		t.Fatal("balanced schedule should be unavailable at 10:00")
 	}
 	if activity == "" || notBefore <= at.UnixMilli() {
 		t.Fatalf("activity=%q notBefore=%d", activity, notBefore)
+	}
+}
+
+func TestLiveSceneOverridesBusySchedule(t *testing.T) {
+	profile := DefaultProfile(time.Now().UnixMilli())
+	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
+
+	// 日程上这格是工作时间，本来要推到下一个空档。
+	state := DefaultState(at.UnixMilli())
+	if available, _, notBefore := taskAvailability(profile, state, at); available || notBefore <= at.UnixMilli() {
+		t.Fatalf("expected a deferral, got available=%v notBefore=%d", available, notBefore)
+	}
+
+	// 但亲密场景 10 分钟前才起来，人就在这段对话里，必须立刻能回。
+	state.SceneStage = "active"
+	state.ConsentState = "affirmed"
+	state.SceneStartedAt = at.Add(-10 * time.Minute).UnixMilli()
+	available, activity, notBefore := taskAvailability(profile, state, at)
+	if !available {
+		t.Fatal("live scene should make her available regardless of the schedule")
+	}
+	if notBefore != 0 {
+		t.Fatalf("notBefore = %d, want 0", notBefore)
+	}
+	if activity != "亲密中" {
+		t.Fatalf("activity = %q, want 亲密中", activity)
+	}
+
+	// 过了 3 小时衰减窗口就不再算数，回到日程判断。
+	state.SceneStartedAt = at.Add(-4 * time.Hour).UnixMilli()
+	if available, _, _ := taskAvailability(profile, state, at); available {
+		t.Fatal("scene past its decay window should not force availability")
 	}
 }
 

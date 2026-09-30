@@ -224,7 +224,13 @@ func (t TurnTask) Active() bool {
 	}
 }
 
-func taskAvailability(profile Profile, at time.Time) (bool, string, int64) {
+func taskAvailability(profile Profile, state State, at time.Time) (bool, string, int64) {
+	// 场景还活着，人就在这段对话里，日程表上写什么都拦不住回消息。
+	// 之前亲密场景进行中发一条，会被判成「处理工作和日常琐事，18:30 再回」，
+	// 活活晾五个半小时。
+	if sceneLive(state, at) {
+		return true, displayActivity(state), 0
+	}
 	blocks := scheduleBlocksForDay(profile, at)
 	minute := at.Hour()*60 + at.Minute()
 	for _, block := range blocks {
@@ -260,6 +266,19 @@ func blockAvailable(kind string) bool {
 	default:
 		return false
 	}
+}
+
+// sceneLive 报告场景是否仍在进行。时间边界写在这里而不是依赖 sceneStage 已被衰减，
+// 所以就算持久化的 stage 还没被 tick 更新过也不会误判成「还在进行中」。
+func sceneLive(state State, at time.Time) bool {
+	if state.SceneStartedAt <= 0 {
+		return false
+	}
+	switch state.SceneStage {
+	case "active", "climax", "aftercare":
+		return at.Sub(time.UnixMilli(state.SceneStartedAt)) < 3*time.Hour
+	}
+	return false
 }
 
 func conservativeTurnBrief(state State, at time.Time, activity, availabilityNote string, available bool, nextAt int64, reason string) TurnBrief {
