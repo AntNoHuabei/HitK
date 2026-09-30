@@ -56,7 +56,7 @@ func (m *Manager) submitUserTurnAt(ctx context.Context, threadID, text, provider
 	if err != nil {
 		return TurnTask{}, err
 	}
-	available, activity, notBefore := taskAvailability(profile, state, now)
+	available, activity, notBefore := taskAvailability(state, m.resolver(profile), now)
 	task := TurnTask{
 		ID:                 "task_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12],
 		ThreadID:           threadID,
@@ -170,7 +170,7 @@ func (m *Manager) submitProactiveTurnAt(ctx context.Context, now time.Time) (Tur
 	if err != nil {
 		return TurnTask{}, false, err
 	}
-	available, activity, notBefore := taskAvailability(profile, state, now)
+	available, activity, notBefore := taskAvailability(state, m.resolver(profile), now)
 	if !available {
 		return TurnTask{}, false, nil
 	}
@@ -254,7 +254,7 @@ func (m *Manager) processDueTurnTasks(ctx context.Context, now time.Time) {
 		// 等待途中场景可能才起来，或者日程刚好空出来。每分钟重判一次并往前挪，
 		// 别让人守着一个早已过期的 notBefore 干等。
 		if task.NotBefore > now.UnixMilli() && profileErr == nil && stateErr == nil {
-			if available, activity, _ := taskAvailability(profile, state, now); available {
+			if available, activity, _ := taskAvailability(state, m.resolver(profile), now); available {
 				task.NotBefore = now.UnixMilli()
 				task.CurrentActivity = activity
 				task.AvailabilityReason = ""
@@ -317,7 +317,7 @@ func (m *Manager) processTurnTaskAt(ctx context.Context, taskID string, now time
 		return
 	}
 	// 复用上面已经按真实时间衰减过的那份 state。
-	available, activity, nextAt := taskAvailability(profile, state, now)
+	available, activity, nextAt := taskAvailability(state, m.resolver(profile), now)
 	// 用户按过「让她现在回」就不再拿日程把她塞回等待。
 	if !available && !task.Forced {
 		task.Status = TaskWaiting
@@ -515,6 +515,9 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 	}); err != nil {
 		return TurnResolution{}, err
 	}
+	// The turn's own hours go into the day, so a long scene really does push her
+	// afternoon around instead of leaving the schedule untouched.
+	m.scheduleTurnDrift(now, resolution.ActionMinutes)
 	return resolution, nil
 }
 

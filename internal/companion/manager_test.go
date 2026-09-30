@@ -529,7 +529,7 @@ func TestEventIdsDoNotAffectDeterministicChoice(t *testing.T) {
 	profile := DefaultProfile(1)
 	state := DefaultState(1)
 	at := time.Date(2026, 9, 28, 15, 0, 0, 0, time.Local)
-	block := scheduleBlockFor(profile, at)
+	block := templateBlockFor(profile, at)
 	engine, err := NewMetricEngine(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -586,13 +586,13 @@ func TestScheduleChangesAcrossTheDayAndWeek(t *testing.T) {
 	weekdayMorning := time.Date(2026, time.September, 28, 8, 0, 0, 0, time.Local)
 	weekdayNight := time.Date(2026, time.September, 28, 23, 0, 0, 0, time.Local)
 	weekend := time.Date(2026, time.October, 3, 14, 0, 0, 0, time.Local)
-	if kind := scheduleBlockFor(profile, weekdayMorning).Kind; kind == "sleep" {
+	if kind := templateBlockFor(profile, weekdayMorning).Kind; kind == "sleep" {
 		t.Fatalf("weekday morning should not be sleep")
 	}
-	if kind := scheduleBlockFor(profile, weekdayNight).Kind; kind != "sleep" {
+	if kind := templateBlockFor(profile, weekdayNight).Kind; kind != "sleep" {
 		t.Fatalf("weekday night kind = %q, want sleep", kind)
 	}
-	if kind := scheduleBlockFor(profile, weekend).Kind; kind == "work" {
+	if kind := templateBlockFor(profile, weekend).Kind; kind == "work" {
 		t.Fatalf("weekend unexpectedly uses work block")
 	}
 }

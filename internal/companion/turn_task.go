@@ -58,7 +58,7 @@ type TurnTask struct {
 	Applied            bool            `json:"applied,omitempty"`
 	// Forced 是用户按了「让她现在回」。有了它，日程可用性这一关直接跳过，
 	// 否则 processTurnTaskAt 会照着日程把她再塞回等待。
-	Forced             bool            `json:"forced,omitempty"`
+	Forced bool `json:"forced,omitempty"`
 }
 
 // InputText joins the user messages folded into this task.
@@ -228,14 +228,18 @@ func (t TurnTask) Active() bool {
 	}
 }
 
-func taskAvailability(profile Profile, state State, at time.Time) (bool, string, int64) {
+// planResolver hands out the plan for any day, so availability can look ahead to
+// the next free block without knowing how plans are stored.
+type planResolver func(time.Time) DayPlan
+
+func taskAvailability(state State, resolve planResolver, at time.Time) (bool, string, int64) {
 	// 场景还活着，人就在这段对话里，日程表上写什么都拦不住回消息。
 	// 之前亲密场景进行中发一条，会被判成「处理工作和日常琐事，18:30 再回」，
 	// 活活晾五个半小时。
 	if sceneLive(state, at) {
 		return true, displayActivity(state), 0
 	}
-	blocks := scheduleBlocksForDay(profile, at)
+	blocks := resolve(at).Blocks
 	minute := at.Hour()*60 + at.Minute()
 	for _, block := range blocks {
 		if minute < block.StartMinute || minute >= block.EndMinute {
@@ -252,7 +256,7 @@ func taskAvailability(profile Profile, state State, at time.Time) (bool, string,
 			return false, fmt.Sprintf("%s，暂时不能回复", block.Label), start.UnixMilli()
 		}
 		tomorrow := at.AddDate(0, 0, 1)
-		for _, candidate := range scheduleBlocksForDay(profile, tomorrow) {
+		for _, candidate := range resolve(tomorrow).Blocks {
 			if !blockAvailable(candidate.Kind) {
 				continue
 			}

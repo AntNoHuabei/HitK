@@ -10,7 +10,7 @@ import (
 func TestTaskAvailabilityWaitsForNextFreeBlock(t *testing.T) {
 	profile := DefaultProfile(time.Now().UnixMilli())
 	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
-	available, activity, notBefore := taskAvailability(profile, DefaultState(at.UnixMilli()), at)
+	available, activity, notBefore := taskAvailability(DefaultState(at.UnixMilli()), templateResolver(profile), at)
 	if available {
 		t.Fatal("balanced schedule should be unavailable at 10:00")
 	}
@@ -25,7 +25,7 @@ func TestLiveSceneOverridesBusySchedule(t *testing.T) {
 
 	// 日程上这格是工作时间，本来要推到下一个空档。
 	state := DefaultState(at.UnixMilli())
-	if available, _, notBefore := taskAvailability(profile, state, at); available || notBefore <= at.UnixMilli() {
+	if available, _, notBefore := taskAvailability(state, templateResolver(profile), at); available || notBefore <= at.UnixMilli() {
 		t.Fatalf("expected a deferral, got available=%v notBefore=%d", available, notBefore)
 	}
 
@@ -33,7 +33,7 @@ func TestLiveSceneOverridesBusySchedule(t *testing.T) {
 	state.SceneStage = "active"
 	state.ConsentState = "affirmed"
 	state.SceneStartedAt = at.Add(-10 * time.Minute).UnixMilli()
-	available, activity, notBefore := taskAvailability(profile, state, at)
+	available, activity, notBefore := taskAvailability(state, templateResolver(profile), at)
 	if !available {
 		t.Fatal("live scene should make her available regardless of the schedule")
 	}
@@ -46,7 +46,7 @@ func TestLiveSceneOverridesBusySchedule(t *testing.T) {
 
 	// 过了 3 小时衰减窗口就不再算数，回到日程判断。
 	state.SceneStartedAt = at.Add(-4 * time.Hour).UnixMilli()
-	if available, _, _ := taskAvailability(profile, state, at); available {
+	if available, _, _ := taskAvailability(state, templateResolver(profile), at); available {
 		t.Fatal("scene past its decay window should not force availability")
 	}
 }

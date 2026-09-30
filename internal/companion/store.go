@@ -24,6 +24,8 @@ var (
 	bucketTraits   = []byte("traits")
 	bucketTriggers = []byte("trigger_states")
 	bucketTasks    = []byte("tasks")
+	// Day plans live under the character id so each world keeps its own calendar.
+	bucketPlans = []byte("day_plans")
 )
 
 const (
@@ -44,7 +46,7 @@ type Store struct {
 }
 
 type TickCommit struct {
-	ID     string
+	ID       string
 	State    State
 	Event    *LifeEvent
 	Events   []LifeEvent
@@ -67,7 +69,7 @@ func OpenStore(path string) (*Store, error) {
 	err = db.Update(func(tx *bolt.Tx) error {
 		for _, bucket := range [][]byte{
 			bucketMeta, bucketProfile, bucketState, bucketEvents, bucketThoughts, bucketMemories,
-			bucketEffects, bucketTraits, bucketTriggers, bucketTasks,
+			bucketEffects, bucketTraits, bucketTriggers, bucketTasks, bucketPlans,
 		} {
 			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
 				return err
@@ -261,6 +263,72 @@ func (s *Store) SaveEffects(effects []ActiveEffect) error {
 		}
 		for _, effect := range effects {
 			if err := putJSON(bucket, effect.ID, effect); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// dayPlanKey keeps each character's calendar separate inside its own file, matching
+// how profile and state rows are keyed.
+func dayPlanKey(id, date string) string { return id + "|" + date }
+
+// DayPlan returns the saved plan for one character's date. The bool is false when
+// that day has never been planned, which is not an error.
+func (s *Store) DayPlan(id, date string) (DayPlan, bool, error) {
+	var plan DayPlan
+	err := s.view(func(tx *bolt.Tx) error {
+		raw := tx.Bucket(bucketPlans).Get([]byte(dayPlanKey(id, date)))
+		if len(raw) == 0 {
+			return nil
+		}
+		if err := json.Unmarshal(raw, &plan); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return DayPlan{}, false, err
+	}
+	if len(plan.Blocks) == 0 {
+		return DayPlan{}, false, nil
+	}
+	return plan, true, nil
+}
+
+// SaveDayPlan writes a plan under its own date.
+func (s *Store) SaveDayPlan(id string, plan DayPlan) error {
+	if plan.Date == "" {
+		return fmt.Errorf("day plan date is empty")
+	}
+	return s.update(func(tx *bolt.Tx) error {
+		return putJSON(tx.Bucket(bucketPlans), dayPlanKey(id, plan.Date), plan)
+	})
+}
+
+// PruneDayPlans drops this character's plans dated before beforeDate, so the bucket
+// cannot grow without bound. Dates sort lexicographically, so the compare is safe.
+func (s *Store) PruneDayPlans(id, beforeDate string) error {
+	prefix := id + "|"
+	return s.update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketPlans)
+		var stale [][]byte
+		err := bucket.ForEach(func(k, _ []byte) error {
+			key := string(k)
+			if !strings.HasPrefix(key, prefix) {
+				return nil
+			}
+			if strings.Compare(key[len(prefix):len(prefix)+10], beforeDate) < 0 {
+				stale = append(stale, append([]byte(nil), k...))
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		for _, key := range stale {
+			if err := bucket.Delete(key); err != nil {
 				return err
 			}
 		}
@@ -566,6 +634,13 @@ func (s *Store) DecayMemories(now int64) error {
 	})
 }
 
+// SaveThought inserts or replaces one pending thought.
+func (s *Store) SaveThought(thought PendingThought) error {
+	return s.update(func(tx *bolt.Tx) error {
+		return putJSON(tx.Bucket(bucketThoughts), thought.ID, thought)
+	})
+}
+
 // SaveMemory inserts or replaces one memory.
 func (s *Store) SaveMemory(memory Memory) error {
 	memory = normalizeMemory(memory)
@@ -700,7 +775,7 @@ func DefaultProfile(now int64) Profile {
 // DefaultState returns the first-run state.
 func DefaultState(now int64) State {
 	at := time.UnixMilli(now)
-	block := scheduleBlockFor(DefaultProfile(now), at)
+	block := templateBlockFor(DefaultProfile(now), at)
 	startedAt, endsAt := blockBounds(block, at)
 	return State{
 		Metrics:           defaultMetricValues(),

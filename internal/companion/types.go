@@ -29,9 +29,9 @@ type Profile struct {
 	Provider string `json:"provider,omitempty"`
 	Model    string `json:"model,omitempty"`
 	// Avatar is a short emoji string used by the character switcher.
-	Avatar string `json:"avatar,omitempty"`
-	CreatedAt        int64    `json:"createdAt"`
-	UpdatedAt        int64    `json:"updatedAt"`
+	Avatar    string `json:"avatar,omitempty"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 // CharacterSummary is the registry-facing projection of one companion world.
@@ -191,16 +191,16 @@ type WakeSummary struct {
 // companion header.
 type Overview struct {
 	CharacterID string           `json:"characterId"`
-	Profile    Profile          `json:"profile"`
-	State      State            `json:"state"`
-	Metrics    []MetricView     `json:"metrics"`
-	Derived    DerivedState     `json:"derived"`
-	Clock      WorldClock       `json:"clock"`
-	Weather    *WeatherSnapshot `json:"weather,omitempty"`
-	Paused     bool             `json:"paused"`
-	Unread     int              `json:"unread"`
-	ThreadID   string           `json:"threadId"`
-	ActiveTask *TurnTaskView    `json:"activeTask,omitempty"`
+	Profile     Profile          `json:"profile"`
+	State       State            `json:"state"`
+	Metrics     []MetricView     `json:"metrics"`
+	Derived     DerivedState     `json:"derived"`
+	Clock       WorldClock       `json:"clock"`
+	Weather     *WeatherSnapshot `json:"weather,omitempty"`
+	Paused      bool             `json:"paused"`
+	Unread      int              `json:"unread"`
+	ThreadID    string           `json:"threadId"`
+	ActiveTask  *TurnTaskView    `json:"activeTask,omitempty"`
 }
 
 // DecisionInput is the structured input handed to the model adapter.

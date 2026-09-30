@@ -40,8 +40,8 @@ const (
 type Event struct {
 	Kind        EventKind `json:"kind"`
 	CharacterID string    `json:"characterId"`
-	Overview Overview  `json:"overview"`
-	At       int64     `json:"at"`
+	Overview    Overview  `json:"overview"`
+	At          int64     `json:"at"`
 }
 
 // ModelPort performs the two opt-in model operations used by the simulation.
@@ -66,7 +66,7 @@ type ConversationPort interface {
 
 // Manager owns one companion world and its background lifecycle.
 type Manager struct {
-	id    string
+	id      string
 	store   *Store
 	weather *WeatherClient
 	engine  *MetricEngine
@@ -172,6 +172,96 @@ func (m *Manager) logInfo(message string, args ...any) {
 	m.mu.Unlock()
 	if logger != nil {
 		logger.Info(message, args...)
+	}
+}
+
+func (m *Manager) logWarn(message string, args ...any) {
+	m.mu.Lock()
+	logger := m.logger
+	m.mu.Unlock()
+	if logger != nil {
+		logger.Warn(message, args...)
+	}
+}
+
+// planAt returns this character's plan for the day containing at. The first time a
+// day is touched it materialises the template skeleton and persists it, so from
+// then on the day is a record drift can edit rather than a fresh lookup.
+func (m *Manager) planAt(profile Profile, at time.Time) DayPlan {
+	date := at.Format("2006-01-02")
+	if plan, ok, err := m.store.DayPlan(m.id, date); err == nil && ok {
+		return plan
+	}
+	plan := templateDayPlan(profile, at)
+	if err := m.store.SaveDayPlan(m.id, plan); err != nil {
+		m.logWarn("companion day plan persist failed", "date", date, "err", err.Error())
+	}
+	return plan
+}
+
+// ApplyDriftNow pushes one disruption into the day containing at and persists the
+// result. A no-op drift does not touch storage.
+func (m *Manager) ApplyDriftNow(at time.Time, d Drift) DriftOutcome {
+	profile, err := m.store.Profile(m.id)
+	if err != nil {
+		return DriftOutcome{}
+	}
+	plan := m.planAt(profile, at)
+	before := plan.Revision
+	outcome := plan.ApplyDrift(d)
+	if plan.Revision == before {
+		return outcome
+	}
+	if err := m.store.SaveDayPlan(m.id, plan); err != nil {
+		m.logWarn("companion drift persist failed", "date", plan.Date, "err", err.Error())
+	}
+	return outcome
+}
+
+// resolver hands out plans for any day against a profile the caller already holds,
+// so availability checks can look ahead without re-reading the profile each time.
+func (m *Manager) resolver(profile Profile) planResolver {
+	return func(at time.Time) DayPlan { return m.planAt(profile, at) }
+}
+
+// scheduleTurnDrift treats the time a turn actually took as lived time and pushes
+// it into her day. A long midday scene should genuinely make her late for the
+// afternoon, which is the whole reason the plan stays mutable. The drift is anchored
+// where the action started, not where the turn finished, so the elapsed part is not
+// counted twice.
+func (m *Manager) scheduleTurnDrift(at time.Time, minutes int) {
+	if minutes < 15 {
+		return
+	}
+	if minutes > 240 {
+		minutes = 240
+	}
+	start := at.Add(-time.Duration(minutes) * time.Minute)
+	outcome := m.ApplyDriftNow(start, Drift{
+		AtMinute: start.Hour()*60 + start.Minute(),
+		Minutes:  minutes,
+		Severity: 3,
+		Reason:   "和他待在一起，没注意时间",
+		Origin:   "turn",
+	})
+	if outcome.MissedID == "" && outcome.Late < 15 {
+		return
+	}
+	content := fmt.Sprintf("今天后面的安排被推晚了%d分钟", outcome.Late)
+	priority := 5
+	if outcome.MissedID != "" {
+		content = fmt.Sprintf("今天原定的一件事彻底赶不上了：%s", outcome.MissedLabel)
+		priority = 7
+	}
+	thought := PendingThought{
+		ID:        "thought_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12],
+		Content:   content,
+		Priority:  priority,
+		Status:    "active",
+		CreatedAt: at.UnixMilli(),
+	}
+	if err := m.store.SaveThought(thought); err != nil {
+		m.logWarn("companion drift thought failed", "err", err.Error())
 	}
 }
 
@@ -282,16 +372,16 @@ func (m *Manager) Overview(ctx context.Context) (Overview, error) {
 	}
 	return Overview{
 		CharacterID: m.id,
-		Profile:    profile,
-		State:      view,
-		Metrics:    m.engine.Views(view),
-		Derived:    m.engine.Derived(view),
-		Clock:      worldClock(time.Now()),
-		Weather:    m.weather.Cached(profile.City),
-		Paused:     paused == "1",
-		Unread:     count,
-		ThreadID:   threadID,
-		ActiveTask: activeTask,
+		Profile:     profile,
+		State:       view,
+		Metrics:     m.engine.Views(view),
+		Derived:     m.engine.Derived(view),
+		Clock:       worldClock(time.Now()),
+		Weather:     m.weather.Cached(profile.City),
+		Paused:      paused == "1",
+		Unread:      count,
+		ThreadID:    threadID,
+		ActiveTask:  activeTask,
 	}, nil
 }
 
@@ -540,7 +630,9 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		if stepTime.After(now) {
 			stepTime = now
 		}
-		block := scheduleBlockFor(profile, stepTime)
+		// Read the day from its persisted plan, not the template, so drift applied
+		// earlier today actually shows up in what she is doing now.
+		block := m.planAt(profile, stepTime).blockAt(stepTime)
 		effects = pruneEffects(effects, stepTime.UnixMilli())
 		m.engine.ApplyTick(&state, profile, block, effects, stepTime.UnixMilli())
 
@@ -718,15 +810,15 @@ func (m *Manager) overviewUnchecked(ctx context.Context) (Overview, error) {
 	count, _ := strconv.Atoi(unread)
 	return Overview{
 		CharacterID: m.id,
-		Profile:  profile,
-		State:    state,
-		Metrics:  m.engine.Views(state),
-		Derived:  m.engine.Derived(state),
-		Clock:    worldClock(time.Now()),
-		Weather:  m.weather.Cached(profile.City),
-		Paused:   paused == "1",
-		Unread:   count,
-		ThreadID: threadID,
+		Profile:     profile,
+		State:       state,
+		Metrics:     m.engine.Views(state),
+		Derived:     m.engine.Derived(state),
+		Clock:       worldClock(time.Now()),
+		Weather:     m.weather.Cached(profile.City),
+		Paused:      paused == "1",
+		Unread:      count,
+		ThreadID:    threadID,
 	}, nil
 }
 
@@ -738,7 +830,7 @@ func (m *Manager) emitEvent(kind EventKind, overview Overview) {
 		if overview.CharacterID == "" {
 			overview.CharacterID = m.id
 		}
-	emit(Event{Kind: kind, CharacterID: m.id, Overview: overview, At: time.Now().UnixMilli()})
+		emit(Event{Kind: kind, CharacterID: m.id, Overview: overview, At: time.Now().UnixMilli()})
 	}
 }
 
