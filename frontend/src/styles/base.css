@@ -4,6 +4,14 @@
   scrollbar-color: var(--hitk-border, #d9d9d9) transparent;
 }
 
+/* 语义告警色。主题系统只提供 signal，没开 antd 的 cssVar，所以 --ant-color-* 在这里
+   根本不存在；用下面两个别名顶上，取值与 features/companion/model/metricTone.ts 对齐。 */
+:root {
+  --hitk-warn: #d97706;
+  --hitk-danger: #d4380d;
+  --hitk-good: #16a34a;
+}
+
 /* 统一滚动条: 轨道保持透明, 滑块使用当前皮肤的边框/强调色。 */
 *::-webkit-scrollbar {
   width: 9px;

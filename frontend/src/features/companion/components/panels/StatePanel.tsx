@@ -29,6 +29,9 @@ const toneFor = (metric: CompanionMetricView) => {
   return BAD_WHEN_HIGH.has(metric.id) ? "warn" : "success";
 };
 
+// 「需要留意」要点到下面那一行，两边得用同一个 id。
+const metricRowId = (metricId: string) => `hitk-companion-metric-${metricId}`;
+
 export function StatePanel({
   metrics,
   derived,
@@ -85,12 +88,26 @@ export function StatePanel({
           </Text>
         ) : (
           notable.map((item) => (
-            <div key={item.metric.id} className="hitk-companion-state-notable-row">
+            // 保证分组是开的，再把那条指标滚进视野；面板一长，光靠展开找不到它。
+            <button
+              key={item.metric.id}
+              type="button"
+              className="hitk-companion-state-notable-row"
+              title={`定位到${item.metric.label}`}
+              onClick={() => {
+                setOverride((current) => ({ ...current, [item.metric.group]: false }));
+                requestAnimationFrame(() => {
+                  document
+                    .getElementById(metricRowId(item.metric.id))
+                    ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                });
+              }}
+            >
               <span>{item.metric.label}</span>
               <b className={item.direction === "high" ? "is-warn" : "is-low"}>
                 {item.read} {item.metric.value.toFixed(1)}
               </b>
-            </div>
+            </button>
           ))
         )}
       </div>
@@ -111,7 +128,7 @@ export function StatePanel({
           {group.collapsed ? null : group.rows.map((metric) => {
             const tone = toneFor(metric);
             const percent = ((metric.value - metric.min) / Math.max(1, metric.max - metric.min)) * 100;
-            return <div key={metric.id} className="hitk-companion-state-row">
+            return <div key={metric.id} id={metricRowId(metric.id)} className="hitk-companion-state-row">
               <span>{metric.label}</span>
               <Progress
                 percent={Math.max(0, Math.min(100, percent))}

@@ -4,6 +4,7 @@
 !.env.example
 .smoke/
 .workbuddy/
+frontend/.shots/
 .idea/
 bin
 wails_*.syso

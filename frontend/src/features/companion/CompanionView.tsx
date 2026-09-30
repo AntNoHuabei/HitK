@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   App as AntApp,
   Button,
+  Drawer,
   Flex,
   Input,
   Modal,
@@ -12,9 +13,13 @@ import {
 } from "antd";
 import {
   CloudOutlined,
+  DoubleLeftOutlined,
+  DoubleRightOutlined,
+  ExclamationCircleFilled,
   HeartOutlined,
   ReloadOutlined,
   SendOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import {
   companionRepository,
@@ -38,12 +43,12 @@ import { StatusMeter } from "./components/panels/StatusMeter";
 import { TurnTaskBanner } from "./components/panels/TurnTaskBanner";
 import { useCharacterStore } from "./model/characterStore";
 import { useCharacterModel } from "./model/useCharacterModel";
+import { useInspectorState, type InspectorTab } from "./model/inspectorState";
+import { notableMetrics } from "./model/metricSalience";
 import { useCompanionStore } from "./model/companionStore";
 
 const { Text, Title } = Typography;
 const NOTICE_KEY = "hitk.companion.notice.v1";
-
-type PanelKey = "state" | "life" | "memories" | "settings";
 
 export function CompanionView() {
   const { message } = AntApp.useApp();
@@ -58,7 +63,8 @@ export function CompanionView() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [panel, setPanel] = useState<PanelKey>("state");
+  const inspector = useInspectorState();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(() => localStorage.getItem(NOTICE_KEY) !== "1");
   const [memoryEditor, setMemoryEditor] = useState<CompanionMemory | null>(null);
   const [memoryModalOpen, setMemoryModalOpen] = useState(false);
@@ -290,21 +296,27 @@ export function CompanionView() {
 
   const metricValue = (id: string) =>
     (overview.metrics ?? []).find((metric) => metric.id === id)?.value ?? 0;
+  const notable = notableMetrics(overview.metrics ?? []);
 
   return (
     <div className="hitk-companion hitk-chat">
       <header className="hitk-companion-head">
         <div className="hitk-companion-identity">
           <span className="hitk-companion-mark" aria-hidden="true"><HeartOutlined /></span>
-          <div>
+          <div className="hitk-companion-title">
             <Title level={3}>{profile.name}</Title>
             <Text type="secondary">{overview.state.currentActivity}</Text>
           </div>
         </div>
         <div className="hitk-companion-status">
-          <StatusMeter label="精力" value={metricValue("vitality")} />
-          <StatusMeter label="压力" value={metricValue("stress")} tone="warn" />
-          <StatusMeter label="想念" value={metricValue("missing")} tone="signal" />
+          {/* 面板展开时详情就在右手边，头部不再重复三根条；收起时才把它们挪回来兜底。 */}
+          {inspector.collapsed ? (
+            <>
+              <StatusMeter label="精力" value={metricValue("vitality")} />
+              <StatusMeter label="压力" value={metricValue("stress")} tone="warn" />
+              <StatusMeter label="想念" value={metricValue("missing")} tone="signal" />
+            </>
+          ) : null}
           <Tag bordered={false}>{overview.derived.mood}</Tag>
           {overview.weather ? (
             <Tooltip title={`${overview.weather.city} · 城市级天气`}>
@@ -315,11 +327,34 @@ export function CompanionView() {
           ) : (
             <Tag icon={<CloudOutlined />} bordered={false}>天气未知</Tag>
           )}
+          {notable.length > 0 && (
+            <Tooltip title={notable.map((item) => `${item.metric.label}${item.read}`).join(" · ")}>
+              <button
+                type="button"
+                className="hitk-companion-alert"
+                onClick={() => inspector.openTab("state")}
+              >
+                <ExclamationCircleFilled />
+                <span>{notable.length} 项需要留意</span>
+              </button>
+            </Tooltip>
+          )}
           {overview.paused && <Tag color="default">已暂停</Tag>}
+          <Tooltip title={inspector.collapsed ? `展开${profile.name}的面板` : "收起面板"}>
+            <Button
+              type="text"
+              className="hitk-companion-toggle"
+              aria-label={inspector.collapsed ? `展开${profile.name}的面板` : "收起她的面板"}
+              aria-expanded={!inspector.collapsed}
+              aria-controls="hitk-companion-side"
+              icon={inspector.collapsed ? <DoubleRightOutlined /> : <DoubleLeftOutlined />}
+              onClick={inspector.toggle}
+            />
+          </Tooltip>
         </div>
       </header>
 
-      <div className="hitk-companion-body">
+      <div className={`hitk-companion-body${inspector.collapsed ? " is-collapsed" : ""}`}>
         <section className="hitk-companion-conversation" aria-label={`与${profile.name}的对话`}>
           <div className="hitk-companion-messages">
             {overview.activeTask && <TurnTaskBanner task={overview.activeTask} onCancel={cancelTask} />}
@@ -396,20 +431,23 @@ export function CompanionView() {
           </div>
         </section>
 
-        <aside className="hitk-companion-side" aria-label={`${profile.name}的生活与记忆`}>
+        <aside
+          id="hitk-companion-side"
+          className="hitk-companion-side"
+          aria-label={`${profile.name}的生活与记忆`}
+        >
           <Segmented
             block
-            value={panel}
-            onChange={(value) => setPanel(value as PanelKey)}
+            value={inspector.tab}
+            onChange={(value) => inspector.openTab(value as InspectorTab)}
             options={[
               { label: "状态", value: "state" },
               { label: "近日生活", value: "life" },
               { label: "记忆", value: "memories" },
-              { label: "设置", value: "settings" },
             ]}
           />
           <div className="hitk-companion-panel">
-            {panel === "state" && (
+            {inspector.tab === "state" && (
               <StatePanel
                 metrics={overview.metrics ?? []}
                 derived={overview.derived}
@@ -418,8 +456,8 @@ export function CompanionView() {
                 clock={overview.clock}
               />
             )}
-            {panel === "life" && <LifePanel events={events} />}
-            {panel === "memories" && (
+            {inspector.tab === "life" && <LifePanel events={events} />}
+            {inspector.tab === "memories" && (
               <MemoryPanel
                 memories={memories}
                 characterName={profile.name}
@@ -443,27 +481,49 @@ export function CompanionView() {
                 onDelete={(id) => void deleteMemory(id)}
               />
             )}
-            {panel === "settings" && (
-              <SettingsPanel
-                profile={profile}
-                paused={overview.paused}
-                modelOptions={modelOptions}
-                activeModelKey={activeModelKey}
-                reasoningOptions={models.reasoningOptions}
-                pinStale={models.pinStale}
-                modelReady={models.hasUsableModel}
-                deleteDisabled={deleteDisabled}
-                deleteTooltip={deleteTooltip}
-                onPause={(paused) => void setPaused(paused)}
-                onTick={() => void companionRepository.tickNow().then(refresh).catch((err) => message.error(errorText(err)))}
-                onReset={() => void reset()}
-                onDelete={() => void deleteCharacter()}
-                onSaveProfile={saveProfile}
-              />
-            )}
+          </div>
+          <div className="hitk-companion-side-foot">
+            <Button
+              type="text"
+              className="hitk-companion-settings-btn"
+              icon={<SettingOutlined />}
+              onClick={() => setSettingsOpen(true)}
+            >
+              {`${profile.name}的设置`}
+            </Button>
           </div>
         </aside>
       </div>
+
+      {/* 人设、模型、危险区需要真正的编辑宽度，不塞在 370px 的检视栏里。 */}
+      <Drawer
+        className="hitk-companion-settings-drawer"
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        width={560}
+        title={`${profile.name}的设置`}
+        destroyOnClose
+      >
+        <SettingsPanel
+          profile={profile}
+          paused={overview.paused}
+          modelOptions={modelOptions}
+          activeModelKey={activeModelKey}
+          reasoningOptions={models.reasoningOptions}
+          pinStale={models.pinStale}
+          modelReady={models.hasUsableModel}
+          deleteDisabled={deleteDisabled}
+          deleteTooltip={deleteTooltip}
+          onPause={(paused) => void setPaused(paused)}
+          onTick={() => void companionRepository.tickNow().then(refresh).catch((err) => message.error(errorText(err)))}
+          onReset={() => void reset()}
+          onDelete={() => {
+            setSettingsOpen(false);
+            void deleteCharacter();
+          }}
+          onSaveProfile={saveProfile}
+        />
+      </Drawer>
 
       <MemoryEditor
         open={memoryModalOpen}

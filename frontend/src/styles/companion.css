@@ -28,48 +28,110 @@
 
 .hitk-companion-head {
   display: flex;
-  min-height: 82px;
+  min-height: 60px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 14px 24px;
+  gap: 18px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--hitk-divider);
   background: var(--hitk-header-bg);
 }
 
 .hitk-companion-identity {
   display: flex;
-  min-width: 220px;
+  min-width: 0;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .hitk-companion-identity .ant-typography {
   margin: 0;
 }
 
+.hitk-companion-title {
+  display: grid;
+  min-width: 0;
+}
+
+.hitk-companion-title .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-companion-title h3.ant-typography {
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.hitk-companion-title .ant-typography-secondary {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .hitk-companion-mark,
 .hitk-companion-empty-mark {
   display: grid;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--hitk-signal) 24%, var(--hitk-divider));
   border-radius: 50%;
   color: var(--hitk-signal);
   background: var(--hitk-inset-bg);
-  font-size: 18px;
+  font-size: 15px;
 }
 
 .hitk-companion-status {
   display: flex;
   min-width: 0;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* 「N 项需要留意」：头部唯一的告警入口，点开直接落到状态 tab。 */
+.hitk-companion-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--hitk-warn) 38%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--hitk-warn) 12%, transparent);
+  color: var(--hitk-warn);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.hitk-companion-alert:hover,
+.hitk-companion-alert:focus-visible {
+  background: color-mix(in srgb, var(--hitk-warn) 22%, transparent);
+}
+
+.hitk-companion-toggle.ant-btn {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--hitk-muted);
+}
+
+.hitk-companion-toggle.ant-btn:hover,
+.hitk-companion-toggle.ant-btn:focus-visible {
+  color: var(--hitk-text) !important;
+  background: var(--hitk-chat-hover) !important;
 }
 
 .hitk-companion-meter {
@@ -93,6 +155,19 @@
   min-height: 0;
   flex: 1;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 370px);
+}
+
+/* 收起检视栏时对话独占整行，并把正文放宽一档，别让 800px 的列飘在空地上。 */
+.hitk-companion-body.is-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.hitk-companion-body.is-collapsed .hitk-companion-side {
+  display: none;
+}
+
+.hitk-companion-body.is-collapsed .hitk-companion-conversation {
+  --hitk-chat-content-width: 920px;
 }
 
 .hitk-companion-conversation {
@@ -162,6 +237,35 @@
   scrollbar-gutter: stable;
 }
 
+.hitk-companion-side-foot {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--hitk-divider) 70%, transparent);
+}
+
+.hitk-companion-settings-btn.ant-btn {
+  padding-inline: 6px;
+  color: var(--hitk-muted);
+  font-size: 12px;
+}
+
+.hitk-companion-settings-btn.ant-btn:hover,
+.hitk-companion-settings-btn.ant-btn:focus-visible {
+  color: var(--hitk-text) !important;
+}
+
+/* 设置抽屉：人设长文本需要真正的编辑宽度。 */
+.hitk-companion-settings-drawer .ant-drawer-body {
+  padding: 16px 22px 26px;
+}
+
+.hitk-companion-settings-drawer .hitk-companion-settings {
+  gap: 14px;
+}
+
 .hitk-companion-life-list,
 .hitk-companion-memory-list,
 .hitk-companion-settings,
@@ -218,8 +322,20 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  width: 100%;
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: var(--hitk-muted);
+  cursor: pointer;
   font-size: 12px;
+  text-align: left;
+}
+
+.hitk-companion-state-notable-row:hover,
+.hitk-companion-state-notable-row:focus-visible {
+  background: var(--hitk-chat-hover);
 }
 
 .hitk-companion-state-notable-row span {
@@ -237,11 +353,11 @@
 }
 
 .hitk-companion-state-notable-row b.is-warn {
-  color: var(--ant-color-warning);
+  color: var(--hitk-warn);
 }
 
 .hitk-companion-state-notable-row b.is-low {
-  color: var(--ant-color-primary);
+  color: var(--hitk-signal);
 }
 
 .hitk-companion-state-calm {
@@ -279,8 +395,8 @@
 .hitk-companion-state-flag {
   padding: 1px 5px;
   border-radius: 3px;
-  background: color-mix(in srgb, var(--ant-color-warning) 16%, transparent);
-  color: var(--ant-color-warning);
+  background: color-mix(in srgb, var(--hitk-warn) 16%, transparent);
+  color: var(--hitk-warn);
   font-size: 10px;
   font-weight: 600;
 }
@@ -341,11 +457,11 @@
 }
 
 .hitk-companion-state-row b .is-rising {
-  color: var(--ant-color-success);
+  color: var(--hitk-good);
 }
 
 .hitk-companion-state-row b .is-falling {
-  color: var(--ant-color-warning);
+  color: var(--hitk-warn);
 }
 
 .hitk-companion-life-item {
@@ -424,7 +540,7 @@
 }
 
 .hitk-companion-group-error-icon {
-  color: var(--ant-color-warning) !important;
+  color: var(--hitk-warn) !important;
   font-size: 12px !important;
 }
 
@@ -617,7 +733,7 @@
   display: flex;
   margin-top: 8px;
   padding-top: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--ant-color-error) 26%, var(--hitk-divider));
+  border-top: 1px solid color-mix(in srgb, var(--hitk-danger) 26%, var(--hitk-divider));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -678,8 +794,8 @@
 }
 
 .hitk-companion-error {
-  border-left-color: var(--ant-color-error);
-  color: var(--ant-color-error);
+  border-left-color: var(--hitk-danger);
+  color: var(--hitk-danger);
 }
 
 .hitk-companion-task {
@@ -710,7 +826,7 @@
 }
 
 .hitk-companion-task.is-failed {
-  border-color: color-mix(in srgb, var(--ant-color-error) 35%, var(--hitk-divider));
+  border-color: color-mix(in srgb, var(--hitk-danger) 35%, var(--hitk-divider));
 }
 
 .hitk-chat-action-message {
@@ -726,9 +842,9 @@
 .hitk-chat-partial-note {
   margin-top: 8px;
   padding: 7px 9px;
-  border-left: 2px solid color-mix(in srgb, var(--ant-color-warning) 55%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--hitk-warn) 55%, transparent);
   color: var(--hitk-muted);
-  background: color-mix(in srgb, var(--ant-color-warning) 7%, transparent);
+  background: color-mix(in srgb, var(--hitk-warn) 7%, transparent);
   font-size: 11px;
   line-height: 1.55;
 }
@@ -744,22 +860,37 @@
     justify-content: flex-start;
   }
 
+  /* 窄窗口下检视栏改成浮层：以前竖着堆在对话下面，会把对话压成一块固定高度的死区。 */
   .hitk-companion-body {
-    display: flex;
-    overflow-y: auto;
-    flex-direction: column;
+    position: relative;
+    display: block;
   }
 
   .hitk-companion-conversation {
-    min-height: 620px;
-    flex: 0 0 auto;
+    height: 100%;
   }
 
   .hitk-companion-side {
-    min-height: 420px;
-    flex: 0 0 auto;
-    border-top: 1px solid var(--hitk-divider);
-    border-left: 0;
+    position: absolute;
+    z-index: 6;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 92vw);
+    border-left: 1px solid var(--hitk-divider);
+    box-shadow: -14px 0 30px rgba(0, 0, 0, 0.28);
+  }
+
+  .hitk-companion-body.is-collapsed .hitk-companion-side {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  /* 再窄就别留一条 180px 的对话缝了，检视栏直接铺满，靠头部开关收起。 */
+  .hitk-companion-side {
+    width: 100%;
+    box-shadow: none;
   }
 }
 
@@ -779,5 +910,9 @@
 
   .hitk-companion-side {
     padding-inline: 10px;
+  }
+
+  .hitk-companion-settings-drawer .ant-drawer-content-wrapper {
+    width: 94vw !important;
   }
 }
