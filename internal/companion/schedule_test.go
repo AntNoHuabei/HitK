@@ -174,6 +174,40 @@ func TestLateToleranceRunsInverseToWeight(t *testing.T) {
 	}
 }
 
+// TestBuiltPlanCoversEveryMinute keeps the day contiguous. Minutes belonging to no
+// block used to read as free time, which leaked parked messages out while she was
+// in the middle of getting through the morning.
+func TestBuiltPlanCoversEveryMinute(t *testing.T) {
+	days := []time.Time{
+		time.Date(2026, 9, 28, 12, 0, 0, 0, time.Local), // Monday
+		time.Date(2026, 9, 30, 12, 0, 0, 0, time.Local), // Wednesday
+		time.Date(2026, 10, 3, 12, 0, 0, 0, time.Local), // Saturday
+		time.Date(2026, 10, 4, 12, 0, 0, 0, time.Local), // Sunday
+	}
+	for _, tendency := range []string{"balanced", "busy", "relaxed", "social", ""} {
+		for _, day := range days {
+			profile := DefaultProfile(1)
+			profile.ScheduleTendency = tendency
+			plan := buildDayPlan(profile, day, mergeCommitments(profile, nil))
+
+			covered := make([]bool, 1440)
+			for _, block := range plan.Blocks {
+				for m := block.StartMinute; m < block.EndMinute; m++ {
+					if m >= 0 && m < 1440 {
+						covered[m] = true
+					}
+				}
+			}
+			for m, ok := range covered {
+				if !ok {
+					t.Fatalf("tendency %q on %s leaves %02d:%02d uncovered",
+						tendency, day.Format("2006-01-02"), m/60, m%60)
+				}
+			}
+		}
+	}
+}
+
 // seedDay writes a hand-built plan for the day around at so the scenario does not
 // depend on template jitter.
 func seedDay(t *testing.T, manager *Manager, at time.Time, specs ...blockSpec) {

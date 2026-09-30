@@ -53,39 +53,214 @@ func TestUnstartedHeavyBlockLeavesHerReachable(t *testing.T) {
 	}
 }
 
+// TestBusyPromisePointsAtReliablyFreeBlock: while she is working, the time she is
+// promised is the next block that is light enough to stay free. Pointing at the
+// unstarted lunch instead promised 12:45 and delivered 17:00, because by 12:45 she
+// had started the afternoon and the promise was worthless.
+func TestBusyPromisePointsAtReliablyFreeBlock(t *testing.T) {
+	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
+	plan := mustPlan(t,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "12:00", weight: 6},
+		blockSpec{kind: "meal", label: "吃午饭", start: "12:00", end: "12:45", weight: 6},
+		blockSpec{kind: "work", label: "下午上班", start: "12:45", end: "17:00", weight: 6},
+		blockSpec{kind: "open", label: "晚上空着", start: "17:00", end: "23:00", weight: 1},
+	)
+	plan.markStarted("b_0", at)
+	resolve := func(time.Time) DayPlan { return plan }
+
+	available, activity, notBefore := taskAvailability(DefaultState(at.UnixMilli()), resolve, at)
+	if available {
+		t.Fatal("a started work block should hold her")
+	}
+	want := time.Date(2026, 9, 28, 17, 0, 0, 0, time.Local).UnixMilli()
+	if notBefore != want {
+		t.Fatalf("promised %v, want the 17:00 open block (%v); activity=%q",
+			time.UnixMilli(notBefore).Format("15:04"), time.UnixMilli(want).Format("15:04"), activity)
+	}
+}
+
+// TestAvailabilityNeverEscapesToIdleWhenNothingIsFree: a day with no light block
+// must keep her parked rather than falling through the bottom into "空闲".
+func TestAvailabilityNeverEscapesToIdleWhenNothingIsFree(t *testing.T) {
+	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
+	plan := mustPlan(t,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "17:00", weight: 8},
+	)
+	plan.markStarted("b_0", at)
+	resolve := func(time.Time) DayPlan { return plan }
+
+	available, activity, notBefore := taskAvailability(DefaultState(at.UnixMilli()), resolve, at)
+	if available {
+		t.Fatalf("a heavy started block with nothing light after it should keep her parked, got activity=%q", activity)
+	}
+	if notBefore <= at.UnixMilli() {
+		t.Fatalf("notBefore = %d, want a retry point ahead of now", notBefore)
+	}
+}
+
 func TestLiveSceneOverridesBusySchedule(t *testing.T) {
 	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
 	plan := mustPlan(t,
-		blockSpec{kind: "work", label: "上班", start: "09:00", end: "17:00", weight: 6},
-		blockSpec{kind: "rest", label: "在家待着", start: "17:00", end: "23:00", weight: 2},
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "17:00", weight: 8},
 	)
-	resolve := busyResolver(t, plan, at)
+	plan.markStarted("b_0", at)
+	resolve := func(time.Time) DayPlan { return plan }
 
-	// 日程上这格是工作时间，本来要推到下一个空档。
+	if available, _, _ := taskAvailability(DefaultState(at.UnixMilli()), resolve, at); available {
+		t.Fatal("a started heavy block should hold her")
+	}
 	state := DefaultState(at.UnixMilli())
-	if available, _, notBefore := taskAvailability(state, resolve, at); available || notBefore <= at.UnixMilli() {
-		t.Fatalf("expected a deferral, got available=%v notBefore=%d", available, notBefore)
+	state.SceneStage = "active"
+	state.SceneStartedAt = at.Add(-10 * time.Minute).UnixMilli()
+	if available, activity, _ := taskAvailability(state, resolve, at); !available {
+		t.Fatalf("a live scene should beat the schedule, activity=%q", activity)
+	}
+}
+
+// TestParkedMessageKeepsItsPromise walks the minute ticker forward from the
+// moment she said "busy until X" and fails if it ever lets her write before X.
+// The ticker re-judges availability every minute, and the live rule counts a
+// heavy block she has not started yet as free time, so crossing into the next
+// unstarted block pulled a parked message out well before the time she named.
+func TestParkedMessageKeepsItsPromise(t *testing.T) {
+	manager := openTestManager(t)
+	manager.SetPorts(&fakeModel{}, &fakeConversation{threadID: "th_companion"})
+	pinned := fixedBusyHour
+	seedDay(t, manager, pinned,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "12:00", weight: 6},
+		blockSpec{kind: "meal", label: "吃午饭", start: "12:00", end: "13:00", weight: 6},
+		blockSpec{kind: "work", label: "下午上班", start: "13:00", end: "17:00", weight: 6},
+		blockSpec{kind: "open", label: "晚上空着", start: "17:00", end: "23:00", weight: 1},
+	)
+	startBlockAt(t, manager, pinned)
+	pinClock(t, manager, pinned)
+
+	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "在吗", "", "", "", pinned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != TaskWaiting || task.NotBefore <= pinned.UnixMilli() {
+		t.Fatalf("want a parked task, got status=%s notBefore=%s",
+			task.Status, time.UnixMilli(task.NotBefore).Format("15:04"))
+	}
+	promise := time.UnixMilli(task.NotBefore)
+	dumpDay(t, manager, pinned)
+
+	for step := pinned.Add(time.Minute); step.Before(promise); step = step.Add(time.Minute) {
+		manager.processDueTurnTasks(context.Background(), step)
+		current, err := manager.store.TurnTask(task.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if current.Status != TaskWaiting {
+			t.Fatalf("ticker released her at %s (status=%s), promise was %s",
+				step.Format("15:04"), current.Status, promise.Format("15:04"))
+		}
+		if current.NotBefore < promise.UnixMilli() {
+			t.Fatalf("ticker pulled the promise in from %s to %s at %s",
+				promise.Format("15:04"), time.UnixMilli(current.NotBefore).Format("15:04"), step.Format("15:04"))
+		}
+	}
+}
+
+// TestTickerStillReleasesForALiveScene keeps the one early release that matters:
+// if a scene starts while she is parked, she is back in this conversation and the
+// parked message goes out now rather than at the time named hours ago.
+func TestTickerStillReleasesForALiveScene(t *testing.T) {
+	manager := openTestManager(t)
+	manager.SetPorts(&fakeModel{}, &fakeConversation{threadID: "th_companion"})
+	pinned := fixedBusyHour
+	seedDay(t, manager, pinned,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "17:00", weight: 8},
+		blockSpec{kind: "open", label: "晚上空着", start: "17:00", end: "23:00", weight: 1},
+	)
+	startBlockAt(t, manager, pinned)
+	pinClock(t, manager, pinned)
+
+	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "在吗", "", "", "", pinned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != TaskWaiting || task.NotBefore <= pinned.UnixMilli() {
+		t.Fatalf("want a parked task, got status=%s", task.Status)
 	}
 
-	// 但亲密场景 10 分钟前才起来，人就在这段对话里，必须立刻能回。
+	later := pinned.Add(time.Hour)
+	state, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
 	state.SceneStage = "active"
 	state.ConsentState = "affirmed"
-	state.SceneStartedAt = at.Add(-10 * time.Minute).UnixMilli()
-	available, activity, notBefore := taskAvailability(state, resolve, at)
-	if !available {
-		t.Fatal("live scene should make her available regardless of the schedule")
-	}
-	if notBefore != 0 {
-		t.Fatalf("notBefore = %d, want 0", notBefore)
-	}
-	if activity != "亲密中" {
-		t.Fatalf("activity = %q, want 亲密中", activity)
+	state.SceneStartedAt = later.Add(-5 * time.Minute).UnixMilli()
+	if err := manager.store.SaveState(manager.id, state); err != nil {
+		t.Fatal(err)
 	}
 
-	// 过了 3 小时衰减窗口就不再算数，回到日程判断。
-	state.SceneStartedAt = at.Add(-4 * time.Hour).UnixMilli()
-	if available, _, _ := taskAvailability(state, resolve, at); available {
-		t.Fatal("scene past its decay window should not force availability")
+	manager.processDueTurnTasks(context.Background(), later)
+	current, err := manager.store.TurnTask(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.NotBefore > later.UnixMilli() {
+		t.Fatalf("live scene did not release the parked task: notBefore=%s",
+			time.UnixMilli(current.NotBefore).Format("15:04"))
+	}
+}
+
+// TestTickerReleasesIntoALightBlock keeps the other honest early release: drift
+// moved her into an open stretch ahead of the promised time, so waiting longer
+// would be pointless.
+func TestTickerReleasesIntoALightBlock(t *testing.T) {
+	manager := openTestManager(t)
+	manager.SetPorts(&fakeModel{}, &fakeConversation{threadID: "th_companion"})
+	pinned := fixedBusyHour
+	seedDay(t, manager, pinned,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "12:00", weight: 8},
+		blockSpec{kind: "open", label: "中午空着", start: "12:00", end: "13:00", weight: 1},
+		blockSpec{kind: "work", label: "下午上班", start: "13:00", end: "18:00", weight: 8},
+	)
+	startBlockAt(t, manager, pinned)
+	pinClock(t, manager, pinned)
+
+	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "在吗", "", "", "", pinned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != TaskWaiting || task.NotBefore <= pinned.UnixMilli() {
+		t.Fatalf("want a parked task, got status=%s", task.Status)
+	}
+
+	light := pinned.Add(2 * time.Hour)
+	manager.processDueTurnTasks(context.Background(), light)
+	current, err := manager.store.TurnTask(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.NotBefore > light.UnixMilli() {
+		t.Fatalf("an open block should have released her: notBefore=%s",
+			time.UnixMilli(current.NotBefore).Format("15:04"))
+	}
+}
+
+// dumpDay prints the live plan so a failing availability assertion can be read
+// against the blocks that actually produced it.
+func dumpDay(t *testing.T, manager *Manager, at time.Time) {
+	t.Helper()
+	profile, err := manager.store.Profile(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := manager.planAt(profile, at)
+	t.Logf("plan %s rev=%d", plan.Date, plan.Revision)
+	for _, block := range plan.Blocks {
+		started := "unstarted"
+		if block.StartedAt > 0 {
+			started = "started"
+		}
+		t.Logf("  %02d:%02d-%02d:%02d w=%-2d %-8s %s %s",
+			block.StartMinute/60, block.StartMinute%60, block.EndMinute/60, block.EndMinute%60,
+			block.Weight, block.Kind, block.Label, started)
 	}
 }
 

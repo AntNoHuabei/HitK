@@ -239,32 +239,48 @@ func taskAvailability(state State, resolve planResolver, at time.Time) (bool, st
 	if sceneLive(state, at) {
 		return true, displayActivity(state), 0
 	}
-	blocks := resolve(at).Blocks
-	minute := at.Hour()*60 + at.Minute()
-	for _, block := range blocks {
-		if minute < block.StartMinute || minute >= block.EndMinute {
+	plan := resolve(at)
+	// blockAt always answers. The old loop searched for the block containing this
+	// minute and, when the plan had a gap, fell off the bottom into "空闲" and let a
+	// parked message out while she was nowhere near free.
+	block := plan.blockAt(at)
+	if blockReplyable(block) {
+		return true, block.Label, 0
+	}
+	label := fmt.Sprintf("%s，暂时不能回复", block.Label)
+	if next, ok := nextFreeStart(plan, block.EndMinute, at); ok {
+		return false, label, next
+	}
+	tomorrow := at.AddDate(0, 0, 1)
+	if next, ok := nextFreeStart(resolve(tomorrow), 0, tomorrow); ok {
+		return false, label, next
+	}
+	// Nothing light is coming up. Retry in an hour rather than failing open: a
+	// parked message should wait on a schedule it can name, not escape because the
+	// lookup ran out of blocks.
+	return false, label, at.Add(time.Hour).UnixMilli()
+}
+
+// nextFreeStart finds the first block at or after fromMinute that she can be
+// counted on to be free in. Only light blocks qualify. An unstarted heavy block is
+// free right now only because she has not begun it yet, and by the time we get
+// there she will have, which is what turned "busy until 12:45" into "busy until
+// 17:00" and made the promise worthless.
+func nextFreeStart(plan DayPlan, fromMinute int, day time.Time) (int64, bool) {
+	best := -1
+	for _, block := range plan.Blocks {
+		if block.Weight > replyWeightCeiling || block.EndMinute <= fromMinute {
 			continue
 		}
-		if blockReplyable(block) {
-			return true, block.Label, 0
-		}
-		for _, candidate := range blocks {
-			if candidate.StartMinute < block.EndMinute || !blockReplyable(candidate) {
-				continue
-			}
-			start := time.Date(at.Year(), at.Month(), at.Day(), 0, candidate.StartMinute, 0, 0, at.Location())
-			return false, fmt.Sprintf("%s，暂时不能回复", block.Label), start.UnixMilli()
-		}
-		tomorrow := at.AddDate(0, 0, 1)
-		for _, candidate := range resolve(tomorrow).Blocks {
-			if !blockReplyable(candidate) {
-				continue
-			}
-			start := time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 0, candidate.StartMinute, 0, 0, tomorrow.Location())
-			return false, fmt.Sprintf("%s，暂时不能回复", block.Label), start.UnixMilli()
+		start := max(block.StartMinute, fromMinute)
+		if best < 0 || start < best {
+			best = start
 		}
 	}
-	return true, "空闲", 0
+	if best < 0 {
+		return 0, false
+	}
+	return time.Date(day.Year(), day.Month(), day.Day(), 0, best, 0, 0, day.Location()).UnixMilli(), true
 }
 
 // blockReplyable is one rule instead of a lookup table: a light block never holds
@@ -273,6 +289,27 @@ func taskAvailability(state State, resolve planResolver, at time.Time) (bool, st
 // reachable, and exactly why the old kind table got it backwards.
 func blockReplyable(block scheduleBlock) bool {
 	return block.Weight <= replyWeightCeiling || block.StartedAt == 0
+}
+
+// earlyRelease answers a narrower question than taskAvailability: once she has
+// told him "busy until five", is there anything that makes it honest to write
+// back before five? Only two things qualify. A scene that pulled her back into
+// this conversation, and a block light enough that she was never really held by it.
+//
+// The "heavy block she has not started" escape is left out on purpose. That rule
+// is right for a message arriving cold, where no promise has been made yet, but it
+// is what turned "busy until 17:00" into a reply at 12:00 the moment she drifted
+// into an unstarted lunch. A promise she does not keep is worse than a promise
+// she keeps a little late.
+func earlyRelease(state State, resolve planResolver, at time.Time) (bool, string) {
+	if sceneLive(state, at) {
+		return true, displayActivity(state)
+	}
+	block := resolve(at).blockAt(at)
+	if block.Weight <= replyWeightCeiling {
+		return true, block.Label
+	}
+	return false, ""
 }
 
 // sceneLive 报告场景是否仍在进行。时间边界写在这里而不是依赖 sceneStage 已被衰减，

@@ -91,6 +91,11 @@ func (p DayPlan) blockAt(at time.Time) scheduleBlock {
 	if len(p.Blocks) == 0 {
 		return scheduleBlock{Kind: "rest", Label: "空闲", Origin: "plan", Weight: 2, StartMinute: 0, EndMinute: 1440}
 	}
+	// A hole left by drift belongs to nothing. Handing back the last block of the
+	// day here would tell her she is asleep at ten in the morning.
+	if minute < p.Blocks[len(p.Blocks)-1].EndMinute {
+		return openBlock(minute, minute)
+	}
 	// Past the end of the plan: hold the last block rather than falling off the map.
 	return p.Blocks[len(p.Blocks)-1]
 }
@@ -517,13 +522,16 @@ func (b *dayBuilder) fillOpen() {
 	filled := make([]scheduleBlock, 0, len(b.blocks)*2)
 	cursor := 0
 	for _, block := range b.blocks {
-		if block.StartMinute-cursor >= 10 {
+		// Every leftover stretch gets a block, however short. A skipped six minute
+		// gap between breakfast and the commute left minutes belonging to nothing,
+		// and availability read those as free time.
+		if block.StartMinute > cursor {
 			filled = append(filled, openBlock(cursor, block.StartMinute))
 		}
 		filled = append(filled, block)
 		cursor = block.EndMinute
 	}
-	if 1440-cursor >= 10 {
+	if cursor < 1440 {
 		filled = append(filled, openBlock(cursor, 1440))
 	}
 	b.blocks = filled

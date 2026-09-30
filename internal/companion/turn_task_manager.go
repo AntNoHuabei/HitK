@@ -251,10 +251,13 @@ func (m *Manager) processDueTurnTasks(ctx context.Context, now time.Time) {
 		if task.Status != TaskWaiting {
 			continue
 		}
-		// 等待途中场景可能才起来，或者日程刚好空出来。每分钟重判一次并往前挪，
-		// 别让人守着一个早已过期的 notBefore 干等。
 		if task.NotBefore > now.UnixMilli() && profileErr == nil && stateErr == nil {
-			if available, activity, _ := taskAvailability(state, m.resolver(profile), now); available {
+			// 等待途中场景可能才起来，或者日程刚好空出来，所以每分钟重判一次，
+			// 别让人守着一个早已过期的 notBefore 干等。但提前放行只认这两种：
+			// 场景把她拉回了对话，或者眼下这格本来就轻。用完整的日程判断会把
+			// 已经说出口的时间往回吞 —— 她讲了 17 点，结果 12 点一进那格
+			// 还没开始的午饭就被放出来了。
+			if released, activity := earlyRelease(state, m.resolver(profile), now); released {
 				task.NotBefore = now.UnixMilli()
 				task.CurrentActivity = activity
 				task.AvailabilityReason = ""
