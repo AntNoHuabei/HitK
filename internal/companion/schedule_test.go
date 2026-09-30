@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-// templateResolver builds a planResolver straight off the template, for tests that
-// do not care about persisted plans.
-func templateResolver(profile Profile) planResolver {
-	return func(at time.Time) DayPlan { return templateDayPlan(profile, at) }
-}
-
 type blockSpec struct {
 	kind   string
 	label  string
@@ -186,6 +180,29 @@ func seedDay(t *testing.T, manager *Manager, at time.Time, specs ...blockSpec) {
 	t.Helper()
 	plan := mustPlan(t, specs...)
 	plan.Date = at.Format("2006-01-02")
+	if err := manager.store.SaveDayPlan(manager.id, plan); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// startBlockAt marks whatever the persisted day holds at `at` as begun. The tick
+// loop does this as time passes, and availability now keys off it, so a test that
+// wants her busy has to put her inside the block rather than just point at a busy
+// hour on the clock.
+func startBlockAt(t *testing.T, manager *Manager, at time.Time) {
+	t.Helper()
+	profile, err := manager.store.Profile(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := manager.planAt(profile, at)
+	block := plan.blockAt(at)
+	if block.Kind == "open" {
+		t.Fatalf("no committed block at %s to be busy with", at.Format("15:04"))
+	}
+	if !plan.markStarted(block.ID, at) {
+		t.Fatalf("could not start block %q", block.ID)
+	}
 	if err := manager.store.SaveDayPlan(manager.id, plan); err != nil {
 		t.Fatal(err)
 	}

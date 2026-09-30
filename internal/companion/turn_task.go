@@ -245,11 +245,11 @@ func taskAvailability(state State, resolve planResolver, at time.Time) (bool, st
 		if minute < block.StartMinute || minute >= block.EndMinute {
 			continue
 		}
-		if blockAvailable(block.Kind) {
+		if blockReplyable(block) {
 			return true, block.Label, 0
 		}
 		for _, candidate := range blocks {
-			if candidate.StartMinute < block.EndMinute || !blockAvailable(candidate.Kind) {
+			if candidate.StartMinute < block.EndMinute || !blockReplyable(candidate) {
 				continue
 			}
 			start := time.Date(at.Year(), at.Month(), at.Day(), 0, candidate.StartMinute, 0, 0, at.Location())
@@ -257,7 +257,7 @@ func taskAvailability(state State, resolve planResolver, at time.Time) (bool, st
 		}
 		tomorrow := at.AddDate(0, 0, 1)
 		for _, candidate := range resolve(tomorrow).Blocks {
-			if !blockAvailable(candidate.Kind) {
+			if !blockReplyable(candidate) {
 				continue
 			}
 			start := time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 0, candidate.StartMinute, 0, 0, tomorrow.Location())
@@ -267,13 +267,12 @@ func taskAvailability(state State, resolve planResolver, at time.Time) (bool, st
 	return true, "空闲", 0
 }
 
-func blockAvailable(kind string) bool {
-	switch kind {
-	case "morning", "break", "rest", "hobby":
-		return true
-	default:
-		return false
-	}
+// blockReplyable is one rule instead of a lookup table: a light block never holds
+// her, and a heavy one only holds her once she has actually started it. A weight
+// 8 job she has not begun is her putting it off, which is exactly when she is
+// reachable, and exactly why the old kind table got it backwards.
+func blockReplyable(block scheduleBlock) bool {
+	return block.Weight <= replyWeightCeiling || block.StartedAt == 0
 }
 
 // sceneLive 报告场景是否仍在进行。时间边界写在这里而不是依赖 sceneStage 已被衰减，

@@ -63,6 +63,15 @@ type State struct {
 	LastUserAt        int64                `json:"lastUserAt"`
 	LastProactiveAt   int64                `json:"lastProactiveAt"`
 	LastMemoryDecayAt int64                `json:"lastMemoryDecayAt"`
+	// SleepDebtMinutes accumulates past the sleep anchor and only pays back while
+	// she actually sleeps, capped per session so a big debt takes days to clear.
+	SleepDebtMinutes int `json:"sleepDebtMinutes"`
+	// SleepRepaidMinutes is how much the current sleep session has already paid back,
+	// so the per-session cap holds even across a long catch-up.
+	SleepRepaidMinutes int `json:"sleepRepaidMinutes"`
+	// SleepStreak counts consecutive nights she went to bed well past the anchor.
+	// Three or more starts dragging her mood down.
+	SleepStreak int `json:"sleepStreak"`
 }
 
 // LifeEvent is one meaningful event produced by a simulation step. Minor

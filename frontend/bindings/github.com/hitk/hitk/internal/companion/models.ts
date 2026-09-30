@@ -161,10 +161,12 @@ export enum MetricID {
     MetricAlertness = "alertness",
     MetricCognitiveLoad = "cognitiveLoad",
     MetricMotivation = "motivation",
+    MetricFlow = "flow",
     MetricMoodValence = "moodValence",
     MetricStress = "stress",
     MetricAnxiety = "anxiety",
     MetricIrritability = "irritability",
+    MetricBoredom = "boredom",
     MetricLoneliness = "loneliness",
     MetricSocialEnergy = "socialEnergy",
     MetricLibido = "libido",
@@ -332,6 +334,24 @@ export interface State {
     "lastUserAt": number;
     "lastProactiveAt": number;
     "lastMemoryDecayAt": number;
+
+    /**
+     * SleepDebtMinutes accumulates past the sleep anchor and only pays back while
+     * she actually sleeps, capped per session so a big debt takes days to clear.
+     */
+    "sleepDebtMinutes": number;
+
+    /**
+     * SleepRepaidMinutes is how much the current sleep session has already paid back,
+     * so the per-session cap holds even across a long catch-up.
+     */
+    "sleepRepaidMinutes": number;
+
+    /**
+     * SleepStreak counts consecutive nights she went to bed well past the anchor.
+     * Three or more starts dragging her mood down.
+     */
+    "sleepStreak": number;
 }
 
 export enum TraitID {

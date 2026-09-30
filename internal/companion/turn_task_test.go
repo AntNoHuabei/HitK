@@ -7,25 +7,63 @@ import (
 	"time"
 )
 
-func TestTaskAvailabilityWaitsForNextFreeBlock(t *testing.T) {
-	profile := DefaultProfile(time.Now().UnixMilli())
-	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
-	available, activity, notBefore := taskAvailability(DefaultState(at.UnixMilli()), templateResolver(profile), at)
-	if available {
-		t.Fatal("balanced schedule should be unavailable at 10:00")
+// busyResolver serves a hand-built day with the block at `at` already begun. That
+// is what the tick loop produces over time, and availability now turns on whether
+// she has actually started something rather than on what the clock says she is
+// scheduled for, so a test that wants her busy has to put her inside it.
+func busyResolver(t *testing.T, plan DayPlan, at time.Time) planResolver {
+	t.Helper()
+	block := plan.blockAt(at)
+	if block.Kind == "open" {
+		t.Fatalf("no committed block at %s to be busy with", at.Format("15:04"))
 	}
-	if activity == "" || notBefore <= at.UnixMilli() {
-		t.Fatalf("activity=%q notBefore=%d", activity, notBefore)
+	if !plan.markStarted(block.ID, at) {
+		t.Fatalf("could not start block %q", block.ID)
+	}
+	return func(time.Time) DayPlan { return plan }
+}
+
+func TestTaskAvailabilityWaitsForNextFreeBlock(t *testing.T) {
+	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
+	plan := mustPlan(t,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "17:00", weight: 6},
+		blockSpec{kind: "rest", label: "在家待着", start: "17:00", end: "23:00", weight: 2},
+	)
+	available, activity, notBefore := taskAvailability(DefaultState(at.UnixMilli()), busyResolver(t, plan, at), at)
+	if available {
+		t.Fatal("a block she has actually started should hold her")
+	}
+	want := time.Date(2026, 9, 28, 17, 0, 0, 0, time.Local).UnixMilli()
+	if activity == "" || notBefore != want {
+		t.Fatalf("activity=%q notBefore=%d, want %d", activity, notBefore, want)
+	}
+}
+
+func TestUnstartedHeavyBlockLeavesHerReachable(t *testing.T) {
+	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
+	// The same heavy block, but she has not begun it. That is putting it off, which
+	// is exactly when she picks up the phone, and it is the whole reason the old
+	// kind table was replaced.
+	plan := mustPlan(t,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "17:00", weight: 8},
+	)
+	resolve := func(time.Time) DayPlan { return plan }
+	if available, _, _ := taskAvailability(DefaultState(at.UnixMilli()), resolve, at); !available {
+		t.Fatal("a heavy block she has not started should leave her reachable")
 	}
 }
 
 func TestLiveSceneOverridesBusySchedule(t *testing.T) {
-	profile := DefaultProfile(time.Now().UnixMilli())
 	at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
+	plan := mustPlan(t,
+		blockSpec{kind: "work", label: "上班", start: "09:00", end: "17:00", weight: 6},
+		blockSpec{kind: "rest", label: "在家待着", start: "17:00", end: "23:00", weight: 2},
+	)
+	resolve := busyResolver(t, plan, at)
 
 	// 日程上这格是工作时间，本来要推到下一个空档。
 	state := DefaultState(at.UnixMilli())
-	if available, _, notBefore := taskAvailability(state, templateResolver(profile), at); available || notBefore <= at.UnixMilli() {
+	if available, _, notBefore := taskAvailability(state, resolve, at); available || notBefore <= at.UnixMilli() {
 		t.Fatalf("expected a deferral, got available=%v notBefore=%d", available, notBefore)
 	}
 
@@ -33,7 +71,7 @@ func TestLiveSceneOverridesBusySchedule(t *testing.T) {
 	state.SceneStage = "active"
 	state.ConsentState = "affirmed"
 	state.SceneStartedAt = at.Add(-10 * time.Minute).UnixMilli()
-	available, activity, notBefore := taskAvailability(state, templateResolver(profile), at)
+	available, activity, notBefore := taskAvailability(state, resolve, at)
 	if !available {
 		t.Fatal("live scene should make her available regardless of the schedule")
 	}
@@ -46,7 +84,7 @@ func TestLiveSceneOverridesBusySchedule(t *testing.T) {
 
 	// 过了 3 小时衰减窗口就不再算数，回到日程判断。
 	state.SceneStartedAt = at.Add(-4 * time.Hour).UnixMilli()
-	if available, _, _ := taskAvailability(state, templateResolver(profile), at); available {
+	if available, _, _ := taskAvailability(state, resolve, at); available {
 		t.Fatal("scene past its decay window should not force availability")
 	}
 }
@@ -147,6 +185,8 @@ func TestForceReplyPullsWaitingTaskOutOfSchedule(t *testing.T) {
 	}
 	pinned := fixedBusyHour
 	pinClock(t, manager, pinned)
+	// She is genuinely mid-way through the work block, not merely scheduled for it.
+	startBlockAt(t, manager, pinned)
 
 	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "在吗", "", "", "", pinned)
 	if err != nil {

@@ -185,18 +185,34 @@ func (m *Manager) logWarn(message string, args ...any) {
 }
 
 // planAt returns this character's plan for the day containing at. The first time a
-// day is touched it materialises the template skeleton and persists it, so from
-// then on the day is a record drift can edit rather than a fresh lookup.
+// day is touched it materialises from the body template plus her commitments and
+// persists it, so from then on the day is a record drift can edit rather than a
+// fresh lookup.
 func (m *Manager) planAt(profile Profile, at time.Time) DayPlan {
 	date := at.Format("2006-01-02")
 	if plan, ok, err := m.store.DayPlan(m.id, date); err == nil && ok {
 		return plan
 	}
-	plan := templateDayPlan(profile, at)
+	plan := m.dayPlanFor(profile, at)
+	// A day that begins while she is still asleep inherits that sleep rather than
+	// starting a fresh unstarted one, so she does not wake at midnight and have to
+	// fall asleep again.
+	if prev, ok, err := m.store.DayPlan(m.id, at.AddDate(0, 0, -1).Format("2006-01-02")); err == nil && ok {
+		plan.carrySleepFrom(prev)
+	}
 	if err := m.store.SaveDayPlan(m.id, plan); err != nil {
 		m.logWarn("companion day plan persist failed", "date", date, "err", err.Error())
 	}
 	return plan
+}
+
+// dayPlanFor builds today from the body template plus whatever she is committed to.
+func (m *Manager) dayPlanFor(profile Profile, at time.Time) DayPlan {
+	stored, err := m.store.Commitments(m.id)
+	if err != nil {
+		stored = nil
+	}
+	return buildDayPlan(profile, at, mergeCommitments(profile, stored))
 }
 
 // ApplyDriftNow pushes one disruption into the day containing at and persists the
@@ -625,15 +641,39 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		}
 	}
 	eventCount := 0
+	// Plans are held per date across the whole advance so a block started at one
+	// step is still started at the next, instead of being re-read as unstarted from
+	// storage every fifteen minutes.
+	plans := map[string]DayPlan{}
+	planFor := func(stepTime time.Time) DayPlan {
+		date := stepTime.Format("2006-01-02")
+		if plan, ok := plans[date]; ok {
+			return plan
+		}
+		plan := m.planAt(profile, stepTime)
+		plans[date] = plan
+		return plan
+	}
 	for i := 0; i < steps; i++ {
 		stepTime := from.Add(time.Duration(i+1) * tickInterval)
 		if stepTime.After(now) {
 			stepTime = now
 		}
-		// Read the day from its persisted plan, not the template, so drift applied
-		// earlier today actually shows up in what she is doing now.
-		block := m.planAt(profile, stepTime).blockAt(stepTime)
+		plan := planFor(stepTime)
+		block := plan.blockAt(stepTime)
 		effects = pruneEffects(effects, stepTime.UnixMilli())
+		// Forces are advanced before the fire check so this step reads the freshest
+		// need and reluctance rather than the ones it walked in with.
+		UpdateDrives(&state, block, stepTime)
+		if block.StartedAt == 0 && !block.Missed && ShouldStart(state, block, stepTime) {
+			if plan.markStarted(block.ID, stepTime) {
+				if block.Kind == "sleep" {
+					NoteSleepStart(&state, stepTime)
+				}
+				plans[plan.Date] = plan
+				block = plan.blockAt(stepTime)
+			}
+		}
 		m.engine.ApplyTick(&state, profile, block, effects, stepTime.UnixMilli())
 
 		triggerEvents, nextTriggers := m.engine.EvaluateTriggers(state, triggerStates, stepTime)
@@ -682,7 +722,7 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 			}
 		}
 		startedAt, endsAt := blockBounds(block, stepTime)
-		state.CurrentActivity = block.Label
+		state.CurrentActivity = activityLabel(block)
 		state.ActivityKind = block.Kind
 		state.ActivityStartedAt = startedAt
 		state.ActivityEndsAt = endsAt
@@ -691,6 +731,7 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		if err := m.store.CommitTick(TickCommit{ID: m.id,
 			State: state, Event: event, Thought: thought, Memories: memories,
 			Effects: effects, Triggers: triggerStates,
+			Plan: &plan,
 		}); err != nil {
 			return err
 		}

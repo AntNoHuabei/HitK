@@ -138,7 +138,9 @@ func TestConversationBuildAdvancesWorldClock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	task, err := manager.SubmitUserTurn(context.Background(), "th_companion", "陪我说会儿话吧", "", "", "")
+	// Submit against the pinned instant so the background kick leaves this task
+	// alone and the test owns the processing.
+	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "陪我说会儿话吧", "", "", "", base)
 	if err != nil {
 		t.Fatal(err)
 	}

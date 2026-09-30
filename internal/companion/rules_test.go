@@ -20,8 +20,8 @@ func TestEmbeddedRulesLoadAndHashIsStable(t *testing.T) {
 	if first.Hash == "" || first.Hash != second.Hash {
 		t.Fatalf("rule hash is not stable: %q / %q", first.Hash, second.Hash)
 	}
-	if len(first.Metrics) != 18 {
-		t.Fatalf("metric count = %d, want 18", len(first.Metrics))
+	if len(first.Metrics) != 20 {
+		t.Fatalf("metric count = %d, want 20", len(first.Metrics))
 	}
 	if len(first.Traits) != 6 {
 		t.Fatalf("trait count = %d, want 6", len(first.Traits))

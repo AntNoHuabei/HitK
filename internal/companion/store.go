@@ -26,6 +26,8 @@ var (
 	bucketTasks    = []byte("tasks")
 	// Day plans live under the character id so each world keeps its own calendar.
 	bucketPlans = []byte("day_plans")
+	// Commitments are the environment layer: extras beyond the profile defaults.
+	bucketCommitments = []byte("commitments")
 )
 
 const (
@@ -55,6 +57,9 @@ type TickCommit struct {
 	Effects  []ActiveEffect
 	Triggers map[string]TriggerState
 	Task     *TurnTask
+	// Plan is the day she is living through, carried along so a block starting or
+	// drifting lands in the same transaction as the state it caused.
+	Plan *DayPlan
 }
 
 // OpenStore opens or creates a companion database.
@@ -69,7 +74,7 @@ func OpenStore(path string) (*Store, error) {
 	err = db.Update(func(tx *bolt.Tx) error {
 		for _, bucket := range [][]byte{
 			bucketMeta, bucketProfile, bucketState, bucketEvents, bucketThoughts, bucketMemories,
-			bucketEffects, bucketTraits, bucketTriggers, bucketTasks, bucketPlans,
+			bucketEffects, bucketTraits, bucketTriggers, bucketTasks, bucketPlans, bucketCommitments,
 		} {
 			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
 				return err
@@ -168,6 +173,11 @@ func (s *Store) CommitTick(commit TickCommit) error {
 	return s.update(func(tx *bolt.Tx) error {
 		if err := putState(tx, characterID, commit.State); err != nil {
 			return err
+		}
+		if commit.Plan != nil && commit.Plan.Revision > 0 {
+			if err := putJSON(tx.Bucket(bucketPlans), dayPlanKey(characterID, commit.Plan.Date), *commit.Plan); err != nil {
+				return err
+			}
 		}
 		if commit.Event != nil {
 			if err := putJSON(tx.Bucket(bucketEvents), eventKey(*commit.Event), *commit.Event); err != nil {
@@ -333,6 +343,43 @@ func (s *Store) PruneDayPlans(id, beforeDate string) error {
 			}
 		}
 		return nil
+	})
+}
+
+// SaveCommitment stores one commitment beyond the profile defaults.
+func (s *Store) SaveCommitment(characterID string, commitment Commitment) error {
+	if commitment.ID == "" {
+		return fmt.Errorf("commitment id is empty")
+	}
+	return s.update(func(tx *bolt.Tx) error {
+		return putJSON(tx.Bucket(bucketCommitments), characterID+"|"+commitment.ID, commitment)
+	})
+}
+
+// Commitments returns this character's stored extras.
+func (s *Store) Commitments(characterID string) ([]Commitment, error) {
+	prefix := characterID + "|"
+	var out []Commitment
+	err := s.view(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketCommitments).ForEach(func(k, raw []byte) error {
+			if !strings.HasPrefix(string(k), prefix) {
+				return nil
+			}
+			var commitment Commitment
+			if err := json.Unmarshal(raw, &commitment); err != nil {
+				return nil
+			}
+			out = append(out, commitment)
+			return nil
+		})
+	})
+	return out, err
+}
+
+// DeleteCommitment removes one stored commitment.
+func (s *Store) DeleteCommitment(characterID, commitmentID string) error {
+	return s.update(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketCommitments).Delete([]byte(characterID + "|" + commitmentID))
 	})
 }
 
@@ -865,10 +912,12 @@ func defaultMetricValues() map[MetricID]float64 {
 		MetricAlertness:          75,
 		MetricCognitiveLoad:      20,
 		MetricMotivation:         60,
+		MetricFlow:               10,
 		MetricMoodValence:        20,
 		MetricStress:             20,
 		MetricAnxiety:            18,
 		MetricIrritability:       12,
+		MetricBoredom:            5,
 		MetricLoneliness:         35,
 		MetricSocialEnergy:       65,
 		MetricLibido:             35,

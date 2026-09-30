@@ -56,6 +56,16 @@ metrics:
     default: 60
     baseRatePerHour: 0
     recovery: {mode: homeostatic, baseline: 55, speedPerHour: 0.05}
+  # 沉浸度。由 Go 的 drives 直接驱动，这里只给边界与默认值，
+  # 所以基速率和恢复都归零，不让通用引擎插手。
+  flow:
+    label: 沉浸
+    group: cognitive
+    min: 0
+    max: 100
+    default: 10
+    baseRatePerHour: 0
+    recovery: {mode: linear, baseline: 0, speedPerHour: 0}
   moodValence:
     label: 情绪
     group: emotion
@@ -88,6 +98,15 @@ metrics:
     default: 12
     baseRatePerHour: 0
     recovery: {mode: homeostatic, baseline: 10, speedPerHour: 0.07}
+  # 无聊。空白期累积，同样由 drives 驱动。
+  boredom:
+    label: 无聊
+    group: emotion
+    min: 0
+    max: 100
+    default: 5
+    baseRatePerHour: 0
+    recovery: {mode: linear, baseline: 0, speedPerHour: 0}
   loneliness:
     label: 孤独
     group: social

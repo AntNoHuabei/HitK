@@ -584,7 +584,9 @@ func TestWorldClockKnowsWeekdaySeasonAndDayPart(t *testing.T) {
 func TestScheduleChangesAcrossTheDayAndWeek(t *testing.T) {
 	profile := DefaultProfile(1)
 	weekdayMorning := time.Date(2026, time.September, 28, 8, 0, 0, 0, time.Local)
-	weekdayNight := time.Date(2026, time.September, 28, 23, 0, 0, 0, time.Local)
+	// 23:59 is past the latest the jittered bedtime anchor can land, so this holds
+	// whatever the day's jitter turned out to be.
+	weekdayNight := time.Date(2026, time.September, 28, 23, 59, 0, 0, time.Local)
 	weekend := time.Date(2026, time.October, 3, 14, 0, 0, 0, time.Local)
 	if kind := templateBlockFor(profile, weekdayMorning).Kind; kind == "sleep" {
 		t.Fatalf("weekday morning should not be sleep")

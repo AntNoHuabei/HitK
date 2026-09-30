@@ -183,6 +183,16 @@ metrics:
       schedule.sleep: 0.35
       schedule.break: -0.75
       state.fatigue: 0.12
+  # 沉浸与无聊由 drives.go 的三股力直接算，通用引擎在这里必须完全让路：
+  # 速率上下界都锁在 0，权重表留空，值就只会被 Go 改。
+  flow:
+    rateMin: 0
+    rateMax: 0
+    weights: {}
+  boredom:
+    rateMin: 0
+    rateMax: 0
+    weights: {}
 interactions:
   user_presence:
     impulses:
