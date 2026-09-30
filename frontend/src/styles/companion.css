@@ -235,6 +235,9 @@
   scrollbar-width: thin;
   /* 预留滚动条槽，否则滚动条会压住指标行右边缘的数值与趋势箭头。 */
   scrollbar-gutter: stable;
+  /* 滚动条槽是贴在内容右边缘的，光预留还不够：数值列离滚动条只剩 2px，
+     而左边有 16px 留白，看着就是右边顶死的。这 14px 把两边拉平。 */
+  padding-right: 14px;
 }
 
 .hitk-companion-side-foot {
