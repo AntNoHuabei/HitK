@@ -2,7 +2,7 @@
 
 **Agentic Search 知识库桌面端** —— 让模型自己去检索、定位、引用，而不是把资料一次性塞进上下文。
 
-Wails v3 (Go) + React 18 / Ant Design 5。同一套界面兼顾 **Work**（面向资料与知识库）与 **Coding**（面向代码仓库与命令执行）两种工作方式——两者共用同一块对话区域，只在左上角切换。内置 10 套主题，设置页采用左分区 / 右内容的双栏布局。
+Wails v3 (Go) + React 18 / Ant Design 5。同一套界面兼顾 **Work**（面向资料与知识库）、**Coding**（面向代码仓库与命令执行）和独立的 **她**（本地虚拟陪伴）——Work/Coding 共用对话区域，她拥有自己的状态、生活时间线、记忆和专用会话。内置 10 套主题，设置页采用左分区 / 右内容的双栏布局。
 
 ---
 
@@ -149,23 +149,29 @@ go test ./internal/service/ -v -count=1  # 端到端：入库 → 检索 → 工
 
 **自定义服务商**（自建网关、代理、兼容端点）没有内置目录，保存配置时会调用其 `/models` 接口**拉取模型列表**，勾选需要的模型后再保存；拉取失败会给出原因，允许先保存、稍后重试。
 
-每个服务商都可以单独「测试连接」，并设为 Work / Coding 各自的默认模型——两种模式互不干扰，切换模式即切换模型。
+每个服务商都可以单独「测试连接」，并设为 Work / Coding / 她各自的默认模型——三种交互面互不干扰。
 
 **检索向量**可选：默认使用内置的离线哈希向量（零配置、零成本、无需联网）；也可以在设置里指定一家厂商的 embedding 模型（如 `text-embedding-3-small`、`bge-m3`、`nomic-embed-text`），检索会自动切到混合模式，并在切换模型后提示重建索引。
 
 ---
 
-## 4. 两种模式
+## 4. Work、Coding 与「她」
 
 对话和编码**不分家**：左侧栏、消息流、输入框、审批弹窗都是同一套组件，左上角切换 Work / Coding 只改变这一轮携带的 mode（默认模型、工具集、作用域、审批策略随之切换），会话历史连续保留，不会因为切换模式而另开一块区域。
 
-| | Work | Coding |
-| --- | --- | --- |
-| 面向 | 资料、知识库、研究 | 代码仓库、命令执行 |
-| 工具集 | kb_* 检索工具、抓网页、写知识库 | 再加读写文件、目录导航、搜索、Shell |
-| 作用域 | 可绑定某个知识库 | 绑定工作区目录 |
-| 默认模型 | 可单独指定 | 可单独指定 |
-| 审批默认 | 只读优先 | 写操作 / 命令逐次确认 |
+| | Work | Coding | 她 |
+| --- | --- | --- | --- |
+| 面向 | 资料、知识库、研究 | 代码仓库、命令执行 | 虚拟陪伴、生活时间线与记忆 |
+| 工具集 | kb_* 检索工具、抓网页、写知识库 | 再加读写文件、目录导航、搜索、Shell | 不开放通用工具，注入结构化生活上下文 |
+| 作用域 | 可绑定某个知识库 | 绑定工作区目录 | 独立专用会话 |
+| 默认模型 | 可单独指定 | 可单独指定 | 可单独指定 |
+| 审批默认 | 只读优先 | 写操作 / 命令逐次确认 | 只读 |
+
+「她」每 15 分钟推进一次独立状态，最多离线补算 7 天；城市级天气、记忆自动提取、暂停和重置均在本地完成。主动性由陪伴模型按状态判断，不使用 Work/Coding 的工具权限。
+
+内部模拟分为四层：世界时钟和带随机扰动的日程块；精力、饥饿、疲劳、情绪、社交与关系属性；由日程和状态共同决定权重的事件池；带短期事件、长期记忆、召回强化和遗忘曲线的记忆层。用户出现会降低思念与孤独、提升情绪，并按对话内容缓慢改变信任和亲密度。
+
+指标动力学由 `internal/companion/rules/` 下的 embed YAML 驱动：`metric_catalog.yaml` 定义指标和恢复档案，`metric_weights.yaml` 维护多输入权重矩阵，`event_rules.yaml` 定义事件、阈值迟滞和冷却。运行时统一由 Metric Engine 积分，LLM 不参与数值计算。
 
 **审批策略**分三档：`只读`（拒绝一切写操作）、`手动确认`（写操作弹窗确认，可勾选「本会话不再询问」）、`完全放行`（写操作直接执行，不再打断）。
 
@@ -176,19 +182,20 @@ go test ./internal/service/ -v -count=1  # 端到端：入库 → 检索 → 工
 ## 5. 架构
 
 ```
-main.go                     装配：配置 → 容器 → 注册 5 个服务 → 开窗（无边框）
+main.go                     装配：配置 → 容器 → 注册 7 个服务 → 开窗（无边框）
 internal/
   protocol/   提交(Op) 与事件(Event) 的类型定义 —— 前后端唯一的契约
   provider/   18 家厂商接入层，统一成流式 chat + tool-calling
   kb/         知识库：解析 → 分块 → 索引 → 混合检索（BM25 + 向量）
   tools/      工具注册表：kb_* / 文件 / Shell / 网页 / 待办
   agent/      turn 循环（ReAct）：流式 → 工具 → 回灌 → 再流式
-  service/    Wails 服务：App / Chat / KB / Settings / Model
+  companion/  独立陪伴领域：生活模拟、状态、记忆、天气、主动消息
+  service/    Wails 服务：App / Chat / KB / Settings / Model / Runtime / Companion
   config/     配置读写与路径解析
 frontend/src/
   theme/      主题定义与 ThemeContext（CSS 变量注入）
   shared/     types / repositories（服务调用封装）/ wails（事件订阅）/ lib / components
-  features/   按功能拆分的模块：shell / chat / knowledge / settings
+  features/   按功能拆分的模块：shell / chat / companion / knowledge / settings
   views/      MainLayout / ChatView / SettingsView
   styles/     base / app-shell / chat / knowledge / settings / citations / permissions
 ```
@@ -205,7 +212,7 @@ features/chat/
 ```
 
 - **shared/repositories**：所有 Wails 服务调用的唯一入口，组件不直接 import 生成的绑定。绑定是 interface 模式（`wails3 task common:generate:bindings`），Go 的 nil slice 过桥是 `null`，因此仓库层统一做空值兜底。
-- **features/shell/shellStore.ts**：只管视图路由（chat / knowledge / settings），不掺业务状态。
+- **features/shell/shellStore.ts**：只管视图路由（chat / companion / knowledge / settings），不掺业务状态。
 - **事件 → 状态的归约只发生在 `conversationStore` 一处**：`shared/wails/events.ts` 订阅全局事件后分发进 store，组件只读状态、不碰协议。
 
 ### 主题系统
@@ -262,7 +269,7 @@ features/chat/
 | macOS | `~/Library/Application Support/HitK/` |
 | Linux | `$XDG_CONFIG_HOME/HitK/` 或 `~/.config/HitK/` |
 
-目录内容：`config.json`（设置与厂商凭据）、`knowledge.db`（bbolt 知识库）、`threads/*.json`（每会话一个文件，先写临时文件再重命名，崩溃不会留下半截文件）、`runtime-components/`（按需下载并校验的 Skill 组件）、`hitk.log`。
+目录内容：`config.json`（设置与厂商凭据）、`knowledge.db`（bbolt 知识库）、`companion.db`（陪伴状态、生活事件与记忆）、`threads/*.json`（每会话一个文件，先写临时文件再重命名，崩溃不会留下半截文件）、`runtime-components/`（按需下载并校验的 Skill 组件）、`hitk.log`。
 
 设置环境变量 `HITK_DATA_DIR` 可覆盖数据目录（便于多套配置并存或做本地调试）。
 
@@ -289,4 +296,4 @@ features/chat/
 - 离线哈希向量适合中小规模语料；语料明显变大或需要跨语言语义检索时，建议配置厂商 embedding 模型并重建索引。
 - 检索索引存在本地 bbolt 中，暂不支持多设备同步。
 - **内置服务商**的模型目录是内置快照，新模型需更新 `internal/provider/catalog.go` 后重新编译；自定义服务商走 `/models` 拉取，不受此限。
-- 厂商**改名或下线**模型不会让已保存的选择失效：`internal/provider` 维护一份「退役 ID → 在售 ID」映射，启动时自动改写 `config.json` 里的当前模型、两种模式的默认模型与已启用列表并落盘。目录里没有的模型（用户手填的、自建网关的）原样保留，不会被改写。
+- 厂商**改名或下线**模型不会让已保存的选择失效：`internal/provider` 维护一份「退役 ID → 在售 ID」映射，启动时自动改写 `config.json` 里的当前模型、各交互面的默认模型与已启用列表并落盘。目录里没有的模型（用户手填的、自建网关的）原样保留，不会被改写。

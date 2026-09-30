@@ -84,13 +84,21 @@ export interface Attachment {
 }
 
 /**
+ * CompanionReply separates observable actions from spoken dialogue.
+ */
+export interface CompanionReply {
+    "actions"?: string[] | null;
+    "speech"?: string;
+}
+
+/**
  * Delta carries an incremental text update for an in-progress item.
  */
 export interface Delta {
     "itemId": string;
 
     /**
-     * text | reasoning
+     * text | reasoning | action | speech
      */
     "channel": string;
     "text": string;
@@ -164,6 +172,7 @@ export interface Item {
     "status": ItemStatus;
     "createdAt": number;
     "text"?: string;
+    "companionReply"?: CompanionReply | null;
     "reasoning"?: string;
     "tool"?: ToolCall | null;
     "refs"?: Reference[] | null;
@@ -204,6 +213,7 @@ export enum ItemType {
     ItemReasoning = "reasoning",
     ItemToolCall = "tool_call",
     ItemPlan = "plan",
+    ItemCompanionTurn = "companion_turn",
     ItemNotice = "notice",
     ItemError = "error",
 };
@@ -226,6 +236,13 @@ export enum Mode {
      * ModeCoding is the software-engineering surface: files, shell, git, tests.
      */
     ModeCoding = "coding",
+
+    /**
+     * ModeCompanion is the built-in companion surface. It keeps the same turn
+     * lifecycle as other conversations but exposes no tools; its life state is
+     * injected as runtime context instead.
+     */
+    ModeCompanion = "companion",
 
     /**
      * ModeAuto lets the runtime pick a surface from the request.
@@ -261,6 +278,14 @@ export interface Op {
      */
     "reasoningEffort"?: string;
     "policy"?: ApprovalPolicy;
+
+    /**
+     * CompanionTaskID links a companion turn to its durable TurnTask. The
+     * coordinator already persisted the user input and alignment item, so the
+     * agent must not append the input a second time.
+     */
+    "companionTaskId"?: string;
+    "skipUserInput"?: boolean;
 
     /**
      * Approval

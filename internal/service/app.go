@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/hitk/hitk/internal/agent"
+	"github.com/hitk/hitk/internal/companion"
 	"github.com/hitk/hitk/internal/config"
 	"github.com/hitk/hitk/internal/document"
 	"github.com/hitk/hitk/internal/kb"
@@ -38,6 +40,7 @@ type Container struct {
 	Registry  *tools.Registry
 	Sessions  *agent.SessionStore
 	Runtime   *skillruntime.Manager
+	Characters *companion.Registry
 	Documents *document.Engine
 	Catalog   *skillcatalog.Catalog
 	Resolver  *skillcatalog.Resolver
@@ -61,6 +64,23 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 	if err != nil {
 		kbStore.Close()
 		return nil, fmt.Errorf("打开会话目录失败: %w", err)
+	}
+	companionPath := paths.CompanionFile
+	if companionPath == "" {
+		companionPath = filepath.Join(paths.DataDir, "companion.db")
+	}
+	registryPath := paths.CompanionRegistryFile
+	if registryPath == "" {
+		registryPath = filepath.Join(paths.DataDir, "companions.db")
+	}
+	companionsDir := paths.CompanionDir
+	if companionsDir == "" {
+		companionsDir = filepath.Join(paths.DataDir, "companions")
+	}
+	characters, err := companion.OpenRegistry(registryPath, companionsDir, companionPath)
+	if err != nil {
+		kbStore.Close()
+		return nil, fmt.Errorf("打开陪伴角色注册表失败: %w", err)
 	}
 
 	providers := provider.NewRegistry()
@@ -103,6 +123,7 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 		Registry:  registry,
 		Sessions:  sessions,
 		Runtime:   runtimeManager,
+		Characters: characters,
 		Documents: documents,
 		Catalog:   catalog,
 		Resolver:  resolver,
@@ -117,6 +138,7 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 		Tools:        registry,
 		Providers:    providers,
 		Sessions:     sessions,
+		Companion:    companionRouter{registry: characters},
 		Emit:         emit,
 		Workspace:    workspace,
 		ContextLimit: cfg.ContextLimit,
@@ -125,7 +147,54 @@ func NewContainer(paths config.Paths, store *config.Store, emit func(*protocol.E
 	if ctxLimit := contextLimitFor(cfg.Provider, cfg.Model); ctxLimit > 0 {
 		c.Agent.SetContextLimit(ctxLimit)
 	}
+	// Both bridges are character-agnostic: the profile travels with every call,
+	// so one pair serves every companion world.
+	characters.Configure(
+		&companionModelBridge{providers: providers, config: store},
+		&companionConversationBridge{config: store, sessions: sessions, agent: c.Agent, providers: providers},
+	)
 	return c, nil
+}
+
+// companionRouter sends agent-side companion callbacks to whichever character
+// owns the thread the turn is running in.
+type companionRouter struct{ registry *companion.Registry }
+
+func (rt companionRouter) PrepareCompanionTurn(
+	ctx context.Context, threadID, turnID, taskID, userText string,
+) (string, error) {
+	manager, err := rt.registry.ManagerForThread(threadID)
+	if err != nil {
+		return "", err
+	}
+	return manager.PrepareCompanionTurn(ctx, threadID, turnID, taskID, userText)
+}
+
+func (rt companionRouter) CompleteCompanionTurn(threadID, turnID, taskID, userText, assistantText string) {
+	if manager, err := rt.registry.ManagerForThread(threadID); err == nil {
+		manager.CompleteCompanionTurn(threadID, turnID, taskID, userText, assistantText)
+	}
+}
+
+func (rt companionRouter) FailCompanionTurn(threadID, turnID, taskID, message string) {
+	if manager, err := rt.registry.ManagerForThread(threadID); err == nil {
+		manager.FailCompanionTurn(threadID, turnID, taskID, message)
+	}
+}
+
+// ActiveCompanion returns the manager behind the one active character.
+func (c *Container) ActiveCompanion() (*companion.Manager, error) {
+	if c.Characters == nil {
+		return nil, fmt.Errorf("陪伴模块未初始化")
+	}
+	manager, err := c.Characters.Active()
+	if err != nil {
+		return nil, err
+	}
+	if manager == nil {
+		return nil, fmt.Errorf("陪伴模块未初始化")
+	}
+	return manager, nil
 }
 
 type documentExtractor interface {
@@ -160,6 +229,11 @@ func extractDocumentWithRuntime(
 // in the background and keep writing as they finish, so closing the knowledge
 // store underneath them would race the tail of an in-flight turn.
 func (c *Container) Close() {
+	// Stop the companion registry first so no ticker can append a proactive
+	// message while the generic agent is shutting down underneath it.
+	if c.Characters != nil {
+		_ = c.Characters.Close()
+	}
 	if c.Agent != nil {
 		c.Agent.Shutdown()
 	}
@@ -168,6 +242,34 @@ func (c *Container) Close() {
 	}
 	if c.KB != nil {
 		_ = c.KB.Close()
+	}
+}
+
+// SetCompanionEmitter wires companion state updates to a dedicated Wails event
+// for every character world.
+func (c *Container) SetCompanionEmitter(emit func(*companion.Event)) {
+	if c.Characters == nil {
+		return
+	}
+	c.Characters.SetEmitter(func(event companion.Event) {
+		if emit != nil {
+			emit(&event)
+		}
+	})
+}
+
+// SetLogger gives the companion module the same structured application logger.
+func (c *Container) SetLogger(logger *slog.Logger) {
+	if c.Characters != nil {
+		c.Characters.SetLogger(logger)
+	}
+}
+
+// StartCompanion starts the active character's catch-up and Tick loop. Inactive
+// characters stay frozen until they are switched to.
+func (c *Container) StartCompanion() {
+	if c.Characters != nil {
+		c.Characters.Start(context.Background())
 	}
 }
 

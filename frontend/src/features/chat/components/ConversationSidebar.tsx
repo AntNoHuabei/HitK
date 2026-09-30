@@ -17,6 +17,7 @@ import {
 import type { AgentMode, ConversationSummary } from "../../../shared/types/chat";
 import { HITK_THEMES, useHitKTheme } from "../../../theme/ThemeContext";
 import type { ViewKey } from "../../shell/shellStore";
+import { CharacterSidebarGroup } from "../../companion/components/CharacterSidebarGroup";
 
 const { Text } = Typography;
 
@@ -46,10 +47,6 @@ export function ConversationSidebar({
   onDeleteConversation,
 }: Props) {
   const [scrolled, setScrolled] = useState(false);
-
-  const navItems = [
-    { key: "knowledge" as const, label: "知识库", icon: <DatabaseOutlined /> },
-  ];
 
   return (
     <aside className="hitk-chat-app-sidebar" aria-label="应用导航与会话">
@@ -112,18 +109,19 @@ export function ConversationSidebar({
         className={`hitk-chat-sidebar-scroll ${scrolled ? "is-scrolled" : ""}`}
         onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 0)}
       >
+        {/* 「她」单独成组放在 nav 外面：角色行有自己的网格尺寸，
+            挤在 nav 的 .ant-btn 规则里只会互相打架。 */}
+        <CharacterSidebarGroup />
+
         <nav className="hitk-chat-app-nav" aria-label="功能菜单">
-          {navItems.map((item) => (
-            <Button
-              key={item.key}
-              type="text"
-              className={item.key === activeView ? "is-active" : undefined}
-              icon={item.icon}
-              onClick={() => onNavigate(item.key)}
-            >
-              <span>{item.label}</span>
-            </Button>
-          ))}
+          <Button
+            type="text"
+            className={activeView === "knowledge" ? "is-active" : undefined}
+            icon={<DatabaseOutlined />}
+            onClick={() => onNavigate("knowledge")}
+          >
+            <span>知识库</span>
+          </Button>
         </nav>
 
         <div className="hitk-chat-workspace-list">

@@ -177,6 +177,7 @@ export const modelRepository = {
     return {
       work: { provider: raw.work.provider, model: raw.work.model },
       coding: { provider: raw.coding.provider, model: raw.coding.model },
+      companion: { provider: raw.companion.provider, model: raw.companion.model },
     };
   },
 

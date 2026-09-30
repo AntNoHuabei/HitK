@@ -2,7 +2,7 @@
 //
 // 消息与工具卡片直接渲染后端协议模型(Item/Event),这里只放对话列表与
 // 上下文用量这类视图专用的类型。
-export type AgentMode = "work" | "coding";
+export type AgentMode = "work" | "coding" | "companion";
 
 export type ApprovalPolicy = "auto" | "read-only" | "manual";
 

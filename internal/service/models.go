@@ -131,10 +131,11 @@ type ModeDefaultView struct {
 	Model    string `json:"model"`
 }
 
-// ModeDefaultsView carries the Work and Coding selections.
+// ModeDefaultsView carries the Work, Coding and Companion selections.
 type ModeDefaultsView struct {
-	Work   ModeDefaultView `json:"work"`
-	Coding ModeDefaultView `json:"coding"`
+	Work      ModeDefaultView `json:"work"`
+	Coding    ModeDefaultView `json:"coding"`
+	Companion ModeDefaultView `json:"companion"`
 }
 
 // ---------------------------------------------------------------------------
@@ -551,9 +552,11 @@ func (s *ModelService) draftConfig(in ProviderInput) (provider.VendorConfig, pro
 func (s *ModelService) ModeDefaults() ModeDefaultsView {
 	work := s.c.Config.ModeDefault(protocol.ModeWork)
 	coding := s.c.Config.ModeDefault(protocol.ModeCoding)
+	companion := s.c.Config.ModeDefault(protocol.ModeCompanion)
 	return ModeDefaultsView{
-		Work:   ModeDefaultView{Provider: work.Provider, Model: work.Model},
-		Coding: ModeDefaultView{Provider: coding.Provider, Model: coding.Model},
+		Work:      ModeDefaultView{Provider: work.Provider, Model: work.Model},
+		Coding:    ModeDefaultView{Provider: coding.Provider, Model: coding.Model},
+		Companion: ModeDefaultView{Provider: companion.Provider, Model: companion.Model},
 	}
 }
 
@@ -661,7 +664,7 @@ func (s *ModelService) syncRegistry() {
 // in both Work and Coding.
 func (s *ModelService) seedModeDefaults(cfg provider.VendorConfig) {
 	choice := config.ModelChoice{Provider: cfg.ID, Model: cfg.DefaultModel}
-	for _, mode := range []protocol.Mode{protocol.ModeWork, protocol.ModeCoding} {
+	for _, mode := range []protocol.Mode{protocol.ModeWork, protocol.ModeCoding, protocol.ModeCompanion} {
 		current := s.c.Config.ModeDefault(mode)
 		if _, configured := s.vendor(current.Provider); configured {
 			continue
@@ -678,7 +681,7 @@ func (s *ModelService) seedModeDefaults(cfg provider.VendorConfig) {
 // dropModeDefaultFor clears mode selections that point at a model the user has
 // just switched off.
 func (s *ModelService) dropModeDefaultFor(providerID, model string) {
-	for _, mode := range []protocol.Mode{protocol.ModeWork, protocol.ModeCoding} {
+	for _, mode := range []protocol.Mode{protocol.ModeWork, protocol.ModeCoding, protocol.ModeCompanion} {
 		if current := s.c.Config.ModeDefault(mode); current.Provider == providerID && current.Model == model {
 			_ = s.c.Config.Update(func(c *config.Config) { delete(c.ModeDefaults, string(mode)) })
 		}
@@ -688,7 +691,7 @@ func (s *ModelService) dropModeDefaultFor(providerID, model string) {
 // clearModeDefaultsFor drops every mode selection that names a provider, used
 // when that provider is deleted outright.
 func (s *ModelService) clearModeDefaultsFor(providerID string) {
-	for _, mode := range []protocol.Mode{protocol.ModeWork, protocol.ModeCoding} {
+	for _, mode := range []protocol.Mode{protocol.ModeWork, protocol.ModeCoding, protocol.ModeCompanion} {
 		if current := s.c.Config.ModeDefault(mode); current.Provider == providerID {
 			_ = s.c.Config.Update(func(c *config.Config) { delete(c.ModeDefaults, string(mode)) })
 		}
@@ -737,6 +740,8 @@ func parseMode(mode string) (protocol.Mode, error) {
 		return protocol.ModeWork, nil
 	case protocol.ModeCoding:
 		return protocol.ModeCoding, nil
+	case protocol.ModeCompanion:
+		return protocol.ModeCompanion, nil
 	default:
 		return "", fmt.Errorf("未知的模式: %s", mode)
 	}

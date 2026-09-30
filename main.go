@@ -1,10 +1,10 @@
 // Command HitK is a desktop Agentic Search knowledge base.
 //
-// The binary embeds the React frontend and exposes four Go services to it:
-// App (window and workspace), Chat (turns and threads), KB (knowledge bases and
-// retrieval) and Settings (vendors and model selection). Long-running work
-// reports progress through a single protocol event stream rather than through
-// return values, so the UI stays responsive while a turn is in flight.
+// The binary embeds the React frontend and exposes Go services for the shell,
+// chat, knowledge base, settings, models, skill runtimes and the built-in
+// companion. Long-running work reports progress through event streams rather
+// than through return values, so the UI stays responsive while work is in
+// flight.
 package main
 
 import (
@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hitk/hitk/internal/companion"
 	"github.com/hitk/hitk/internal/config"
 	"github.com/hitk/hitk/internal/protocol"
 	"github.com/hitk/hitk/internal/service"
@@ -31,6 +32,7 @@ func init() {
 	// listener signature for the frontend instead of `any`.
 	application.RegisterEvent[protocol.Event](protocol.EventName)
 	application.RegisterEvent[skillruntime.RuntimeProgress](skillruntime.RuntimeProgressEventName)
+	application.RegisterEvent[companion.Event](companion.EventName)
 }
 
 func main() {
@@ -80,6 +82,12 @@ func main() {
 			app.Event.Emit(skillruntime.RuntimeProgressEventName, *progress)
 		}
 	})
+	container.SetCompanionEmitter(func(event *companion.Event) {
+		if event != nil {
+			app.Event.Emit(companion.EventName, *event)
+		}
+	})
+	container.SetLogger(logger)
 	defer container.Close()
 
 	// Services are registered through the app's service registry so that the
@@ -96,6 +104,9 @@ func main() {
 		service.NewModelService(container), application.ServiceOptions{Name: "Model"}))
 	app.RegisterService(application.NewServiceWithOptions(
 		service.NewRuntimeService(container), application.ServiceOptions{Name: "Runtime"}))
+	app.RegisterService(application.NewServiceWithOptions(
+		service.NewCompanionService(container), application.ServiceOptions{Name: "Companion"}))
+	container.StartCompanion()
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     "HitK",

@@ -73,6 +73,10 @@ func Default() Config {
 		ModeDefaults: map[string]ModelChoice{
 			string(protocol.ModeWork):   {Provider: "deepseek", Model: "deepseek-flash"},
 			string(protocol.ModeCoding): {Provider: "deepseek", Model: "deepseek-flash"},
+			string(protocol.ModeCompanion): {
+				Provider: "deepseek",
+				Model:    "deepseek-flash",
+			},
 		},
 		Preferences: map[string]string{},
 		Onboarded:   false,
@@ -96,6 +100,16 @@ type Paths struct {
 	ConfigFile string
 	// KBFile is the bbolt knowledge-base file.
 	KBFile string
+	// CompanionFile is the bbolt database owned by the companion module. It is
+	// deliberately separate from the knowledge base so either can be backed up
+	// or reset independently.
+	CompanionFile string
+	// CompanionRegistryFile indexes every companion character and records which
+	// one is active.
+	CompanionRegistryFile string
+	// CompanionDir holds one bbolt database per extra companion character. The
+	// default character keeps living in CompanionFile so no migration is needed.
+	CompanionDir string
 	// ThreadsDir holds one JSON file per conversation.
 	ThreadsDir string
 	// LogFile receives the application log.
@@ -136,13 +150,16 @@ func ResolvePaths() (Paths, error) {
 	}
 
 	paths := Paths{
-		DataDir:    base,
-		ConfigFile: filepath.Join(base, "config.json"),
-		KBFile:     filepath.Join(base, "knowledge.db"),
-		ThreadsDir: filepath.Join(base, "threads"),
-		LogFile:    filepath.Join(base, "hitk.log"),
+		DataDir:       base,
+		ConfigFile:    filepath.Join(base, "config.json"),
+		KBFile:        filepath.Join(base, "knowledge.db"),
+		CompanionFile: filepath.Join(base, "companion.db"),
+		CompanionRegistryFile: filepath.Join(base, "companions.db"),
+		CompanionDir:          filepath.Join(base, "companions"),
+		ThreadsDir:    filepath.Join(base, "threads"),
+		LogFile:       filepath.Join(base, "hitk.log"),
 	}
-	for _, dir := range []string{paths.DataDir, paths.ThreadsDir} {
+	for _, dir := range []string{paths.DataDir, paths.ThreadsDir, paths.CompanionDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return Paths{}, err
 		}
@@ -221,6 +238,14 @@ func (s *Store) normalize() bool {
 			continue
 		}
 		s.cfg.ModeDefaults[string(mode)] = fallback
+		changed = true
+	}
+	if choice, ok := s.cfg.ModeDefaults[string(protocol.ModeCompanion)]; !ok || choice.IsZero() {
+		work := s.cfg.ModeDefaults[string(protocol.ModeWork)]
+		if work.IsZero() {
+			work = fallback
+		}
+		s.cfg.ModeDefaults[string(protocol.ModeCompanion)] = work
 		changed = true
 	}
 	if s.cfg.Preferences == nil {

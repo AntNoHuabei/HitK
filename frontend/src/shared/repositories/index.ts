@@ -4,6 +4,7 @@
 // 类型,组件因此既不需要知道绑定的路径,也不需要防 null。
 export { appRepository } from "./app";
 export { chatRepository } from "./chat";
+export { companionRepository } from "./companion";
 export { knowledgeRepository } from "./knowledge";
 export { modelRepository } from "./models";
 export { runtimeRepository } from "./runtime";
@@ -24,6 +25,19 @@ export type {
   TodoEntry,
   ToolCall,
   Usage,
+  CompanionCharacter,
+  CompanionEvent,
+  CompanionEventKind,
+  CompanionDerivedState,
+  CompanionMemory,
+  CompanionMetricView,
+  CompanionOverview,
+  CompanionProfile,
+  CompanionState,
+  CompanionTurnBrief,
+  CompanionTurnTaskView,
+  CompanionWeather,
+  LifeEvent,
   RuntimeStatus,
   SkillEnvironmentStatus,
   ResolvedPlan,

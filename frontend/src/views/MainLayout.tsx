@@ -15,6 +15,7 @@ import {
 import { Window as WailsWindow } from "@wailsio/runtime";
 import ChatView from "./ChatView";
 import SettingsView from "./SettingsView";
+import { CompanionRoute } from "../features/companion/CompanionRoute";
 import { KnowledgeView } from "../features/knowledge/components/KnowledgeView";
 import { RuntimeInitializationModal } from "../features/runtime/components/RuntimeInitializationModal";
 import { useShellStore } from "../features/shell/shellStore";
@@ -22,6 +23,7 @@ import type { ViewKey } from "../features/shell/shellStore";
 
 const VIEW_LABEL: Record<ViewKey, string> = {
   chat: "对话",
+  companion: "陪伴",
   knowledge: "知识库",
   settings: "设置",
 };
@@ -31,7 +33,6 @@ export default function MainLayout() {
   const sidebarOpen = useShellStore((state) => state.sidebarOpen);
   const toggleSidebar = useShellStore((state) => state.toggleSidebar);
   const requestNewChat = useShellStore((state) => state.requestNewChat);
-
   return (
     <div className="hitk-window-shell">
       <header className="hitk-window-titlebar">
@@ -101,7 +102,13 @@ export default function MainLayout() {
                 aria-label={VIEW_LABEL[view]}
               >
                 <div className="hitk-feature-content">
-                  {view === "knowledge" ? <KnowledgeView /> : <SettingsView />}
+                  {view === "companion" ? (
+                    <CompanionRoute />
+                  ) : view === "knowledge" ? (
+                    <KnowledgeView />
+                  ) : (
+                    <SettingsView />
+                  )}
                 </div>
               </section>
             )}

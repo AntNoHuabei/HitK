@@ -31,6 +31,10 @@ const (
 	ModeWork Mode = "work"
 	// ModeCoding is the software-engineering surface: files, shell, git, tests.
 	ModeCoding Mode = "coding"
+	// ModeCompanion is the built-in companion surface. It keeps the same turn
+	// lifecycle as other conversations but exposes no tools; its life state is
+	// injected as runtime context instead.
+	ModeCompanion Mode = "companion"
 	// ModeAuto lets the runtime pick a surface from the request.
 	ModeAuto Mode = "auto"
 )
@@ -38,7 +42,7 @@ const (
 // Valid reports whether m is a known mode.
 func (m Mode) Valid() bool {
 	switch m {
-	case ModeWork, ModeCoding, ModeAuto:
+	case ModeWork, ModeCoding, ModeCompanion, ModeAuto:
 		return true
 	}
 	return false
@@ -64,13 +68,14 @@ const (
 type ItemType string
 
 const (
-	ItemUserMessage  ItemType = "user_message"
-	ItemAgentMessage ItemType = "agent_message"
-	ItemReasoning    ItemType = "reasoning"
-	ItemToolCall     ItemType = "tool_call"
-	ItemPlan         ItemType = "plan"
-	ItemNotice       ItemType = "notice"
-	ItemError        ItemType = "error"
+	ItemUserMessage   ItemType = "user_message"
+	ItemAgentMessage  ItemType = "agent_message"
+	ItemReasoning     ItemType = "reasoning"
+	ItemToolCall      ItemType = "tool_call"
+	ItemPlan          ItemType = "plan"
+	ItemCompanionTurn ItemType = "companion_turn"
+	ItemNotice        ItemType = "notice"
+	ItemError         ItemType = "error"
 )
 
 // ItemStatus is the lifecycle state of an item.
@@ -145,22 +150,29 @@ type TodoEntry struct {
 
 // Item is the atomic renderable unit inside a turn.
 type Item struct {
-	ID          string         `json:"id"`
-	TurnID      string         `json:"turnId"`
-	ThreadID    string         `json:"threadId"`
-	Type        ItemType       `json:"type"`
-	Status      ItemStatus     `json:"status"`
-	CreatedAt   int64          `json:"createdAt"`
-	Text        string         `json:"text,omitempty"`
-	Reasoning   string         `json:"reasoning,omitempty"`
-	Tool        *ToolCall      `json:"tool,omitempty"`
-	Refs        []Reference    `json:"refs,omitempty"`
-	Plan        []TodoEntry    `json:"plan,omitempty"`
-	Error       string         `json:"error,omitempty"`
-	Attachments []Attachment   `json:"attachments,omitempty"`
-	Artifacts   []Artifact     `json:"artifacts,omitempty"`
-	Usage       *Usage         `json:"usage,omitempty"`
-	Meta        map[string]any `json:"meta,omitempty"`
+	ID             string          `json:"id"`
+	TurnID         string          `json:"turnId"`
+	ThreadID       string          `json:"threadId"`
+	Type           ItemType        `json:"type"`
+	Status         ItemStatus      `json:"status"`
+	CreatedAt      int64           `json:"createdAt"`
+	Text           string          `json:"text,omitempty"`
+	CompanionReply *CompanionReply `json:"companionReply,omitempty"`
+	Reasoning      string          `json:"reasoning,omitempty"`
+	Tool           *ToolCall       `json:"tool,omitempty"`
+	Refs           []Reference     `json:"refs,omitempty"`
+	Plan           []TodoEntry     `json:"plan,omitempty"`
+	Error          string          `json:"error,omitempty"`
+	Attachments    []Attachment    `json:"attachments,omitempty"`
+	Artifacts      []Artifact      `json:"artifacts,omitempty"`
+	Usage          *Usage          `json:"usage,omitempty"`
+	Meta           map[string]any  `json:"meta,omitempty"`
+}
+
+// CompanionReply separates observable actions from spoken dialogue.
+type CompanionReply struct {
+	Actions []string `json:"actions,omitempty"`
+	Speech  string   `json:"speech,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +200,7 @@ const (
 // Delta carries an incremental text update for an in-progress item.
 type Delta struct {
 	ItemID  string `json:"itemId"`
-	Channel string `json:"channel"` // text | reasoning
+	Channel string `json:"channel"` // text | reasoning | action | speech
 	Text    string `json:"text"`
 }
 
@@ -282,6 +294,11 @@ type Op struct {
 	Attachments     []Attachment   `json:"attachments,omitempty"`
 	ReasoningEffort string         `json:"reasoningEffort,omitempty"` // off | low | medium | high
 	Policy          ApprovalPolicy `json:"policy,omitempty"`
+	// CompanionTaskID links a companion turn to its durable TurnTask. The
+	// coordinator already persisted the user input and alignment item, so the
+	// agent must not append the input a second time.
+	CompanionTaskID string `json:"companionTaskId,omitempty"`
+	SkipUserInput   bool   `json:"skipUserInput,omitempty"`
 	// Approval
 	ApprovalID string `json:"approvalId,omitempty"`
 	Approve    bool   `json:"approve,omitempty"`

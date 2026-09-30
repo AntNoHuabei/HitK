@@ -112,7 +112,7 @@ export function DataSettingsPage() {
         <div className="hitk-settings-data-copy">
           <Text strong>数据目录</Text>
           <Paragraph type="secondary" style={{ margin: "4px 0 10px" }}>
-            会话记录、知识库索引与配置都保存在这里。整体拷走这个目录即为完整备份。
+            会话记录、知识库索引、陪伴状态与配置都保存在这里。整体拷走这个目录即为完整备份。
           </Paragraph>
           {settings && (
             <Space wrap>

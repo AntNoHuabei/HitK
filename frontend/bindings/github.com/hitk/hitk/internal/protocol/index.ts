@@ -14,6 +14,7 @@ export type {
     ApprovalRequest,
     Artifact,
     Attachment,
+    CompanionReply,
     Delta,
     Event,
     InputPart,

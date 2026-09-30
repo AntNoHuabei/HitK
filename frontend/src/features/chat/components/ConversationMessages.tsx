@@ -26,7 +26,7 @@ const MAX_REFS = 12;
 
 interface MessagesProps {
   items: Item[];
-  buffers: { text: Record<string, string>; reasoning: Record<string, string> };
+  buffers: { action?: Record<string, string>; text: Record<string, string>; reasoning: Record<string, string> };
   running: boolean;
   modelLabel: string;
   usage: Usage | null;
@@ -91,15 +91,22 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
       );
 
     case ItemType.ItemAgentMessage: {
-      const body = buffers.text[item.id] ?? item.text ?? "";
-		if (!body && streaming) return null;
+      const action = buffers.action?.[item.id] ?? item.companionReply?.actions?.join("\n\n") ?? "";
+      const body = buffers.text[item.id]
+        ?? (item.companionReply ? item.companionReply.speech ?? "" : item.text ?? "");
+		if (!action && !body && streaming) return null;
+      const metaBody = [action, body].filter(Boolean).join("\n\n");
       return (
         <div className="hitk-chat-assistant-message">
-          <Markdown>{body}</Markdown>
+          {action && <div className="hitk-chat-action-message">{action}</div>}
+          {body && <Markdown>{body}</Markdown>}
           {streaming && <span className="hitk-cursor" />}
+          {!streaming && Boolean(item.meta?.providerError) && (
+            <div className="hitk-chat-partial-note">{String(item.meta?.providerError)}</div>
+          )}
           {refs.length > 0 && !streaming && <CitationRow refs={refs} />}
           {!streaming && (
-            <ResponseMeta body={body} model={modelLabel} usage={usage} />
+            <ResponseMeta body={metaBody} model={modelLabel} usage={usage} />
           )}
         </div>
       );
@@ -116,6 +123,9 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
 
     case ItemType.ItemPlan:
       return <PlanRow entries={item.plan ?? []} />;
+
+    case ItemType.ItemCompanionTurn:
+      return <CompanionTurnRow item={item} />;
 
     case ItemType.ItemNotice:
       return (
@@ -140,6 +150,29 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
     default:
       return null;
   }
+}
+
+function CompanionTurnRow({ item }: { item: Item }) {
+  const brief = item.meta?.brief;
+  const raw = brief ? JSON.stringify(brief, null, 2) : "";
+  return (
+    <details className="hitk-agent-detail hitk-companion-turn-detail">
+      <summary>
+        <BulbOutlined />
+        <span>细节对齐</span>
+        <span className="hitk-tool-status">时间 · 场景 · 状态结算</span>
+      </summary>
+      <div className="hitk-agent-reasoning">
+        <Markdown>{item.text || "对齐结果已保存。"}</Markdown>
+        {raw && (
+          <details className="hitk-agent-detail">
+            <summary>查看结构化对齐</summary>
+            <pre className="hitk-tool-detail">{raw}</pre>
+          </details>
+        )}
+      </div>
+    </details>
+  );
 }
 
 function ReasoningRow({ body, streaming }: { body: string; streaming: boolean }) {

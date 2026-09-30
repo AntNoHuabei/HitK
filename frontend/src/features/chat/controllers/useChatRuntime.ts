@@ -29,7 +29,9 @@ export function useChatRuntime(options: RuntimeOptions = {}) {
 
   const refreshConversations = useCallback(async () => {
     try {
-      setConversations(await chatRepository.listConversations());
+      const items = await chatRepository.listConversations();
+      // 陪伴会话归侧栏「她」分组，不混进历史对话。
+      setConversations(items.filter((item) => item.mode !== "companion"));
     } catch {
       // 保留上一份可用列表,列表刷新失败不值得打断对话。
     }

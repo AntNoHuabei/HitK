@@ -4,12 +4,29 @@
 // 组件永不直接 import 生成物。
 import * as App from "../../../bindings/github.com/hitk/hitk/internal/service/appservice";
 import * as Chat from "../../../bindings/github.com/hitk/hitk/internal/service/chatservice";
+import * as Companion from "../../../bindings/github.com/hitk/hitk/internal/service/companionservice";
 import * as KB from "../../../bindings/github.com/hitk/hitk/internal/service/kbservice";
 import * as Model from "../../../bindings/github.com/hitk/hitk/internal/service/modelservice";
 import * as Settings from "../../../bindings/github.com/hitk/hitk/internal/service/settingsservice";
 import * as Runtime from "../../../bindings/github.com/hitk/hitk/internal/service/runtimeservice";
 
-export { App, Chat, KB, Model, Runtime, Settings };
+export { App, Chat, Companion, KB, Model, Runtime, Settings };
+
+export type {
+  CharacterSummary as CompanionCharacter,
+  DerivedState as CompanionDerivedState,
+  Event as CompanionEvent,
+  EventKind as CompanionEventKind,
+  LifeEvent,
+  Memory as CompanionMemory,
+  MetricView as CompanionMetricView,
+  Overview as CompanionOverview,
+  Profile as CompanionProfile,
+  State as CompanionState,
+  TurnBrief as CompanionTurnBrief,
+  TurnTaskView as CompanionTurnTaskView,
+  WeatherSnapshot as CompanionWeather,
+} from "../../../bindings/github.com/hitk/hitk/internal/companion/models";
 
 export type {
   RuntimeProgress,

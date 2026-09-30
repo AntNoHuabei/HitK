@@ -5,7 +5,7 @@
 import { create } from "zustand";
 import type { AgentMode } from "../../shared/types/chat";
 
-export type ViewKey = "chat" | "knowledge" | "settings";
+export type ViewKey = "chat" | "companion" | "knowledge" | "settings";
 
 interface ShellState {
   view: ViewKey;

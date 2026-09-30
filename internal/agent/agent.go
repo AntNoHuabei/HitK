@@ -50,6 +50,10 @@ type Options struct {
 	Tools     *tools.Registry
 	Providers *provider.Registry
 	Sessions  *SessionStore
+	// Companion is optional. When present and a turn runs in
+	// protocol.ModeCompanion, the agent injects its dynamic life context and
+	// reports each completed exchange back to it.
+	Companion CompanionRuntime
 	// Emit publishes protocol events to the UI. It must not block.
 	Emit func(*protocol.Event)
 	// Workspace is the project root used by coding tools.
@@ -69,6 +73,7 @@ type Agent struct {
 	registry  *tools.Registry
 	providers *provider.Registry
 	sessions  *SessionStore
+	companion CompanionRuntime
 	emit      func(*protocol.Event)
 	workspace string
 	ctxLimit  int
@@ -116,6 +121,7 @@ func New(opts Options) *Agent {
 		registry:  opts.Tools,
 		providers: opts.Providers,
 		sessions:  opts.Sessions,
+		companion: opts.Companion,
 		emit:      opts.Emit,
 		workspace: opts.Workspace,
 		ctxLimit:  ctxLimit,
@@ -339,14 +345,23 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 			modelID = meta.DefaultModel
 		}
 	}
+	failCompanionTask := func(message string) {
+		if mode == protocol.ModeCompanion && a.companion != nil && op.CompanionTaskID != "" {
+			a.companion.FailCompanionTurn(thread.ID, h.turnID, op.CompanionTaskID, message)
+		}
+	}
 
 	providerClient, err := a.providers.Provider(provID)
 	if err != nil {
-		a.emitError(thread.ID, h.turnID, fmt.Sprintf("模型厂商配置错误：%v", err))
+		message := fmt.Sprintf("模型厂商配置错误：%v", err)
+		failCompanionTask(message)
+		a.emitError(thread.ID, h.turnID, message)
 		return
 	}
 	if !a.providers.Ready(provID) {
-		a.emitError(thread.ID, h.turnID, fmt.Sprintf("%s 尚未配置 API Key，请在「设置 → 模型」中填写。", provID))
+		message := fmt.Sprintf("%s 尚未配置 API Key，请在「设置 → 模型」中填写。", provID)
+		failCompanionTask(message)
+		a.emitError(thread.ID, h.turnID, message)
 		return
 	}
 
@@ -354,7 +369,7 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 	// is never lost even if the provider errors out immediately.
 	userText := joinInput(op.Input)
 	var userItem *protocol.Item
-	if userText != "" || len(op.Attachments) > 0 {
+	if !op.SkipUserInput && (userText != "" || len(op.Attachments) > 0) {
 		for i := range op.Attachments {
 			if op.Attachments[i].Kind == "image" {
 				op.Attachments[i].ParseState = "ready"
@@ -402,6 +417,7 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 	usage := &protocol.Usage{}
 	step := 0
 	aborted := false
+	finalResponse := ""
 	// hitLimit records that the loop stopped because the step budget ran out
 	// rather than because the model produced a final answer.
 	hitLimit := true
@@ -419,6 +435,7 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 
 		messages, err := a.buildMessages(thread, mode, provID, modelID, op)
 		if err != nil {
+			failCompanionTask(err.Error())
 			a.emitError(thread.ID, h.turnID, err.Error())
 			return
 		}
@@ -427,7 +444,12 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		if supports, known := a.providers.ModelSupportsTools(provID, modelID); known && !supports {
 			schemas = nil
 		}
-		system := a.systemPrompt(thread, mode, provID, modelID, op)
+		system, err := a.systemPrompt(ctx, thread, mode, provID, modelID, op)
+		if err != nil {
+			failCompanionTask(err.Error())
+			a.emitError(thread.ID, h.turnID, err.Error())
+			return
+		}
 		dynamicTokens := estimateMessages(messages)
 
 		// --- stream the model -------------------------------------------------
@@ -462,7 +484,9 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 			msgItem.Status = protocol.StatusFailed
 			msgItem.Error = err.Error()
 			reasonItem.Status = protocol.StatusCompleted
-			a.emitError(thread.ID, h.turnID, friendlyProviderError(provID, err))
+			message := friendlyProviderError(provID, err)
+			failCompanionTask(message)
+			a.emitError(thread.ID, h.turnID, message)
 			return
 		}
 
@@ -472,17 +496,31 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 			reasonBu strings.Builder
 			stepUse  provider.Usage
 		)
+		var replyParser *companionReplyParser
+		if mode == protocol.ModeCompanion {
+			replyParser = newCompanionReplyParser()
+		}
 
 	streamLoop:
 		for chunk := range stream {
 			switch chunk.Kind {
 			case provider.ChunkText:
-				if !msgStarted {
-					a.emitItem(protocol.EvItemStarted, msgItem)
-					msgStarted = true
-				}
 				textBuf.WriteString(chunk.Text)
-				a.emitDelta(thread.ID, h.turnID, msgItem.ID, "text", chunk.Text)
+				if replyParser != nil {
+					for _, delta := range replyParser.Write(chunk.Text) {
+						if !msgStarted {
+							a.emitItem(protocol.EvItemStarted, msgItem)
+							msgStarted = true
+						}
+						a.emitDelta(thread.ID, h.turnID, msgItem.ID, delta.Channel, delta.Text)
+					}
+				} else {
+					if !msgStarted {
+						a.emitItem(protocol.EvItemStarted, msgItem)
+						msgStarted = true
+					}
+					a.emitDelta(thread.ID, h.turnID, msgItem.ID, "text", chunk.Text)
+				}
 			case provider.ChunkReasoning:
 				if !reasonStarted {
 					a.emitItem(protocol.EvItemStarted, reasonItem)
@@ -504,15 +542,29 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 					a.emitItem(protocol.EvItemStarted, msgItem)
 					msgStarted = true
 				}
-				msgItem.Status = protocol.StatusFailed
 				msgItem.Error = friendlyProviderError(provID, chunk.Err)
-				msgItem.Text = textBuf.String()
+				if replyParser != nil && strings.TrimSpace(textBuf.String()) != "" {
+					parsed := replyParser.Finish()
+					msgItem.CompanionReply = &parsed
+					msgItem.Text = companionReplyText(parsed)
+					msgItem.Status = protocol.StatusCompleted
+					msgItem.Meta = map[string]any{"providerError": msgItem.Error, "partial": true}
+				} else {
+					msgItem.Status = protocol.StatusFailed
+					msgItem.Text = textBuf.String()
+				}
 				a.emitItem(protocol.EvItemCompleted, msgItem)
 				thread.Items = append(thread.Items, msgItem)
 				a.emitError(thread.ID, h.turnID, msgItem.Error)
 				a.sessions.Save(thread)
 				break streamLoop
 			}
+		}
+
+		var companionReply *protocol.CompanionReply
+		if replyParser != nil {
+			parsed := replyParser.Finish()
+			companionReply = &parsed
 		}
 
 		// A cancelled stream closes its channel without a done chunk, so the
@@ -557,6 +609,10 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		if aborted {
 			if msgStarted && msgItem.Status == protocol.StatusInProgress {
 				msgItem.Text = textBuf.String()
+				if companionReply != nil {
+					msgItem.CompanionReply = companionReply
+					msgItem.Text = companionReplyText(*companionReply)
+				}
 				msgItem.Status = protocol.StatusCompleted
 				msgItem.Refs = mergeRefs(turnRefs)
 				a.emitItem(protocol.EvItemCompleted, msgItem)
@@ -566,8 +622,14 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		}
 
 		text := textBuf.String()
+		displayText := text
+		if companionReply != nil {
+			displayText = companionReplyText(*companionReply)
+			text = formatCompanionReply(*companionReply)
+		}
 		if msgStarted || text != "" || len(calls) > 0 {
-			msgItem.Text = text
+			msgItem.Text = displayText
+			msgItem.CompanionReply = companionReply
 			msgItem.Status = protocol.StatusCompleted
 			msgItem.Refs = mergeRefs(turnRefs)
 			a.emitItem(protocol.EvItemCompleted, msgItem)
@@ -577,6 +639,7 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 		if len(calls) == 0 {
 			// No tools requested: the model is answering, so the turn ends here.
 			hitLimit = false
+			finalResponse = text
 			break
 		}
 
@@ -625,12 +688,19 @@ func (a *Agent) runTurn(ctx context.Context, h *turnHandle, thread *protocol.Thr
 	_ = a.sessions.Save(thread)
 
 	if aborted {
+		failCompanionTask(abortReason(ctx))
 		end := protocol.NewEvent(protocol.EvTurnAborted)
 		end.ThreadID = thread.ID
 		end.TurnID = h.turnID
 		end.Reason = abortReason(ctx)
 		a.publish(end)
 		return
+	}
+
+	if mode == protocol.ModeCompanion && a.companion != nil && strings.TrimSpace(finalResponse) != "" {
+		a.companion.CompleteCompanionTurn(thread.ID, h.turnID, op.CompanionTaskID, userText, finalResponse)
+	} else if mode == protocol.ModeCompanion && a.companion != nil {
+		failCompanionTask("陪伴回复为空")
 	}
 
 	end := protocol.NewEvent(protocol.EvTurnCompleted)
@@ -652,6 +722,14 @@ func (a *Agent) buildMessages(thread *protocol.Thread, mode protocol.Mode, provI
 	items := a.compactIfNeeded(thread)
 
 	var msgs []provider.Message
+	if mode == protocol.ModeCompanion {
+		if cutoff := companionHistoryCutoff(items, 6); cutoff > 0 {
+			msgs = append(msgs, provider.UserText(
+				"[系统提示] 较早对话原文已因上下文压缩省略；请依据当前 TurnBrief、状态、记忆和最近几轮继续，不要复述省略内容。",
+			))
+			items = items[cutoff:]
+		}
+	}
 	// The latest user turn is sent as an explicit message even though it is
 	// also stored as an item, because the item list may have been compacted.
 	// Emitting it once here keeps the model's view consistent with the UI.
@@ -673,15 +751,19 @@ func (a *Agent) buildMessages(thread *protocol.Thread, mode protocol.Mode, provI
 			}
 			msgs = append(msgs, provider.Message{Role: provider.RoleUser, Parts: parts})
 		case protocol.ItemAgentMessage:
-			if strings.TrimSpace(it.Text) == "" {
+			assistantText := it.Text
+			if it.CompanionReply != nil {
+				assistantText = formatCompanionReply(*it.CompanionReply)
+			}
+			if strings.TrimSpace(assistantText) == "" {
 				continue
 			}
 			// An assistant turn that requested tools must carry the calls, or
 			// the following tool results reference a call the model never made.
 			if calls := toolCallsOf(it); len(calls) > 0 {
-				msgs = append(msgs, provider.AssistantTools(calls, it.Text))
+				msgs = append(msgs, provider.AssistantTools(calls, assistantText))
 			} else {
-				msgs = append(msgs, provider.AssistantText(it.Text))
+				msgs = append(msgs, provider.AssistantText(assistantText))
 			}
 		case protocol.ItemToolCall:
 			if it.Tool == nil {
@@ -703,6 +785,27 @@ func (a *Agent) buildMessages(thread *protocol.Thread, mode protocol.Mode, provI
 		msgs = append(msgs, provider.UserText(joinInput(op.Input)))
 	}
 	return msgs, nil
+}
+
+func companionHistoryCutoff(items []*protocol.Item, keep int) int {
+	if keep <= 0 {
+		return len(items)
+	}
+	count := 0
+	for i := len(items) - 1; i >= 0; i-- {
+		item := items[i]
+		if item == nil {
+			continue
+		}
+		switch item.Type {
+		case protocol.ItemUserMessage, protocol.ItemAgentMessage:
+			count++
+			if count >= keep {
+				return i
+			}
+		}
+	}
+	return 0
 }
 
 // toolCallsOf recovers the tool calls recorded alongside an assistant message.
@@ -1064,12 +1167,31 @@ func (a *Agent) recordToolResult(thread *protocol.Thread, h *turnHandle, call pr
 // System prompt assembly
 // ---------------------------------------------------------------------------
 
-func (a *Agent) systemPrompt(thread *protocol.Thread, mode protocol.Mode, provID, modelID string, op protocol.Op) string {
+func (a *Agent) systemPrompt(ctx context.Context, thread *protocol.Thread, mode protocol.Mode, provID, modelID string, op protocol.Op) (string, error) {
 	_ = thread
 	_ = provID
 	_ = modelID
-	_ = op
-	return buildSystemPrompt(promptContext{Mode: mode})
+	base := buildSystemPrompt(promptContext{Mode: mode})
+	if mode != protocol.ModeCompanion || a.companion == nil {
+		return base, nil
+	}
+	if op.CompanionTaskID == "" {
+		return "", fmt.Errorf("陪伴任务缺少 taskId")
+	}
+	contextBlock, err := a.companion.PrepareCompanionTurn(
+		ctx,
+		thread.ID,
+		"",
+		op.CompanionTaskID,
+		joinInput(op.Input),
+	)
+	if err != nil {
+		return "", fmt.Errorf("加载陪伴上下文失败: %w", err)
+	}
+	if strings.TrimSpace(contextBlock) == "" {
+		return base, nil
+	}
+	return base + "\n\n" + contextBlock, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -1355,6 +1477,9 @@ func friendlyProviderError(provID string, err error) string {
 		return fmt.Sprintf("%s 触发限流或额度不足，请稍后重试或更换模型。原始信息：%s", provID, msg)
 	case strings.Contains(msg, "context length") || strings.Contains(msg, "too long"):
 		return fmt.Sprintf("上下文超出模型上限：请开启新会话或减少引用内容。原始信息：%s", msg)
+	case strings.Contains(strings.ToLower(msg), "sensitive information") ||
+		strings.Contains(msg, "敏感信息"):
+		return fmt.Sprintf("%s 的云端内容安全策略拦截了本轮上下文。已生成的部分内容会保留；继续相同长场景时建议改用不启用该过滤的模型。原始信息：%s", provID, msg)
 	}
 	return msg
 }
@@ -1377,6 +1502,12 @@ func estimateTokens(s string) int { return kb.EstimateTokens(s) }
 // estimateItem budgets one item.
 func estimateItem(it *protocol.Item) int {
 	n := estimateTokens(it.Text) + estimateTokens(it.Reasoning)
+	if it.CompanionReply != nil {
+		n += estimateTokens(it.CompanionReply.Speech)
+		for _, action := range it.CompanionReply.Actions {
+			n += estimateTokens(action)
+		}
+	}
 	if it.Tool != nil {
 		n += estimateTokens(it.Tool.Result) + estimateTokens(it.Tool.Arguments)/2
 	}

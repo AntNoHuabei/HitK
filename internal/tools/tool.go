@@ -153,8 +153,8 @@ func (r *Registry) Names() []string {
 // mode gets retrieval and writing, coding mode gets the filesystem and a shell.
 // Plan management is shared because both need to show progress.
 func (r *Registry) ForMode(mode protocol.Mode) []provider.ToolSchema {
-	names := toolSets[mode]
-	if len(names) == 0 {
+	names, ok := toolSets[mode]
+	if !ok {
 		names = toolSets[protocol.ModeWork]
 	}
 
@@ -192,6 +192,9 @@ var toolSets = map[protocol.Mode][]string{
 		"run_command",
 		"todo_write",
 	},
+	// Companion conversations must never expose general agent tools. The
+	// companion's state is supplied as read-only model context by its runtime.
+	protocol.ModeCompanion: {},
 	protocol.ModeAuto: {
 		"skill_run",
 		"fetch_url",

@@ -180,9 +180,9 @@ export function ModelsSettingsPage() {
             <Text strong>模式默认模型</Text>
             <Text type="secondary">新建对话会分别继承这两项设置</Text>
           </div>
-          {(["work", "coding"] as const).map((profile) => (
+          {(["work", "coding", "companion"] as const).map((profile) => (
             <label key={profile}>
-              <span>{profile === "work" ? "Work" : "Coding"}</span>
+              <span>{modeLabel(profile)}</span>
               <Select
                 aria-label={`${profile} 默认模型`}
                 style={{ minWidth: 260 }}
@@ -199,7 +199,7 @@ export function ModelsSettingsPage() {
                   const [provider, ...model] = String(value).split("::");
                   void run(
                     () => modelRepository.setModeDefault(profile, provider, model.join("::")),
-                    `${profile === "work" ? "Work" : "Coding"} 默认模型已更新`,
+                    `${modeLabel(profile)} 默认模型已更新`,
                   );
                 }}
               />
@@ -300,4 +300,8 @@ export function ModelsSettingsPage() {
       />
     </section>
   );
+}
+
+function modeLabel(mode: "work" | "coding" | "companion"): string {
+  return { work: "Work", coding: "Coding", companion: "她" }[mode];
 }

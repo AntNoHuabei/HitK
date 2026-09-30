@@ -1,0 +1,303 @@
+version: 1
+metrics:
+  vitality:
+    rateMin: -3.0
+    rateMax: 4.0
+    weights:
+      schedule.work: -0.55
+      schedule.sleep: 1.1
+      schedule.break: 0.35
+      schedule.social: -0.25
+      state.fatigue: -0.75
+      state.hunger: -0.45
+      state.stress: -0.30
+      trait.fitness: 0.20
+      effect.exercise: 0.10
+    gates:
+      - when: {source: trait.fitness, op: gte, value: 70}
+        multiplier: 1.20
+  fatigue:
+    rateMin: -5.0
+    rateMax: 4.0
+    weights:
+      schedule.work: 0.55
+      schedule.social: 0.35
+      schedule.sleep: -3.2
+      schedule.break: -0.65
+      state.stress: 0.40
+      state.hunger: 0.25
+      trait.fitness: -0.25
+      effect.exercise: 0.35
+    gates:
+      - when: {source: trait.sleepDebt, op: gt, value: 70}
+        multiplier: 1.30
+  sleepPressure:
+    rateMin: -24.0
+    rateMax: 7.0
+    weights:
+      schedule.sleep: -20.0
+      schedule.work: 0.80
+      state.fatigue: 0.50
+      trait.sleepDebt: 0.60
+  alertness:
+    rateMin: -4.0
+    rateMax: 3.0
+    weights:
+      schedule.sleep: -2.5
+      state.sleepPressure: -1.10
+      state.fatigue: -0.65
+      state.cognitiveLoad: -0.25
+      state.anxiety: -0.25
+  cognitiveLoad:
+    rateMin: -3.0
+    rateMax: 4.0
+    weights:
+      schedule.work: 0.90
+      state.fatigue: 0.35
+      state.anxiety: 0.45
+      state.stress: 0.35
+  motivation:
+    rateMin: -3.0
+    rateMax: 2.5
+    weights:
+      state.vitality: 0.55
+      state.moodValence: 0.25
+      state.fatigue: -0.50
+      state.cognitiveLoad: -0.40
+      state.anxiety: -0.35
+  moodValence:
+    rateMin: -5.0
+    rateMax: 5.0
+    weights:
+      state.vitality: 0.45
+      state.stress: -0.65
+      state.anxiety: -0.45
+      state.loneliness: -0.40
+      state.missing: -0.22
+      relationship.user_presence: 0.60
+      schedule.social: 0.35
+  stress:
+    rateMin: -3.0
+    rateMax: 4.0
+    weights:
+      schedule.work: 0.85
+      schedule.sleep: -0.40
+      state.hunger: 0.30
+      state.fatigue: 0.38
+      state.anxiety: 0.32
+      trait.resilience: -0.35
+      relationship.user_presence: -0.28
+      effect.exercise: -0.75
+    gates:
+      - when: {source: trait.sleepDebt, op: gt, value: 70}
+        multiplier: 1.35
+  anxiety:
+    rateMin: -2.0
+    rateMax: 3.0
+    weights:
+      state.stress: 0.50
+      state.fatigue: 0.28
+      state.sleepPressure: 0.22
+      trait.sensitivity: 0.32
+      trait.resilience: -0.28
+      relationship.user_presence: -0.30
+      trait.attachmentSecurity: -0.25
+  irritability:
+    rateMin: -3.0
+    rateMax: 3.5
+    weights:
+      state.hunger: 0.48
+      state.fatigue: 0.42
+      state.stress: 0.55
+      state.anxiety: 0.20
+      state.moodValence: -0.25
+  loneliness:
+    rateMin: -4.0
+    rateMax: 2.0
+    weights:
+      schedule.social: -1.60
+      schedule.rest: 0.30
+      relationship.user_presence: -1.80
+      state.socialEnergy: -0.25
+      state.missing: 0.42
+      trait.attachmentSecurity: -0.25
+  socialEnergy:
+    rateMin: -4.0
+    rateMax: 2.5
+    weights:
+      schedule.social: -1.70
+      schedule.rest: 0.80
+      schedule.sleep: 0.90
+      relationship.user_presence: -0.35
+      state.fatigue: -0.30
+  libido:
+    rateMin: -1.5
+    rateMax: 1.5
+    weights:
+      state.vitality: 0.24
+      state.moodValence: 0.18
+      state.fatigue: -0.38
+      state.stress: -0.32
+      state.anxiety: -0.28
+      relationship.intimacy: 0.34
+      relationship.user_presence: 0.10
+    gates:
+      - when:
+          all:
+            - {source: state.fatigue, op: gt, value: 70}
+            - {source: state.vitality, op: lt, value: 30}
+        multiplier: 0.35
+  sexualSatisfaction:
+    rateMin: -2.0
+    rateMax: 2.5
+    weights:
+      relationship.user_presence: 0.10
+      state.intimacy: 0.22
+      state.moodValence: 0.16
+      state.stress: -0.22
+      state.anxiety: -0.18
+      state.loneliness: -0.12
+  missing:
+    rateMin: 0
+    rateMax: 3.5
+    weights:
+      relationship.absence: 1.40
+      relationship.intimacy: 0.28
+      state.loneliness: 0.18
+    gates:
+      - when: {source: relationship.absenceHours, op: lt, value: 4}
+        multiplier: 0
+  trust:
+    rateMin: -1.0
+    rateMax: 1.0
+    weights: {}
+  intimacy:
+    rateMin: -1.0
+    rateMax: 1.0
+    weights: {}
+  hunger:
+    rateMin: -18.0
+    rateMax: 2.4
+    weights:
+      effect.meal: -12.0
+      schedule.sleep: 0.35
+      schedule.break: -0.75
+      state.fatigue: 0.12
+interactions:
+  user_presence:
+    impulses:
+      missing: -12
+      loneliness: -10
+      socialEnergy: 10
+      moodValence: 6
+      anxiety: -5
+      stress: -3
+  meaningful_conversation:
+    impulses:
+      trust: 1
+      intimacy: 1
+      moodValence: 2
+    traits:
+      attachmentSecurity: 0.25
+  conversation_explicit:
+    impulses:
+      libido: 10
+      sexualSatisfaction: 4
+      moodValence: 5
+      anxiety: -3
+      stress: -3
+      loneliness: -5
+      intimacy: 1
+      trust: 0.5
+    effects:
+      - target: libido
+        ratePerHour: 0.7
+        duration: 90m
+        curve: ramp_decay
+      - target: sexualSatisfaction
+        ratePerHour: 0.18
+        duration: 3h
+        curve: ramp_decay
+  conversation_intimate:
+    impulses:
+      libido: 4
+      intimacy: 1
+      loneliness: -5
+      moodValence: 4
+      stress: -3
+    effects:
+      - target: libido
+        ratePerHour: 0.25
+        duration: 2h
+        curve: ramp_decay
+  conversation_affection:
+    impulses:
+      moodValence: 5
+      loneliness: -4
+      anxiety: -3
+      intimacy: 0.6
+  conversation_support:
+    impulses:
+      stress: -5
+      anxiety: -4
+      loneliness: -5
+      moodValence: 4
+    effects:
+      - target: stress
+        ratePerHour: -0.25
+        duration: 3h
+        curve: ramp_decay
+  conversation_vulnerable:
+    impulses:
+      anxiety: 6
+      stress: 5
+      moodValence: -4
+      missing: 3
+  conversation_conflict:
+    impulses:
+      stress: 8
+      anxiety: 6
+      irritability: 7
+      moodValence: -7
+      intimacy: -0.8
+    effects:
+      - target: stress
+        ratePerHour: 0.25
+        duration: 2h
+        curve: ramp_decay
+  conversation_boundary:
+    impulses:
+      libido: -45
+      sexualSatisfaction: -32
+      stress: 38
+      anxiety: 30
+      irritability: 28
+      moodValence: -42
+      loneliness: 12
+      intimacy: -4
+      trust: -2
+    effects:
+      - target: libido
+        ratePerHour: -0.8
+        duration: 4h
+        curve: ramp_decay
+      - target: stress
+        ratePerHour: 0.8
+        duration: 4h
+        curve: ramp_decay
+      - target: anxiety
+        ratePerHour: 0.5
+        duration: 4h
+        curve: ramp_decay
+  conversation_apology:
+    impulses:
+      stress: -4
+      anxiety: -4
+      trust: 0.5
+      intimacy: 0.3
+      moodValence: 3
+  conversation_humor:
+    impulses:
+      moodValence: 5
+      stress: -3
+      loneliness: -2

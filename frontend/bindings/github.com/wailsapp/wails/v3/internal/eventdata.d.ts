@@ -7,6 +7,9 @@ import type { Events } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import type * as companion$0 from "../../../../hitk/hitk/internal/companion/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import type * as protocol$0 from "../../../../hitk/hitk/internal/protocol/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -15,6 +18,7 @@ import type * as skillruntime$0 from "../../../../hitk/hitk/internal/skillruntim
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "hitk:companion": companion$0.Event;
             "hitk:event": protocol$0.Event;
             "hitk:runtime-progress": skillruntime$0.RuntimeProgress;
         }

@@ -1,0 +1,667 @@
+.hitk-companion {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--hitk-text);
+  background: var(--hitk-content-bg);
+}
+
+.hitk-companion.hitk-chat {
+  --hitk-chat-content-width: 800px;
+  --hitk-chat-inline-gutter: 18px;
+  --hitk-chat-composer-radius: 18px;
+}
+
+.hitk-companion-loading {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--hitk-muted);
+  background: var(--hitk-content-bg);
+}
+
+.hitk-companion-head {
+  display: flex;
+  min-height: 82px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--hitk-divider);
+  background: var(--hitk-header-bg);
+}
+
+.hitk-companion-identity {
+  display: flex;
+  min-width: 220px;
+  align-items: center;
+  gap: 12px;
+}
+
+.hitk-companion-identity .ant-typography {
+  margin: 0;
+}
+
+.hitk-companion-mark,
+.hitk-companion-empty-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--hitk-signal) 24%, var(--hitk-divider));
+  border-radius: 50%;
+  color: var(--hitk-signal);
+  background: var(--hitk-inset-bg);
+  font-size: 18px;
+}
+
+.hitk-companion-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hitk-companion-meter {
+  display: grid;
+  width: 86px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 5px;
+  color: var(--hitk-muted);
+  font-size: 11px;
+}
+
+.hitk-companion-meter .ant-progress {
+  min-width: 0;
+  margin: 0;
+}
+
+.hitk-companion-body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 370px);
+}
+
+.hitk-companion-conversation {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.hitk-companion-messages {
+  width: min(
+    var(--hitk-chat-content-width),
+    calc(100% - var(--hitk-chat-inline-gutter) - var(--hitk-chat-inline-gutter))
+  );
+  min-height: 0;
+  flex: 1;
+  margin: 0 auto;
+  padding: 28px 0 20px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.hitk-companion-empty {
+  display: flex;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.hitk-companion-empty .ant-typography {
+  margin: 2px 0;
+}
+
+.hitk-companion-empty-mark {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 4px;
+  flex-basis: 54px;
+  font-size: 22px;
+}
+
+.hitk-companion-composer {
+  flex: 0 0 auto;
+}
+
+.hitk-companion-side {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: 14px 16px 18px;
+  border-left: 1px solid var(--hitk-divider);
+  background: var(--hitk-header-bg);
+}
+
+.hitk-companion-panel {
+  min-height: 0;
+  flex: 1;
+  margin-top: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.hitk-companion-life-list,
+.hitk-companion-memory-list,
+.hitk-companion-settings,
+.hitk-companion-state-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hitk-companion-state-now {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hitk-divider);
+}
+
+.hitk-companion-state-group {
+  display: grid;
+  gap: 7px;
+  padding: 4px 0 8px;
+}
+
+.hitk-companion-state-group + .hitk-companion-state-group {
+  border-top: 1px solid color-mix(in srgb, var(--hitk-divider) 65%, transparent);
+}
+
+.hitk-companion-state-group h4 {
+  margin: 0;
+  color: var(--hitk-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hitk-companion-state-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 8px;
+  color: var(--hitk-muted);
+  font-size: 11px;
+}
+
+.hitk-companion-state-row .ant-progress {
+  margin: 0;
+  min-width: 0;
+}
+
+.hitk-companion-state-row .ant-progress-inner {
+  min-width: 0;
+}
+
+.hitk-companion-state-row b {
+  color: var(--hitk-text);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hitk-companion-state-row b span {
+  margin-left: 2px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.hitk-companion-state-row b .is-rising {
+  color: var(--ant-color-success);
+}
+
+.hitk-companion-state-row b .is-falling {
+  color: var(--ant-color-warning);
+}
+
+.hitk-companion-life-item {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--hitk-divider) 65%, transparent);
+}
+
+.hitk-companion-life-item time {
+  color: var(--hitk-muted);
+  font-size: 11px;
+}
+
+.hitk-companion-life-item .ant-tag {
+  margin: 0;
+}
+
+.hitk-companion-memory-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--hitk-divider);
+  border-radius: 7px;
+}
+
+.hitk-companion-memory-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------------------------------------------------------------------------
+ * 侧栏「她」角色分组
+ *
+ * 表头复用 .hitk-chat-workspace-item 的 hover/chevron 动画，角色行自己排网格。
+ * 全部走主题变量，10 套主题下都不引入新颜色。
+ * ------------------------------------------------------------------------ */
+.hitk-companion-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 12px;
+}
+
+.hitk-chat-workspace-item.is-active {
+  color: var(--hitk-chat-selected-text) !important;
+  background: var(--hitk-chat-selected) !important;
+  font-weight: 600;
+}
+
+.hitk-chat-workspace-item.is-active .anticon {
+  color: var(--hitk-chat-signal);
+}
+
+.hitk-companion-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-companion-group-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.hitk-companion-group-tail .hitk-chat-nav-count {
+  margin-left: 0;
+}
+
+.hitk-companion-group-error-icon {
+  color: var(--ant-color-warning) !important;
+  font-size: 12px !important;
+}
+
+.hitk-companion-character-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 26px;
+  padding: 2px 0 0;
+}
+
+.hitk-companion-character.ant-btn {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0 !important;
+  border-radius: var(--hitk-chat-radius);
+  background: transparent;
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+  text-align: left;
+}
+
+.hitk-companion-character.ant-btn:hover:not(:disabled),
+.hitk-companion-character.ant-btn:focus-visible:not(:disabled) {
+  background: var(--hitk-chat-hover) !important;
+  color: var(--hitk-chat-text) !important;
+}
+
+.hitk-companion-character.is-active.ant-btn {
+  background: var(--hitk-chat-selected) !important;
+  color: var(--hitk-chat-selected-text) !important;
+  font-weight: 600;
+}
+
+.hitk-companion-character.ant-btn:disabled {
+  background: transparent !important;
+  color: var(--hitk-chat-muted) !important;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hitk-companion-character-avatar {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  border: 1px solid var(--hitk-chat-border);
+  border-radius: 50%;
+  background: var(--hitk-inset-bg);
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.hitk-companion-character.is-active .hitk-companion-character-avatar {
+  border-color: var(--hitk-chat-signal);
+  color: var(--hitk-chat-signal);
+}
+
+.hitk-companion-character-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-companion-character-tail {
+  display: grid;
+  width: 18px;
+  place-items: center;
+  color: var(--hitk-chat-signal);
+  font-size: 11px;
+}
+
+.hitk-companion-character-add .hitk-companion-character-avatar .anticon {
+  font-size: 10px;
+}
+
+.hitk-companion-character-skeleton {
+  height: 32px;
+  border-radius: var(--hitk-chat-radius);
+  background: linear-gradient(
+    90deg,
+    var(--hitk-chat-hover) 0%,
+    color-mix(in srgb, var(--hitk-chat-hover) 40%, transparent) 50%,
+    var(--hitk-chat-hover) 100%
+  );
+  background-size: 200% 100%;
+  animation: hitk-companion-skeleton 1.3s ease-in-out infinite;
+}
+
+@keyframes hitk-companion-skeleton {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 新建角色弹窗：模板 chips 与头像快捷选择
+ * ------------------------------------------------------------------------ */
+.hitk-companion-template-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.hitk-companion-template {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--hitk-divider);
+  border-radius: 8px;
+  background: var(--hitk-inset-bg);
+  color: var(--hitk-text);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.hitk-companion-template:hover {
+  border-color: color-mix(in srgb, var(--hitk-signal) 45%, var(--hitk-divider));
+}
+
+.hitk-companion-template.is-selected {
+  border-color: var(--hitk-signal);
+  background: color-mix(in srgb, var(--hitk-signal) 8%, var(--hitk-inset-bg));
+}
+
+.hitk-companion-template-avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hitk-header-bg);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.hitk-companion-template-text {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.hitk-companion-template-text strong {
+  font-size: 13px;
+}
+
+.hitk-companion-template-text .ant-typography {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-companion-avatar-btn.ant-btn {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.hitk-companion-avatar-input.ant-input {
+  width: 72px;
+  text-align: center;
+}
+
+.hitk-companion-danger-zone {
+  display: flex;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--ant-color-error) 26%, var(--hitk-divider));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hitk-companion-character-skeleton {
+    animation: none;
+  }
+}
+
+.hitk-companion-memory-item > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.hitk-companion-memory-strength {
+  font-size: 10px;
+}
+
+.hitk-companion-settings label {
+  display: grid;
+  gap: 6px;
+  color: var(--hitk-muted);
+  font-size: 12px;
+}
+
+.hitk-companion-settings label > .ant-select,
+.hitk-companion-settings label > .ant-segmented {
+  width: 100%;
+}
+
+.hitk-companion-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.hitk-companion-switch-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.hitk-companion-pause-note {
+  display: block;
+  padding-top: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.hitk-companion-inline-note,
+.hitk-companion-error {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--hitk-divider);
+  color: var(--hitk-muted);
+  font-size: 12px;
+}
+
+.hitk-companion-error {
+  border-left-color: var(--ant-color-error);
+  color: var(--ant-color-error);
+}
+
+.hitk-companion-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--hitk-signal) 25%, var(--hitk-divider));
+  border-radius: 7px;
+  background: var(--hitk-inset-bg);
+}
+
+.hitk-companion-task > .anticon {
+  margin-top: 3px;
+  color: var(--hitk-signal);
+}
+
+.hitk-companion-task > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  flex: 1;
+}
+
+.hitk-companion-task .ant-typography {
+  margin: 0;
+}
+
+.hitk-companion-task.is-failed {
+  border-color: color-mix(in srgb, var(--ant-color-error) 35%, var(--hitk-divider));
+}
+
+.hitk-chat-action-message {
+  margin: 0 0 10px;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, var(--hitk-muted) 42%, transparent);
+  color: var(--hitk-muted);
+  font-style: italic;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.hitk-chat-partial-note {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-left: 2px solid color-mix(in srgb, var(--ant-color-warning) 55%, transparent);
+  color: var(--hitk-muted);
+  background: color-mix(in srgb, var(--ant-color-warning) 7%, transparent);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1120px) {
+  .hitk-companion-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .hitk-companion-status {
+    justify-content: flex-start;
+  }
+
+  .hitk-companion-body {
+    display: flex;
+    overflow-y: auto;
+    flex-direction: column;
+  }
+
+  .hitk-companion-conversation {
+    min-height: 620px;
+    flex: 0 0 auto;
+  }
+
+  .hitk-companion-side {
+    min-height: 420px;
+    flex: 0 0 auto;
+    border-top: 1px solid var(--hitk-divider);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .hitk-companion-head {
+    padding: 12px 14px;
+  }
+
+  .hitk-companion-messages,
+  .hitk-companion-composer {
+    width: calc(100% - 20px);
+  }
+
+  .hitk-companion-meter {
+    width: 76px;
+  }
+
+  .hitk-companion-side {
+    padding-inline: 10px;
+  }
+}

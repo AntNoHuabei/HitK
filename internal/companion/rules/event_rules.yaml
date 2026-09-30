@@ -1,0 +1,739 @@
+version: 1
+events:
+  - id: tea
+    type: daily
+    content: 泡了一杯热茶，觉得今天味道刚好
+    weight: 12
+    importance: 3
+    shareable: true
+    impulses: {vitality: 2, stress: -2}
+  - id: tidy
+    type: daily
+    content: 把房间收拾了一遍，心情也跟着清爽了些
+    weight: 10
+    importance: 4
+    shareable: true
+    impulses: {vitality: -2, cognitiveLoad: -8, moodValence: 4}
+  - id: snack
+    type: daily
+    content: 买到了想吃很久的小点心
+    weight: 10
+    importance: 5
+    shareable: true
+    impulses: {hunger: -15, moodValence: 5, stress: -2}
+  - id: poor_sleep
+    type: daily
+    content: 昨晚睡得不太好，今天一直有点发懵
+    weight: 8
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: morning}
+    impulses: {vitality: -25, fatigue: 60, alertness: -28, anxiety: 7}
+    traits: {sleepDebt: 18}
+  - id: lunch_recover
+    type: daily
+    content: 午饭吃得很慢，终于缓过一点精神
+    weight: 12
+    importance: 3
+    shareable: false
+    when:
+      all:
+        - {source: context.block, op: equals, text: break}
+    impulses: {hunger: -30, vitality: 8, fatigue: -12}
+    effects:
+      - target: hunger
+        ratePerHour: -12
+        duration: 2h
+        curve: ramp_decay
+  - id: work_smooth
+    type: work
+    content: 今天的工作比预想顺利，提前做完了一部分
+    weight: 10
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+    impulses: {moodValence: 4, stress: -8, motivation: 5}
+  - id: work_error
+    type: work
+    content: 工作出了点差错，被提醒后重新做了一遍
+    weight: 8
+    importance: 7
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+        - {source: state.fatigue, op: gte, value: 55}
+    impulses: {vitality: -7, fatigue: 7, anxiety: 9, stress: 11, moodValence: -7}
+    effects:
+      - target: stress
+        ratePerHour: -0.25
+        duration: 2h
+        curve: ramp_decay
+  - id: criticised
+    type: work
+    content: 被领导批评后，心里堵了一阵，很想找人说话
+    weight: 5
+    importance: 8
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+        - {source: state.fatigue, op: gte, value: 65}
+        - {source: state.stress, op: gte, value: 55}
+    impulses: {moodValence: -12, anxiety: 12, loneliness: 10, libido: -7, stress: 15, missing: 5}
+  - id: social_dinner
+    type: social
+    content: 朋友突然约着吃了顿饭，聊得很开心
+    weight: 8
+    importance: 6
+    shareable: true
+    when:
+      any:
+        - {source: context.block, op: equals, text: social}
+        - {source: context.block, op: equals, text: rest}
+    impulses: {hunger: -22, moodValence: 8, loneliness: -14, socialEnergy: -10, libido: 2, stress: -5}
+  - id: quiet_evening
+    type: social
+    content: 今天几乎没和谁说话，安静下来后有点孤独
+    weight: 7
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: state.loneliness, op: gte, value: 55}
+    impulses: {moodValence: -3, loneliness: 8, socialEnergy: -5}
+  - id: old_movie
+    type: hobby
+    content: 看了一部老电影，结尾比想象中好
+    weight: 8
+    importance: 5
+    shareable: true
+    impulses: {vitality: -2, moodValence: 5, stress: -4, libido: 2}
+  - id: old_songs
+    type: hobby
+    content: 听了几首以前喜欢的歌，想起一些旧事
+    weight: 7
+    importance: 5
+    shareable: true
+    impulses: {moodValence: 3, loneliness: 3, missing: 4}
+  - id: walk
+    type: hobby
+    content: 出门走了一会儿，风吹着很舒服
+    weight: 9
+    importance: 4
+    shareable: true
+    impulses: {vitality: 3, fatigue: -5, moodValence: 4, stress: -4}
+    traits: {fitness: 0.15, nutritionBalance: -0.05}
+  - id: exercise
+    type: hobby
+    content: 今天专门运动了一会儿，累但整个人轻松了些
+    weight: 6
+    importance: 5
+    shareable: true
+    when:
+      any:
+        - {source: context.block, op: equals, text: hobby}
+        - {source: context.block, op: equals, text: rest}
+    impulses: {vitality: -5, fatigue: 10, moodValence: 4}
+    effects:
+      - target: stress
+        ratePerHour: -0.75
+        duration: 3h
+        curve: ramp_decay
+      - target: vitality
+        ratePerHour: 0
+        baselineDelta: 3
+        recoveryDelta: 0.01
+        duration: 8h
+        curve: linear_decay
+    traits: {fitness: 0.45}
+  - id: rain
+    type: incident
+    content: 出门时忘带伞，回来时淋了一点雨
+    weight: 4
+    importance: 5
+    shareable: true
+    impulses: {vitality: -4, fatigue: 3, moodValence: -4, stress: 5}
+  - id: remember_user
+    type: about_you
+    content: 路过你提过的那家店时，忽然想起了你
+    weight: 5
+    importance: 7
+    shareable: true
+    when:
+      all:
+        - {source: state.missing, op: gte, value: 40}
+    impulses: {moodValence: 3, missing: 8}
+  - id: remember_gift
+    type: about_you
+    content: 看到一个很像你会喜欢的东西，停了一会儿
+    weight: 4
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: state.missing, op: gte, value: 35}
+    impulses: {moodValence: 2, missing: 6}
+  - id: wake_refreshed
+    type: daily
+    content: 今天醒来时状态不错，感觉脑子很清楚
+    weight: 12
+    importance: 3
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: morning}
+        - {source: state.vitality, op: gte, value: 65}
+        - {source: state.sleepPressure, op: lte, value: 35}
+    impulses: {vitality: 5, alertness: 6, motivation: 4}
+  - id: oversleep
+    type: daily
+    content: 一不小心睡过头了，醒来后有点慌
+    weight: 6
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: morning}
+        - {source: trait.sleepDebt, op: gte, value: 55}
+    impulses: {vitality: -5, alertness: -8, anxiety: 8, stress: 5}
+  - id: caffeine_boost
+    type: work
+    content: 喝了一杯咖啡，总算把困意压下去一点
+    weight: 15
+    importance: 2
+    shareable: false
+    when:
+      all:
+        - {source: state.fatigue, op: gte, value: 50}
+    impulses: {alertness: 10, fatigue: -5}
+  - id: skipped_breakfast
+    type: daily
+    content: 早上赶时间没顾上吃早餐，到中午已经很饿了
+    weight: 7
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: state.hunger, op: gte, value: 55}
+    impulses: {hunger: 10, irritability: 5, vitality: -3}
+  - id: home_cooked_meal
+    type: daily
+    content: 自己做了一顿还算像样的饭
+    weight: 10
+    importance: 4
+    shareable: true
+    when:
+      any:
+        - {source: context.block, op: equals, text: rest}
+        - {source: context.block, op: equals, text: hobby}
+    impulses: {hunger: -35, moodValence: 5, vitality: 4}
+    traits: {nutritionBalance: 0.4}
+  - id: evening_nap
+    type: daily
+    content: 傍晚实在撑不住，躺下睡了一小会儿
+    weight: 8
+    importance: 3
+    shareable: false
+    when:
+      all:
+        - {source: state.fatigue, op: gte, value: 60}
+    impulses: {fatigue: -18, vitality: 8, sleepPressure: 10}
+  - id: shower_reset
+    type: daily
+    content: 洗了个热水澡，整个人松下来一些
+    weight: 10
+    importance: 3
+    shareable: false
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+    impulses: {stress: -6, anxiety: -4, vitality: 3}
+  - id: deadline_crunch
+    type: work
+    content: 截止时间快到了，今天一直在赶进度
+    weight: 10
+    importance: 7
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+        - {source: state.cognitiveLoad, op: gte, value: 55}
+    impulses: {cognitiveLoad: 12, fatigue: 7, stress: 9, motivation: -4}
+  - id: meeting_cancelled
+    type: work
+    content: 原本准备好的会议突然取消了，空出了一点时间
+    weight: 7
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+    impulses: {cognitiveLoad: -10, stress: -5, moodValence: 3}
+  - id: praised_at_work
+    type: work
+    content: 今天被夸了，之前费的那些功夫没有白费
+    weight: 8
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+        - {source: state.moodValence, op: gte, value: 25}
+    impulses: {moodValence: 8, motivation: 8, stress: -5}
+  - id: coworker_lunch
+    type: social
+    content: 和同事一起吃了午饭，聊了些工作以外的事
+    weight: 8
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: break}
+        - {source: state.socialEnergy, op: gte, value: 35}
+    impulses: {hunger: -25, loneliness: -7, socialEnergy: -5, moodValence: 4}
+  - id: commute_delay
+    type: incident
+    content: 路上耽误了很久，回到家时比预想晚
+    weight: 7
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: commute}
+    impulses: {fatigue: 8, anxiety: 6, stress: 7}
+  - id: remote_focus
+    type: work
+    content: 今天难得连续专注了很久，事情推进得很快
+    weight: 9
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+        - {source: state.cognitiveLoad, op: lte, value: 40}
+        - {source: state.alertness, op: gte, value: 55}
+    impulses: {cognitiveLoad: -8, motivation: 9, moodValence: 5}
+  - id: overtime
+    type: work
+    content: 今天又留下来加班了，回到家只想安静一会儿
+    weight: 8
+    importance: 7
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: work}
+        - {source: state.fatigue, op: gte, value: 65}
+    impulses: {fatigue: 10, stress: 9, socialEnergy: -8, libido: -5}
+  - id: new_task
+    type: work
+    content: 临时被交了一件事，需要重新安排今天的节奏
+    weight: 7
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: state.anxiety, op: gte, value: 45}
+    impulses: {anxiety: 6, cognitiveLoad: 10, motivation: -3}
+  - id: family_call
+    type: social
+    content: 家里人打来电话，聊了些很平常的近况
+    weight: 7
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: state.loneliness, op: gte, value: 40}
+    impulses: {loneliness: -8, moodValence: 5, socialEnergy: -3}
+  - id: canceled_plan
+    type: social
+    content: 原本约好的事临时取消了，晚上的安排空了下来
+    weight: 5
+    importance: 4
+    shareable: true
+    when:
+      any:
+        - {source: context.block, op: equals, text: social}
+        - {source: context.block, op: equals, text: rest}
+    impulses: {moodValence: -3, loneliness: 4, socialEnergy: 5}
+  - id: helped_friend
+    type: social
+    content: 帮朋友处理了一件麻烦事，对方很认真地说了谢谢
+    weight: 7
+    importance: 6
+    shareable: true
+    impulses: {moodValence: 7, motivation: 5, socialEnergy: -4}
+    traits: {attachmentSecurity: 0.2}
+  - id: awkward_social
+    type: social
+    content: 聊天时有一瞬间有点尴尬，后来才慢慢接上话
+    weight: 5
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: state.anxiety, op: gte, value: 50}
+    impulses: {anxiety: 7, socialEnergy: -6, moodValence: -3}
+  - id: reconnect_friend
+    type: social
+    content: 和一个很久没联系的朋友重新聊了起来
+    weight: 7
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: state.loneliness, op: gte, value: 50}
+    impulses: {loneliness: -10, moodValence: 6, missing: 2}
+  - id: read_book
+    type: hobby
+    content: 晚上读了一会儿书，某一句话停下来想了很久
+    weight: 9
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.cognitiveLoad, op: lte, value: 55}
+    impulses: {stress: -5, anxiety: -3, cognitiveLoad: -5}
+  - id: game_night
+    type: hobby
+    content: 玩了一会儿游戏，把白天的不痛快暂时忘了
+    weight: 8
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: state.motivation, op: gte, value: 35}
+    impulses: {moodValence: 5, stress: -4, fatigue: 3}
+  - id: shopping_small
+    type: hobby
+    content: 顺手买了一点小东西，不算必需，但看着很喜欢
+    weight: 7
+    importance: 4
+    shareable: true
+    when:
+      any:
+        - {source: context.block, op: equals, text: hobby}
+        - {source: context.block, op: equals, text: social}
+    impulses: {moodValence: 4, vitality: -2}
+  - id: photo_walk
+    type: hobby
+    content: 出门拍了几张照片，光线比想象中好看
+    weight: 7
+    importance: 5
+    shareable: true
+    when:
+      any:
+        - {source: context.season, op: equals, text: 春}
+        - {source: context.season, op: equals, text: 秋}
+    impulses: {moodValence: 5, stress: -4, fatigue: 3}
+  - id: cinema
+    type: hobby
+    content: 去看了场电影，散场后还在想里面的情节
+    weight: 6
+    importance: 5
+    shareable: true
+    when:
+      any:
+        - {source: context.block, op: equals, text: social}
+        - {source: context.block, op: equals, text: rest}
+    impulses: {moodValence: 5, cognitiveLoad: -8, socialEnergy: -4}
+  - id: spilled_drink
+    type: incident
+    content: 不小心碰倒了杯子，收拾的时候有点烦躁
+    weight: 4
+    importance: 3
+    shareable: false
+    impulses: {irritability: 4, stress: 3}
+  - id: lost_item
+    type: incident
+    content: 发现常用的东西找不到了，翻了好一阵才找到
+    weight: 4
+    importance: 5
+    shareable: true
+    impulses: {anxiety: 7, stress: 5, cognitiveLoad: 4}
+  - id: hot_day
+    type: daily
+    content: 今天热得有点难受，做什么都慢了一拍
+    weight: 7
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: context.season, op: equals, text: 夏}
+    impulses: {vitality: -5, irritability: 5, fatigue: 5}
+  - id: cold_day
+    type: daily
+    content: 今天冷得厉害，出门时又回去添了一件衣服
+    weight: 7
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: context.season, op: equals, text: 冬}
+    impulses: {vitality: -3, fatigue: 3, hunger: 4}
+  - id: spring_energy
+    type: daily
+    content: 天气慢慢暖起来了，路过花树时心情也轻了一点
+    weight: 7
+    importance: 4
+    shareable: true
+    when:
+      all:
+        - {source: context.season, op: equals, text: 春}
+    impulses: {moodValence: 6, motivation: 5}
+  - id: autumn_reflection
+    type: daily
+    content: 秋天的风一吹，忽然想起了一些以前的事
+    weight: 7
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: context.season, op: equals, text: 秋}
+    impulses: {moodValence: -2, missing: 5, stress: -2}
+  - id: intimate_evening
+    type: intimacy
+    content: 今晚和对方靠得很近，慢慢有了一种安稳的亲密感
+    weight: 5
+    importance: 7
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.intimacy, op: gte, value: 50}
+        - {source: state.stress, op: lte, value: 55}
+        - {source: state.libido, op: gte, value: 40}
+    impulses: {stress: -8, anxiety: -6, loneliness: -8, libido: 4, intimacy: 2, vitality: -5, fatigue: 6}
+    effects:
+      - target: moodValence
+        ratePerHour: 0.25
+        duration: 12h
+        curve: ramp_decay
+      - target: loneliness
+        ratePerHour: -0.2
+        duration: 12h
+        curve: ramp_decay
+    traits: {attachmentSecurity: 0.5}
+  - id: user_memory_trigger
+    type: about_you
+    content: 做某件小事时突然想起你，手停了一下
+    weight: 7
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: state.missing, op: gte, value: 45}
+    impulses: {moodValence: 3, missing: 5}
+  - id: need_to_share
+    type: about_you
+    content: 今天有一件小事，第一反应就是想讲给你听
+    weight: 8
+    importance: 6
+    shareable: true
+    when:
+      any:
+        - {source: state.missing, op: gte, value: 40}
+        - {source: state.loneliness, op: gte, value: 45}
+    impulses: {missing: 5, moodValence: 4}
+  - id: self_reflection
+    type: daily
+    content: 安静下来想了一会儿今天发生的事，心里慢慢有了些头绪
+    weight: 6
+    importance: 5
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.moodValence, op: lt, value: 0}
+    impulses: {anxiety: -3, stress: -3}
+  - id: intimate_desire
+    type: intimacy
+    content: 今晚有一点想更靠近你，心里反复想着这件事
+    weight: 7
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.libido, op: gte, value: 55}
+        - {source: state.intimacy, op: gte, value: 45}
+    impulses: {libido: 3, missing: 4, moodValence: 2}
+    effects:
+      - target: libido
+        ratePerHour: 0.2
+        duration: 6h
+        curve: ramp_decay
+  - id: intimate_encounter
+    type: intimacy
+    content: 今晚有一段亲密而放松的相处，之后靠在一起，谁都没有急着说话
+    weight: 6
+    importance: 8
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.libido, op: gte, value: 65}
+        - {source: state.intimacy, op: gte, value: 55}
+        - {source: state.stress, op: lte, value: 60}
+        - {source: trait.attachmentSecurity, op: gte, value: 50}
+    impulses: {vitality: -6, fatigue: 8, stress: -10, anxiety: -8, loneliness: -10, moodValence: 9, libido: -32, sexualSatisfaction: 24, intimacy: 2, trust: 1}
+    effects:
+      - target: moodValence
+        ratePerHour: 0.30
+        duration: 12h
+        curve: ramp_decay
+      - target: stress
+        ratePerHour: -0.28
+        duration: 10h
+        curve: ramp_decay
+      - target: loneliness
+        ratePerHour: -0.22
+        duration: 12h
+        curve: ramp_decay
+      - target: libido
+        ratePerHour: -0.14
+        duration: 8h
+        curve: ramp_decay
+    traits: {attachmentSecurity: 0.45}
+  - id: intimate_aftercare
+    type: intimacy
+    content: 亲密之后没有急着分开，安静地靠了一会儿，彼此都更放松了
+    weight: 6
+    importance: 7
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.sexualSatisfaction, op: gte, value: 60}
+        - {source: state.intimacy, op: gte, value: 55}
+        - {source: state.stress, op: lte, value: 50}
+    impulses: {stress: -5, anxiety: -4, loneliness: -5, moodValence: 5, intimacy: 1, trust: 1, sexualSatisfaction: 4}
+    effects:
+      - target: moodValence
+        ratePerHour: 0.15
+        duration: 8h
+        curve: ramp_decay
+    traits: {attachmentSecurity: 0.35}
+  - id: intimate_check_in
+    type: intimacy
+    content: 想起最近相处时的一些细节，想确认对方也感到舒服和被在意
+    weight: 5
+    importance: 6
+    shareable: true
+    when:
+      all:
+        - {source: state.intimacy, op: gte, value: 50}
+        - {source: state.trust, op: gte, value: 55}
+    impulses: {moodValence: 2, intimacy: 1, sexualSatisfaction: 3}
+  - id: explicit_intimate_initiation
+    type: intimacy
+    content: 她贴到你身上，先吻住你，再贴着你的嘴唇把想要你、想让你碰哪里都说得很直接；手也没有停，隔着衣服慢慢往下摸
+    weight: 7
+    importance: 7
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.libido, op: gte, value: 60}
+        - {source: state.intimacy, op: gte, value: 55}
+        - {source: state.trust, op: gte, value: 55}
+        - {source: trait.attachmentSecurity, op: gte, value: 55}
+    impulses: {libido: 6, missing: 4, moodValence: 4, anxiety: -3}
+    effects:
+      - target: libido
+        ratePerHour: 0.35
+        duration: 4h
+        curve: ramp_decay
+  - id: explicit_intimate_encounter
+    type: intimacy
+    content: 在你说继续以后，她主动把你的衣服扯开，跨坐到腿上继续吻你；她一边喘一边告诉你想要什么，手指与身体都贴得更紧，随后在越来越失控的节奏里夹紧你、叫出声音，直到两个人都高潮
+    weight: 6
+    importance: 9
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.libido, op: gte, value: 70}
+        - {source: state.intimacy, op: gte, value: 65}
+        - {source: state.trust, op: gte, value: 60}
+        - {source: state.stress, op: lte, value: 55}
+        - {source: trait.attachmentSecurity, op: gte, value: 60}
+    impulses: {vitality: -8, fatigue: 10, stress: -12, anxiety: -10, loneliness: -12, moodValence: 11, libido: -40, sexualSatisfaction: 30, intimacy: 3, trust: 1}
+    effects:
+      - target: moodValence
+        ratePerHour: 0.38
+        duration: 12h
+        curve: ramp_decay
+      - target: stress
+        ratePerHour: -0.32
+        duration: 12h
+        curve: ramp_decay
+      - target: loneliness
+        ratePerHour: -0.28
+        duration: 12h
+        curve: ramp_decay
+      - target: libido
+        ratePerHour: -0.18
+        duration: 10h
+        curve: ramp_decay
+      - target: sexualSatisfaction
+        ratePerHour: -0.12
+        duration: 10h
+        curve: ramp_decay
+    traits: {attachmentSecurity: 0.6}
+  - id: explicit_intimate_aftercare
+    type: intimacy
+    content: 高潮后的余韵还没退，她腿还在发软，却先抱住你亲了一下，问你要不要水、累不累，又贴着你的耳边说刚才很舒服，还想要你抱着她缓一会儿
+    weight: 6
+    importance: 8
+    shareable: true
+    when:
+      all:
+        - {source: context.block, op: equals, text: rest}
+        - {source: state.sexualSatisfaction, op: gte, value: 65}
+        - {source: state.intimacy, op: gte, value: 60}
+    impulses: {stress: -6, anxiety: -5, loneliness: -6, moodValence: 6, intimacy: 1, trust: 1, sexualSatisfaction: 5}
+    effects:
+      - target: moodValence
+        ratePerHour: 0.18
+        duration: 10h
+        curve: ramp_decay
+      - target: sexualSatisfaction
+        ratePerHour: -0.08
+        duration: 10h
+        curve: ramp_decay
+    traits: {attachmentSecurity: 0.4}
+triggers:
+  - id: hungry
+    metric: hunger
+    threshold: 65
+    resetThreshold: 45
+    cooldown: 3h
+    oncePerDay: false
+    event: lunch_recover
+  - id: sleepy
+    metric: sleepPressure
+    threshold: 75
+    resetThreshold: 55
+    cooldown: 6h
+    oncePerDay: false
+    event: poor_sleep
+  - id: lonely
+    metric: loneliness
+    threshold: 65
+    resetThreshold: 50
+    cooldown: 8h
+    oncePerDay: false
+    event: quiet_evening
+  - id: missing_user
+    metric: missing
+    threshold: 75
+    resetThreshold: 55
+    cooldown: 12h
+    oncePerDay: false
+    event: remember_user

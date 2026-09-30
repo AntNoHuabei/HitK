@@ -102,11 +102,12 @@ export interface ModeDefaultView {
 }
 
 /**
- * ModeDefaultsView carries the Work and Coding selections.
+ * ModeDefaultsView carries the Work, Coding and Companion selections.
  */
 export interface ModeDefaultsView {
     "work": ModeDefaultView;
     "coding": ModeDefaultView;
+    "companion": ModeDefaultView;
 }
 
 /**

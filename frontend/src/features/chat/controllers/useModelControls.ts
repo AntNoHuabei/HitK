@@ -7,11 +7,6 @@ import { errorText, modelRepository } from "../../../shared/repositories";
 import type { ModeDefaultsLite, ModelOptionLite, ProviderLite } from "../../../shared/types/settings";
 import type { AgentMode } from "../../../shared/types/chat";
 
-/** optionKey 是模型在扁平列表中的唯一键。 */
-export function optionKey(provider: string, model: string): string {
-  return `${provider}::${model}`;
-}
-
 export function useModelControls(mode: AgentMode, isActive: boolean, refreshKey: string) {
   const [providers, setProviders] = useState<ProviderLite[]>([]);
   const [options, setOptions] = useState<ModelOptionLite[]>([]);

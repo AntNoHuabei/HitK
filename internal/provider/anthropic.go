@@ -48,6 +48,7 @@ type antRequest struct {
 	System      string       `json:"system,omitempty"`
 	Messages    []antMessage `json:"messages"`
 	Tools       []antTool    `json:"tools,omitempty"`
+	ToolChoice  any          `json:"tool_choice,omitempty"`
 	Stream      bool         `json:"stream"`
 	Temperature *float64     `json:"temperature,omitempty"`
 	Thinking    *antThinking `json:"thinking,omitempty"`
@@ -131,6 +132,9 @@ func (a *Anthropic) Stream(ctx context.Context, req ChatRequest) (<-chan Chunk, 
 			schema = json.RawMessage(`{"type":"object","properties":{}}`)
 		}
 		body.Tools = append(body.Tools, antTool{Name: t.Name, Description: t.Description, InputSchema: schema})
+	}
+	if req.ToolChoice != "" {
+		body.ToolChoice = map[string]string{"type": "tool", "name": req.ToolChoice}
 	}
 
 	raw, err := json.Marshal(body)

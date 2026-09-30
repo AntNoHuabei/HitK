@@ -127,3 +127,44 @@ func TestOpenAICompatOmitsThinkingWhenUnspecified(t *testing.T) {
 		t.Fatalf("reasoning_effort must be omitted when thinking is disabled: %#v", body)
 	}
 }
+
+func TestOpenAICompatForcesNamedToolChoice(t *testing.T) {
+	requests := make(chan map[string]any, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		requests <- body
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompat(OpenAICompatConfig{
+		ID: "volcengine-plan", BaseURL: server.URL, APIKey: "test-key",
+	})
+	stream, err := client.Stream(context.Background(), ChatRequest{
+		Model:      "ark-code-latest",
+		Messages:   []Message{UserText("analyze")},
+		ToolChoice: "report_conversation_effect",
+		Tools: []ToolSchema{{
+			Name:       "report_conversation_effect",
+			Parameters: json.RawMessage(`{"type":"object"}`),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	for range stream {
+	}
+	body := <-requests
+	choice, ok := body["tool_choice"].(map[string]any)
+	if !ok {
+		t.Fatalf("tool_choice = %#v, want object", body["tool_choice"])
+	}
+	function, ok := choice["function"].(map[string]any)
+	if !ok || function["name"] != "report_conversation_effect" {
+		t.Fatalf("tool_choice = %#v", choice)
+	}
+}

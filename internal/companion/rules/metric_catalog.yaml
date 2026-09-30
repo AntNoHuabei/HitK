@@ -1,0 +1,177 @@
+version: 1
+metrics:
+  vitality:
+    label: 生命力
+    group: physical
+    min: 0
+    max: 100
+    default: 70
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 70, speedPerHour: 0.035}
+  hunger:
+    label: 饥饿
+    group: physical
+    min: 0
+    max: 100
+    default: 20
+    baseRatePerHour: 1.2
+    recovery: {mode: linear, baseline: 0, speedPerHour: 0}
+  fatigue:
+    label: 疲劳
+    group: physical
+    min: 0
+    max: 100
+    default: 25
+    baseRatePerHour: 0.8
+    recovery: {mode: linear, baseline: 0, speedPerHour: 0}
+  sleepPressure:
+    label: 睡眠压力
+    group: physical
+    min: 0
+    max: 100
+    default: 20
+    baseRatePerHour: 4.2
+    recovery: {mode: linear, baseline: 0, speedPerHour: 0}
+  alertness:
+    label: 清醒度
+    group: cognitive
+    min: 0
+    max: 100
+    default: 75
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 72, speedPerHour: 0.05}
+  cognitiveLoad:
+    label: 认知负荷
+    group: cognitive
+    min: 0
+    max: 100
+    default: 20
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 18, speedPerHour: 0.14}
+  motivation:
+    label: 行动动机
+    group: cognitive
+    min: 0
+    max: 100
+    default: 60
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 55, speedPerHour: 0.05}
+  moodValence:
+    label: 情绪
+    group: emotion
+    min: -100
+    max: 100
+    default: 20
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 15, speedPerHour: 0.035}
+  stress:
+    label: 压力
+    group: emotion
+    min: 0
+    max: 100
+    default: 20
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 16, speedPerHour: 0.06}
+  anxiety:
+    label: 焦虑
+    group: emotion
+    min: 0
+    max: 100
+    default: 18
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 14, speedPerHour: 0.04}
+  irritability:
+    label: 易怒
+    group: emotion
+    min: 0
+    max: 100
+    default: 12
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 10, speedPerHour: 0.07}
+  loneliness:
+    label: 孤独
+    group: social
+    min: 0
+    max: 100
+    default: 35
+    baseRatePerHour: 0.45
+    recovery: {mode: homeostatic, baseline: 25, speedPerHour: 0.012}
+  socialEnergy:
+    label: 社交电量
+    group: social
+    min: 0
+    max: 100
+    default: 65
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 62, speedPerHour: 0.04}
+  libido:
+    label: 性欲
+    group: relationship
+    min: 0
+    max: 100
+    default: 35
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 35, speedPerHour: 0.025}
+  sexualSatisfaction:
+    label: 性满足
+    group: relationship
+    min: 0
+    max: 100
+    default: 45
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 45, speedPerHour: 0.012}
+  missing:
+    label: 思念
+    group: relationship
+    min: 0
+    max: 100
+    default: 0
+    baseRatePerHour: 0
+    recovery: {mode: linear, baseline: 0, speedPerHour: 0}
+  trust:
+    label: 信任
+    group: relationship
+    min: 0
+    max: 100
+    default: 50
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 50, speedPerHour: 0}
+  intimacy:
+    label: 亲密度
+    group: relationship
+    min: 0
+    max: 100
+    default: 25
+    baseRatePerHour: 0
+    recovery: {mode: homeostatic, baseline: 25, speedPerHour: 0}
+traits:
+  resilience:
+    label: 韧性
+    min: 0
+    max: 100
+    default: 50
+  fitness:
+    label: 体能
+    min: 0
+    max: 100
+    default: 40
+  sleepDebt:
+    label: 睡眠债
+    min: 0
+    max: 100
+    default: 10
+  sensitivity:
+    label: 敏感度
+    min: 0
+    max: 100
+    default: 50
+  attachmentSecurity:
+    label: 关系安全感
+    min: 0
+    max: 100
+    default: 45
+  nutritionBalance:
+    label: 饮食稳定度
+    min: 0
+    max: 100
+    default: 55

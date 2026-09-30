@@ -92,10 +92,13 @@ type ToolSchema struct {
 
 // ChatRequest is one streaming completion request.
 type ChatRequest struct {
-	Model       string
-	System      string
-	Messages    []Message
-	Tools       []ToolSchema
+	Model    string
+	System   string
+	Messages []Message
+	Tools    []ToolSchema
+	// ToolChoice names the function the model must call. Empty leaves the
+	// provider default. Adapters that cannot force a function may ignore it.
+	ToolChoice  string
 	Temperature *float64
 	MaxTokens   int
 	// Metadata is passed through to the vendor when it supports it (OpenAI

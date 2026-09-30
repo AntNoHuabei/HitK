@@ -11,7 +11,8 @@ import { ConversationComposer } from "../features/chat/components/ConversationCo
 import { ConversationSidebar } from "../features/chat/components/ConversationSidebar";
 import { ConversationViewport } from "../features/chat/components/ConversationViewport";
 import { useChatRuntime } from "../features/chat/controllers/useChatRuntime";
-import { optionKey, useModelControls } from "../features/chat/controllers/useModelControls";
+import { useModelControls } from "../features/chat/controllers/useModelControls";
+import { optionKey } from "../shared/lib/modelKey";
 import { useShellStore } from "../features/shell/shellStore";
 import { SplitView } from "../shared/components/SplitView";
 

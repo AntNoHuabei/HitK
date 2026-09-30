@@ -72,7 +72,7 @@ type oaiRequest struct {
 	Model           string            `json:"model"`
 	Messages        []oaiMessage      `json:"messages"`
 	Tools           []oaiTool         `json:"tools,omitempty"`
-	ToolChoice      string            `json:"tool_choice,omitempty"`
+	ToolChoice      any               `json:"tool_choice,omitempty"`
 	Stream          bool              `json:"stream"`
 	StreamOptions   *oaiStreamOptions `json:"stream_options,omitempty"`
 	Temperature     *float64          `json:"temperature,omitempty"`
@@ -176,6 +176,12 @@ func (c *OpenAICompat) Stream(ctx context.Context, req ChatRequest) (<-chan Chun
 	}
 	if thinkingType := req.Metadata["thinking_type"]; thinkingType != "" {
 		body.Thinking = &oaiThinking{Type: thinkingType}
+	}
+	if req.ToolChoice != "" {
+		body.ToolChoice = map[string]any{
+			"type":     "function",
+			"function": map[string]string{"name": req.ToolChoice},
+		}
 	}
 	for _, t := range req.Tools {
 		params := t.Parameters

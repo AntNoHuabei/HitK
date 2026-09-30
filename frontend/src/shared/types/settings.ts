@@ -92,6 +92,7 @@ export interface ModeDefaultLite {
 export interface ModeDefaultsLite {
   work: ModeDefaultLite;
   coding: ModeDefaultLite;
+  companion: ModeDefaultLite;
 }
 
 export interface TestResultLite {

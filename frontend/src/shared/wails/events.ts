@@ -3,10 +3,11 @@
 // agent 把每个状态变化都作为一条 `hitk:event` 发布,组件从不轮询。把订阅收在
 // 一处意味着去重与顺序规则只存在一个地方。
 import { Events } from "@wailsio/runtime";
-import type { ProtocolEvent, RuntimeProgress } from "../repositories/bindings";
+import type { CompanionEvent, ProtocolEvent, RuntimeProgress } from "../repositories/bindings";
 
 export const PROTOCOL_EVENT = "hitk:event";
 export const RUNTIME_PROGRESS_EVENT = "hitk:runtime-progress";
+export const COMPANION_EVENT = "hitk:companion";
 
 /**
  * onProtocolEvent 订阅 agent 事件。
@@ -26,6 +27,16 @@ export function onProtocolEvent(handler: (event: ProtocolEvent) => void): () => 
 /** onRuntimeProgress subscribes to component download and installation states. */
 export function onRuntimeProgress(handler: (progress: RuntimeProgress) => void): () => void {
   const off = Events.On(RUNTIME_PROGRESS_EVENT, (ev: { data: RuntimeProgress }) => {
+    if (ev?.data) handler(ev.data);
+  });
+  return () => {
+    if (typeof off === "function") off();
+  };
+}
+
+/** onCompanionEvent subscribes to state and proactive-message updates. */
+export function onCompanionEvent(handler: (event: CompanionEvent) => void): () => void {
+  const off = Events.On(COMPANION_EVENT, (ev: { data: CompanionEvent }) => {
     if (ev?.data) handler(ev.data);
   });
   return () => {

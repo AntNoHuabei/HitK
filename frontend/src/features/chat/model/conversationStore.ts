@@ -116,7 +116,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
   applyEvent: (event) =>
     set((state) => {
       // 同一线程之外的事件与本会话无关;seq 保证重复投递不会重复渲染。
-      if (event.threadId && state.conversationId && event.threadId !== state.conversationId) {
+      if (event.threadId && event.threadId !== state.conversationId) {
         return state;
       }
       if (event.seq > 0 && event.seq <= state.lastSeq) return state;
