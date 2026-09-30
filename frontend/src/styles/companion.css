@@ -158,6 +158,8 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
+  /* 预留滚动条槽，否则滚动条会压住指标行右边缘的数值与趋势箭头。 */
+  scrollbar-gutter: stable;
 }
 
 .hitk-companion-life-list,
@@ -193,9 +195,123 @@
   font-weight: 600;
 }
 
+/* 「需要留意」：只放真正不对劲的几项，没有就直接说平稳。 */
+.hitk-companion-state-notable {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0 2px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--hitk-signal) 20%, var(--hitk-divider));
+  border-radius: 7px;
+  background: var(--hitk-inset-bg);
+}
+
+.hitk-companion-state-notable h4 {
+  margin: 0;
+  color: var(--hitk-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hitk-companion-state-notable-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--hitk-muted);
+  font-size: 12px;
+}
+
+.hitk-companion-state-notable-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-companion-state-notable-row b {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hitk-companion-state-notable-row b.is-warn {
+  color: var(--ant-color-warning);
+}
+
+.hitk-companion-state-notable-row b.is-low {
+  color: var(--ant-color-primary);
+}
+
+.hitk-companion-state-calm {
+  font-size: 12px;
+}
+
+/* 分组标题改成可点折叠的按钮，默认只展开有异常的组。 */
+.hitk-companion-state-group-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--hitk-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.hitk-companion-state-group-head:hover,
+.hitk-companion-state-group-head:focus-visible {
+  color: var(--hitk-text);
+}
+
+.hitk-companion-state-group-head > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hitk-companion-state-flag {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ant-color-warning) 16%, transparent);
+  color: var(--ant-color-warning);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.hitk-companion-state-count {
+  margin-left: auto;
+  color: var(--hitk-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hitk-companion-state-chevron {
+  color: var(--hitk-muted);
+  font-size: 9px !important;
+  transition: transform 160ms ease;
+}
+
+.hitk-companion-state-group-head[aria-expanded='false'] .hitk-companion-state-chevron {
+  transform: rotate(-90deg);
+}
+
+/* 本轮细节：描述紧跟标签，不再被 margin-left:auto 甩到列尾拉出一段空白。 */
+.hitk-companion-turn-detail .hitk-tool-status {
+  margin-left: 2px;
+  color: var(--hitk-muted);
+  font-size: 11px;
+}
+
 .hitk-companion-state-row {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 58px;
+  grid-template-columns: 54px minmax(0, 1fr) 62px;
   align-items: center;
   gap: 8px;
   color: var(--hitk-muted);
