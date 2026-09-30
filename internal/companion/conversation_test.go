@@ -178,7 +178,9 @@ func TestLLMSemanticAnalysisCanCreateLargeImmediateJump(t *testing.T) {
 	// Keep the world one step behind the fixed processing instant so advance()
 	// runs a single tick instead of a full seven-day catch-up.
 	pinClock(t, manager, fixedMorning)
-	task, err := manager.SubmitUserTurn(context.Background(), "th_companion", "继续，我忍不住了", "", "", "")
+	// Submit against the pinned instant so the background kick leaves this task
+	// alone and the test owns the processing.
+	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "继续，我忍不住了", "", "", "", fixedMorning)
 	if err != nil {
 		t.Fatal(err)
 	}

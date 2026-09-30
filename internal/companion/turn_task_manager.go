@@ -274,26 +274,45 @@ func (m *Manager) processTurnTask(ctx context.Context, taskID string) {
 }
 
 func (m *Manager) processTurnTaskAt(ctx context.Context, taskID string, now time.Time) {
+	task, ok := m.claimTurnTask(taskID, now)
+	if !ok {
+		return
+	}
+	m.runTurnTask(ctx, task, now)
+}
+
+// claimTurnTask moves a waiting task into aligning and does nothing else. That
+// transition is the only place two paths can race over one thread, so the lock
+// covers the read and the write and then lets go.
+//
+// The slow work used to live inside this same lock: a catch-up tick over as much as
+// seven days, a weather call out to the network, and a model round trip with a 60
+// second timeout that retries once. Submitting a message needs this lock too, so
+// pressing Enter just sat there until she happened to finish.
+func (m *Manager) claimTurnTask(taskID string, now time.Time) (TurnTask, bool) {
 	m.taskMu.Lock()
 	defer m.taskMu.Unlock()
 
 	task, err := m.store.TurnTask(taskID)
 	if err != nil || task.Status != TaskWaiting {
-		return
+		return TurnTask{}, false
 	}
 	if task.NotBefore > now.UnixMilli() {
-		return
+		return TurnTask{}, false
 	}
 	task.Status = TaskAligning
 	task.StartedAt = now.UnixMilli()
 	task.Error = ""
 	if err := m.store.SaveTurnTask(task); err != nil {
-		return
+		return TurnTask{}, false
 	}
 	m.emitTask(task)
+	return task, true
+}
 
+func (m *Manager) runTurnTask(ctx context.Context, task TurnTask, now time.Time) {
 	m.tickMu.Lock()
-	err = m.advance(ctx, now)
+	err := m.advance(ctx, now)
 	m.tickMu.Unlock()
 	if err != nil {
 		m.failTurnTask(task, err)
@@ -398,6 +417,11 @@ func (m *Manager) processTurnTaskAt(ctx context.Context, taskID string, now time
 		return
 	}
 
+	// The slow stretch is no longer under the lock, so a cancel that landed while we
+	// were away has to be noticed before we push a reply into the conversation.
+	if current, err := m.store.TurnTask(task.ID); err == nil && current.Status != TaskResolved {
+		return
+	}
 	task.Status = TaskGenerating
 	if err := m.store.SaveTurnTask(task); err != nil {
 		m.failTurnTask(task, err)
