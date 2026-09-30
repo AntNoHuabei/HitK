@@ -328,6 +328,112 @@ func TestCatchupIsCappedAtSevenDays(t *testing.T) {
 	}
 }
 
+func TestSceneDecaysOnAdvanceEvenWithoutTickSteps(t *testing.T) {
+	manager := openTestManager(t)
+	now := time.Now().Truncate(time.Second)
+	state, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 场景两小时前开的，模拟时钟已经追平，这一步本来一步都不用跑。
+	// 衰减不能挂在「跑了若干 step」上，否则这种路径下旧场景会一直挂着。
+	state.SceneStage = "active"
+	state.ConsentState = "affirmed"
+	state.SceneStartedAt = now.Add(-2 * time.Hour).UnixMilli()
+	state.LastTickAt = now.UnixMilli()
+	if err := manager.store.SaveState(manager.id, state); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.advance(context.Background(), now); err != nil {
+		t.Fatal(err)
+	}
+	next, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.SceneStage != "aftercare" {
+		t.Fatalf("scene did not decay when no tick step was needed: %q", next.SceneStage)
+	}
+}
+
+func TestOverviewNeverServesStaleScene(t *testing.T) {
+	manager := openTestManager(t)
+	now := time.Now().Truncate(time.Second)
+	state, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SceneStage = "active"
+	state.ConsentState = "affirmed"
+	state.SceneStartedAt = now.Add(-5 * time.Hour).UnixMilli()
+	if err := manager.store.SaveState(manager.id, state); err != nil {
+		t.Fatal(err)
+	}
+	overview, err := manager.Overview(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview.State.SceneStage != "none" {
+		t.Fatalf("overview served a 5h-old scene as current: %q", overview.State.SceneStage)
+	}
+}
+
+func TestOverviewActivityFollowsLiveScene(t *testing.T) {
+	manager := openTestManager(t)
+	now := time.Now().Truncate(time.Second)
+	state, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.CurrentActivity = "吃午饭，短暂休息"
+	state.SceneStage = "active"
+	state.ConsentState = "affirmed"
+	state.SceneStartedAt = now.Add(-10 * time.Minute).UnixMilli()
+	if err := manager.store.SaveState(manager.id, state); err != nil {
+		t.Fatal(err)
+	}
+	overview, err := manager.Overview(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview.State.CurrentActivity != "亲密中" {
+		t.Fatalf("activity still came off the schedule: %q", overview.State.CurrentActivity)
+	}
+	// 落库的仍是日程活动，displayActivity 只改读视图。
+	stored, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.CurrentActivity != "吃午饭，短暂休息" {
+		t.Fatalf("display activity leaked into storage: %q", stored.CurrentActivity)
+	}
+}
+
+func TestSimulationClockConvergesAfterMissedTick(t *testing.T) {
+	manager := openTestManager(t)
+	now := time.Now().Truncate(time.Second)
+	state, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 机器打盹漏掉一次 ticker：距上次 tick 28 分钟。floor 只跑一步，
+	// 余下 13 分钟永久丢掉，模拟时钟就再也追不回来。
+	state.LastTickAt = now.Add(-28 * time.Minute).UnixMilli()
+	if err := manager.store.SaveState(manager.id, state); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.advance(context.Background(), now); err != nil {
+		t.Fatal(err)
+	}
+	next, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lag := now.Sub(time.UnixMilli(next.LastTickAt)); lag > tickInterval/2 {
+		t.Fatalf("sim clock still %s behind real time after a missed tick", lag)
+	}
+}
+
 func TestCompanionStateSurvivesReopen(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "companion.db")

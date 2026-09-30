@@ -304,6 +304,19 @@ func sceneDurationMinutes(state State, at time.Time) int {
 	return minutes
 }
 
+// displayActivity 回答「她现在正在做什么」。场景还活着的时候答案是场景，
+// 不是日程表上那格 —— 否则亲密场景进行中，头部会一脸认真地写着「吃午饭，短暂休息」。
+// flirt 不覆盖：调情可以和别的事同时进行。
+func displayActivity(state State) string {
+	switch state.SceneStage {
+	case "active", "climax":
+		return "亲密中"
+	case "aftercare":
+		return "亲密后的温存"
+	}
+	return state.CurrentActivity
+}
+
 func advanceSceneByWallClock(state *State, at time.Time) bool {
 	if state.SceneStartedAt <= 0 {
 		return false

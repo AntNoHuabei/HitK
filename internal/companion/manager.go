@@ -263,6 +263,11 @@ func (m *Manager) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
+	// 读路径也要把场景按真实时间衰减掉，并让「当前活动」反映此刻而不是日程表，
+	// 否则面板会把几小时前的场景和午饭点的日程一起端上来。这里只改副本，不落库。
+	view := state
+	advanceSceneByWallClock(&view, time.Now())
+	view.CurrentActivity = displayActivity(view)
 	threadID, err := m.ensureThread(ctx)
 	if err != nil {
 		return Overview{}, err
@@ -278,9 +283,9 @@ func (m *Manager) Overview(ctx context.Context) (Overview, error) {
 	return Overview{
 		CharacterID: m.id,
 		Profile:    profile,
-		State:      state,
-		Metrics:    m.engine.Views(state),
-		Derived:    m.engine.Derived(state),
+		State:      view,
+		Metrics:    m.engine.Views(view),
+		Derived:    m.engine.Derived(view),
 		Clock:      worldClock(time.Now()),
 		Weather:    m.weather.Cached(profile.City),
 		Paused:     paused == "1",
@@ -296,18 +301,9 @@ func (m *Manager) TickNow(ctx context.Context, now time.Time) error {
 		return nil
 	}
 	defer m.tickMu.Unlock()
+	// advance 里已经按真实时间衰减过场景并落库了。
 	if err := m.advance(ctx, now); err != nil {
 		return err
-	}
-	state, err := m.store.State(m.id)
-	if err != nil {
-		return err
-	}
-	if advanceSceneByWallClock(&state, now) {
-		state.UpdatedAt = now.UnixMilli()
-		if err := m.store.SaveState(m.id, state); err != nil {
-			return err
-		}
 	}
 	m.maybeProactive(ctx)
 	return nil
@@ -501,7 +497,20 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 	if now.Sub(from) > catchupLimit {
 		from = now.Add(-catchupLimit)
 	}
-	steps := int(now.Sub(from) / tickInterval)
+
+	// 场景时钟只认墙上时钟，跟这一步要不要跑无关。以前它只在 TickNow 里衰减，
+	// 而 startup 直接调 advance 会整个跳过，于是关掉一两小时再打开，
+	// 旧场景还被当成正在进行。
+	if advanceSceneByWallClock(&state, now) {
+		state.UpdatedAt = now.UnixMilli()
+		if err := m.store.SaveState(m.id, state); err != nil {
+			return err
+		}
+	}
+
+	// 四舍五入而不是向下取整：漏掉一次 ticker（机器休眠）后，floor 会把余下的
+	// 十几分钟永久丢掉，模拟时钟就固定滞后十几二十几分钟，活动切换跟着迟到。
+	steps := int((now.Sub(from) + tickInterval/2) / tickInterval)
 	if steps <= 0 {
 		return nil
 	}
@@ -528,6 +537,9 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 	eventCount := 0
 	for i := 0; i < steps; i++ {
 		stepTime := from.Add(time.Duration(i+1) * tickInterval)
+		if stepTime.After(now) {
+			stepTime = now
+		}
 		block := scheduleBlockFor(profile, stepTime)
 		effects = pruneEffects(effects, stepTime.UnixMilli())
 		m.engine.ApplyTick(&state, profile, block, effects, stepTime.UnixMilli())
