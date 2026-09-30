@@ -126,6 +126,26 @@ func (m *Manager) CancelTask(taskID string) error {
 	return nil
 }
 
+// ForceReply 让用户把她从日程里拽出来立刻回消息。
+func (m *Manager) ForceReply(taskID string) error {
+	task, err := m.store.TurnTask(taskID)
+	if err != nil {
+		return err
+	}
+	if task.Status != TaskWaiting {
+		return nil
+	}
+	task.Forced = true
+	task.NotBefore = time.Now().UnixMilli()
+	task.AvailabilityReason = ""
+	if err := m.store.SaveTurnTask(task); err != nil {
+		return err
+	}
+	m.emitTask(task)
+	m.kickTurnTask(context.Background(), task)
+	return nil
+}
+
 // SubmitProactiveTurn creates the same task type used by user replies.
 func (m *Manager) SubmitProactiveTurn(ctx context.Context) (TurnTask, bool, error) {
 	return m.submitProactiveTurnAt(ctx, time.Now())
@@ -298,7 +318,8 @@ func (m *Manager) processTurnTaskAt(ctx context.Context, taskID string, now time
 	}
 	// 复用上面已经按真实时间衰减过的那份 state。
 	available, activity, nextAt := taskAvailability(profile, state, now)
-	if !available {
+	// 用户按过「让她现在回」就不再拿日程把她塞回等待。
+	if !available && !task.Forced {
 		task.Status = TaskWaiting
 		task.NotBefore = nextAt
 		task.CurrentActivity = activity

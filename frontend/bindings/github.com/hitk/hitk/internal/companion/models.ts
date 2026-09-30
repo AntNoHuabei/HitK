@@ -409,6 +409,7 @@ export interface TurnTaskView {
     "availabilityReason"?: string;
     "brief"?: TurnBrief | null;
     "error"?: string;
+    "forced"?: boolean;
 }
 
 /**

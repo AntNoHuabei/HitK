@@ -47,6 +47,13 @@ export function DeleteMemory(id: string): $CancellablePromise<void> {
     return $Call.ByID(629375798, id);
 }
 
+/**
+ * ForceReply 让当前等待中的本轮任务跳过日程限制立刻开回。
+ */
+export function ForceReply(taskID: string): $CancellablePromise<void> {
+    return $Call.ByID(2557797939, taskID);
+}
+
 export function GetTask(taskID: string): $CancellablePromise<companion$0.TurnTaskView> {
     return $Call.ByID(1966684867, taskID);
 }

@@ -56,6 +56,9 @@ type TurnTask struct {
 	MessageItemID      string          `json:"messageItemId,omitempty"`
 	Error              string          `json:"error,omitempty"`
 	Applied            bool            `json:"applied,omitempty"`
+	// Forced 是用户按了「让她现在回」。有了它，日程可用性这一关直接跳过，
+	// 否则 processTurnTaskAt 会照着日程把她再塞回等待。
+	Forced             bool            `json:"forced,omitempty"`
 }
 
 // InputText joins the user messages folded into this task.
@@ -203,6 +206,7 @@ type TurnTaskView struct {
 	AvailabilityReason string          `json:"availabilityReason,omitempty"`
 	Brief              *TurnBrief      `json:"brief,omitempty"`
 	Error              string          `json:"error,omitempty"`
+	Forced             bool            `json:"forced,omitempty"`
 }
 
 func (t TurnTask) View() TurnTaskView {
@@ -211,7 +215,7 @@ func (t TurnTask) View() TurnTaskView {
 		RequestedAt: t.RequestedAt, NotBefore: t.NotBefore, StartedAt: t.StartedAt,
 		ResolvedAt: t.ResolvedAt, CompletedAt: t.CompletedAt,
 		CurrentActivity: t.CurrentActivity, AvailabilityReason: t.AvailabilityReason,
-		Brief: t.Brief, Error: t.Error,
+		Brief: t.Brief, Error: t.Error, Forced: t.Forced,
 	}
 }
 

@@ -945,6 +945,15 @@ func (s *CompanionService) Interrupt() error {
 	return s.c.Agent.Interrupt(overview.ThreadID)
 }
 
+// ForceReply 让当前等待中的本轮任务跳过日程限制立刻开回。
+func (s *CompanionService) ForceReply(taskID string) error {
+	manager, err := s.manager()
+	if err != nil {
+		return err
+	}
+	return manager.ForceReply(taskID)
+}
+
 func (s *CompanionService) Running() bool {
 	overview, err := s.Overview()
 	if err != nil {

@@ -801,36 +801,78 @@
   color: var(--hitk-danger);
 }
 
-.hitk-companion-task {
+/* 忙线通知：对话流里的系统消息，紧跟在最后那句话后面。 */
+.hitk-companion-busy {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 0 0 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 2px 0 14px;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--hitk-signal) 25%, var(--hitk-divider));
-  border-radius: 7px;
-  background: var(--hitk-inset-bg);
+  border: 1px solid color-mix(in srgb, var(--hitk-warn) 28%, var(--hitk-divider));
+  border-left: 3px solid var(--hitk-warn);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--hitk-warn) 6%, var(--hitk-inset-bg));
 }
 
-.hitk-companion-task > .anticon {
-  margin-top: 3px;
-  color: var(--hitk-signal);
+/* 已经把人叫回来了，语气从"等着"换成"在路上"，配色跟着转成 signal。 */
+.hitk-companion-busy.is-forced {
+  border-color: color-mix(in srgb, var(--hitk-signal) 30%, var(--hitk-divider));
+  border-left-color: var(--hitk-signal);
+  background: color-mix(in srgb, var(--hitk-signal) 6%, var(--hitk-inset-bg));
 }
 
-.hitk-companion-task > div {
+.hitk-companion-busy-icon {
   display: grid;
-  min-width: 0;
-  gap: 2px;
-  flex: 1;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--hitk-warn);
+  background: color-mix(in srgb, var(--hitk-warn) 14%, transparent);
 }
 
-.hitk-companion-task .ant-typography {
+.hitk-companion-busy.is-forced .hitk-companion-busy-icon {
+  color: var(--hitk-signal);
+  background: color-mix(in srgb, var(--hitk-signal) 14%, transparent);
+}
+
+.hitk-companion-busy-body {
+  display: grid;
+  flex: 1 1 240px;
+  min-width: 0;
+  gap: 1px;
+}
+
+.hitk-companion-busy-body .ant-typography {
   margin: 0;
 }
 
-.hitk-companion-task.is-failed {
-  border-color: color-mix(in srgb, var(--hitk-danger) 35%, var(--hitk-divider));
+.hitk-companion-busy-meta {
+  font-size: 12px;
+  line-height: 1.5;
 }
+
+/* 预计时间整块走，别断成「预计 15:55 / 能看手机」。 */
+.hitk-companion-busy-eta {
+  white-space: nowrap;
+}
+
+.hitk-companion-busy-eta::before {
+  content: " · ";
+  /* 点跟着时间块走，换行时不会孤零零留在上一行末尾。 */
+  white-space: nowrap;
+}
+
+.hitk-companion-busy-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
 
 .hitk-chat-action-message {
   margin: 0 0 10px;

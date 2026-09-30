@@ -40,7 +40,7 @@ import { MemoryPanel } from "./components/panels/MemoryPanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { StatePanel } from "./components/panels/StatePanel";
 import { StatusMeter } from "./components/panels/StatusMeter";
-import { TurnTaskBanner } from "./components/panels/TurnTaskBanner";
+import { BusyNotice } from "./components/BusyNotice";
 import { useCharacterStore } from "./model/characterStore";
 import { useCharacterModel } from "./model/useCharacterModel";
 import { useInspectorState, type InspectorTab } from "./model/inspectorState";
@@ -203,6 +203,15 @@ export function CompanionView() {
     }
   }, [message, refresh]);
 
+  const forceReply = useCallback(async (taskID: string) => {
+    try {
+      await companionRepository.forceReply(taskID);
+      await refresh();
+    } catch (err) {
+      message.error(errorText(err));
+    }
+  }, [message, refresh]);
+
   const setPaused = useCallback(async (paused: boolean) => {
     try {
       await companionRepository.setPaused(paused);
@@ -357,7 +366,6 @@ export function CompanionView() {
       <div className={`hitk-companion-body${inspector.collapsed ? " is-collapsed" : ""}`}>
         <section className="hitk-companion-conversation" aria-label={`与${profile.name}的对话`}>
           <div className="hitk-companion-messages">
-            {overview.activeTask && <TurnTaskBanner task={overview.activeTask} onCancel={cancelTask} />}
             {store.items.length === 0 ? (
               <div className="hitk-companion-empty">
                 <span className="hitk-companion-empty-mark"><HeartOutlined /></span>
@@ -371,6 +379,15 @@ export function CompanionView() {
                 running={store.running || sending}
                 modelLabel={models.activeLabel}
                 usage={store.usage}
+              />
+            )}
+            {/* 忙线时这就是一条系统消息，紧跟在最后那句话后面，不再挂在页面顶上。 */}
+            {overview.activeTask && (
+              <BusyNotice
+                characterName={profile.name}
+                task={overview.activeTask}
+                onForce={(taskID) => void forceReply(taskID)}
+                onCancel={(taskID) => void cancelTask(taskID)}
               />
             )}
             {store.interrupted && <div className="hitk-companion-inline-note">本轮已经停下。</div>}

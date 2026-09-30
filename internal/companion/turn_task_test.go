@@ -132,3 +132,87 @@ func TestWaitingTaskCoalescesMessages(t *testing.T) {
 		t.Fatalf("persisted messages = %#v", messages)
 	}
 }
+
+func TestForceReplyPullsWaitingTaskOutOfSchedule(t *testing.T) {
+	manager := openTestManager(t)
+	conversation := &fakeConversation{threadID: "th_companion"}
+	manager.SetPorts(&fakeModel{}, conversation)
+	profile, err := manager.store.Profile(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile.ScheduleTendency = "busy"
+	if err := manager.store.SaveProfile(profile); err != nil {
+		t.Fatal(err)
+	}
+	pinned := fixedBusyHour
+	pinClock(t, manager, pinned)
+
+	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "在吗", "", "", "", pinned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != TaskWaiting || task.NotBefore <= pinned.UnixMilli() {
+		t.Fatalf("want a parked task, got status=%s notBefore=%d", task.Status, task.NotBefore)
+	}
+
+	if err := manager.ForceReply(task.ID); err != nil {
+		t.Fatal(err)
+	}
+	forced, err := manager.store.TurnTask(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !forced.Forced {
+		t.Fatal("forced flag not set")
+	}
+	if forced.NotBefore > pinned.UnixMilli() {
+		t.Fatalf("notBefore = %d, want pulled forward to the pinned instant", forced.NotBefore)
+	}
+	if forced.AvailabilityReason != "" {
+		t.Fatalf("availability reason still set: %q", forced.AvailabilityReason)
+	}
+
+	// 关键一关：同一个忙碌时刻再跑一遍，也不该被日程重新塞回等待。
+	manager.processTurnTaskAt(context.Background(), task.ID, pinned)
+	processed, err := manager.store.TurnTask(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if processed.Status == TaskWaiting {
+		t.Fatalf("forced task got re-parked by the schedule: %+v", processed)
+	}
+}
+
+func TestForceReplyIgnoresNonWaitingTask(t *testing.T) {
+	manager := openTestManager(t)
+	conversation := &fakeConversation{threadID: "th_companion"}
+	manager.SetPorts(&fakeModel{}, conversation)
+	pinned := fixedMorning
+	pinClock(t, manager, pinned)
+
+	task, err := manager.submitUserTurnAt(context.Background(), "th_companion", "在吗", "", "", "", pinned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status == TaskWaiting {
+		t.Skip("task parked at a morning instant; nothing to assert")
+	}
+	before, err := manager.store.TurnTask(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.ForceReply(task.ID); err != nil {
+		t.Fatal(err)
+	}
+	after, err := manager.store.TurnTask(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Forced {
+		t.Fatalf("force leaked onto a %s task", after.Status)
+	}
+	if after.Status != before.Status {
+		t.Fatalf("status changed %s -> %s", before.Status, after.Status)
+	}
+}

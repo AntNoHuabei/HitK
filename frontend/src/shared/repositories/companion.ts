@@ -62,6 +62,9 @@ export const companionRepository = {
 
   cancelTask: (taskID: string): Promise<void> => Companion.CancelTask(taskID),
 
+  // 按「让她现在回」：跳过日程可用性这一关，立刻把等待中的这一轮推起来。
+  forceReply: (taskID: string): Promise<void> => Companion.ForceReply(taskID),
+
   interrupt: (): Promise<void> => Companion.Interrupt(),
 
   running: (): Promise<boolean> => Companion.Running(),
