@@ -829,6 +829,7 @@ func DefaultState(now int64) State {
 		Traits:            defaultTraitValues(),
 		CurrentActivity:   block.Label,
 		ActivityKind:      block.Kind,
+		Consciousness:     ConsciousAwake,
 		SceneStage:        "none",
 		ConsentState:      "not_applicable",
 		ActivityStartedAt: startedAt,

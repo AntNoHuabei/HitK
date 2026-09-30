@@ -49,6 +49,7 @@ export type {
 } from "./bindings";
 export {
   ApprovalPolicy as ApprovalPolicyEnum,
+  Consciousness,
   EventKind,
   ItemStatus,
   ItemType,

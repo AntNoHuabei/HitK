@@ -240,6 +240,26 @@ func (m *Manager) resolver(profile Profile) planResolver {
 	return func(at time.Time) DayPlan { return m.planAt(profile, at) }
 }
 
+// consciousnessNow is the live read every surface asks for, so nobody has to
+// re-derive whether she is asleep. The returned time is when she surfaces and is
+// only meaningful when the answer is asleep.
+func (m *Manager) consciousnessNow(profile Profile, state State, at time.Time) (Consciousness, time.Time) {
+	plan := m.planAt(profile, at)
+	if consciousnessAt(state, plan, at) == ConsciousAsleep {
+		return ConsciousAsleep, nextWakeAt(state, plan, at)
+	}
+	return ConsciousAwake, time.Time{}
+}
+
+// asleepUntil keeps "not asleep" as a zero rather than a real timestamp, so the
+// frontend never has to guess whether a wake time means anything.
+func asleepUntil(wakeAt time.Time) int64 {
+	if wakeAt.IsZero() {
+		return 0
+	}
+	return wakeAt.UnixMilli()
+}
+
 // scheduleTurnDrift treats the time a turn actually took as lived time and pushes
 // it into her day. A long midday scene should genuinely make her late for the
 // afternoon, which is the whole reason the plan stays mutable. The drift is anchored
@@ -675,6 +695,9 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 			}
 		}
 		m.engine.ApplyTick(&state, profile, block, effects, stepTime.UnixMilli())
+		// Consciousness settles after the forces move, so the onset check reads the
+		// flow this step just produced rather than the one it walked in with.
+		settleConsciousness(&state, plan, stepTime)
 
 		triggerEvents, nextTriggers := m.engine.EvaluateTriggers(state, triggerStates, stepTime)
 		triggerStates = nextTriggers
@@ -723,6 +746,11 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		}
 		startedAt, endsAt := blockBounds(block, stepTime)
 		state.CurrentActivity = activityLabel(block)
+		// In bed but not under is phone time, and reporting that as "还在睡" would
+		// be a straight lie about what she is doing.
+		if isSleepBlock(block) && block.StartedAt > 0 && state.Consciousness == ConsciousAwake {
+			state.CurrentActivity = "躺床上还没睡着"
+		}
 		state.ActivityKind = block.Kind
 		state.ActivityStartedAt = startedAt
 		state.ActivityEndsAt = endsAt
@@ -849,6 +877,7 @@ func (m *Manager) overviewUnchecked(ctx context.Context) (Overview, error) {
 	paused, _ := m.store.Meta(metaPaused)
 	unread, _ := m.store.Meta(metaUnread)
 	count, _ := strconv.Atoi(unread)
+	consciousness, wakeAt := m.consciousnessNow(profile, state, time.Now())
 	return Overview{
 		CharacterID: m.id,
 		Profile:     profile,
@@ -860,6 +889,11 @@ func (m *Manager) overviewUnchecked(ctx context.Context) (Overview, error) {
 		Paused:      paused == "1",
 		Unread:      count,
 		ThreadID:    threadID,
+		// Derived rather than read off State, so a value that is fifteen minutes old
+		// can never be the one the UI shows.
+		Consciousness: consciousness,
+		AsleepUntil:   asleepUntil(wakeAt),
+		CanForceReply: consciousness != ConsciousAsleep,
 	}, nil
 }
 

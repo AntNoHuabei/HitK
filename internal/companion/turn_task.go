@@ -233,13 +233,24 @@ func (t TurnTask) Active() bool {
 type planResolver func(time.Time) DayPlan
 
 func taskAvailability(state State, resolve planResolver, at time.Time) (bool, string, int64) {
+	plan := resolve(at)
 	// 场景还活着，人就在这段对话里，日程表上写什么都拦不住回消息。
 	// 之前亲密场景进行中发一条，会被判成「处理工作和日常琐事，18:30 再回」，
 	// 活活晾五个半小时。
 	if sceneLive(state, at) {
 		return true, displayActivity(state), 0
 	}
-	plan := resolve(at)
+	// 睡着是生理事实，不是日程偏好，所以走单独一条路，不往下过 blockReplyable。
+	// 「重块还没开始所以可达」对睡眠是反的：躺下没睡着是另一种可达状态，
+	// 真睡过去就谁也叫不醒。
+	if consciousnessAt(state, plan, at) == ConsciousAsleep {
+		return false, "她在睡觉", nextWakeAt(state, plan, at).UnixMilli()
+	}
+	// 躺床上还没睡着就是刷手机时间。睡眠块权重再高也拦不住，因为她人还醒着，
+	// 走下面的通用规则会被「已开始的重量级块」扣住，等于把失眠当成昏迷。
+	if bed := plan.blockAt(at); isSleepBlock(bed) && bed.StartedAt > 0 {
+		return true, "躺床上还没睡着", 0
+	}
 	// blockAt always answers. The old loop searched for the block containing this
 	// minute and, when the plan had a gap, fell off the bottom into "空闲" and let a
 	// parked message out while she was nowhere near free.
@@ -305,7 +316,13 @@ func earlyRelease(state State, resolve planResolver, at time.Time) (bool, string
 	if sceneLive(state, at) {
 		return true, displayActivity(state)
 	}
-	block := resolve(at).blockAt(at)
+	plan := resolve(at)
+	// 睡着绝不提前放行。轻块那条本来就拦得住 weight 10 的睡眠，但这里写死，
+	// 免得以后有人调权重把睡眠调成可打扰。
+	if consciousnessAt(state, plan, at) == ConsciousAsleep {
+		return false, ""
+	}
+	block := plan.blockAt(at)
 	if block.Weight <= replyWeightCeiling {
 		return true, block.Label
 	}

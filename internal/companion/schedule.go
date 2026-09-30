@@ -109,6 +109,27 @@ func (p DayPlan) indexAt(minute int) int {
 	return -1
 }
 
+// blockByID looks a block up by identity rather than by where the clock happens to
+// be, so a record like "she fell asleep in this block" can still be read after the
+// schedule has moved under it.
+func (p DayPlan) blockByID(id string) (scheduleBlock, bool) {
+	if id == "" {
+		return scheduleBlock{}, false
+	}
+	for _, block := range p.Blocks {
+		if block.ID == id {
+			return block, true
+		}
+	}
+	return scheduleBlock{}, false
+}
+
+// minuteInDay turns a minutes-since-midnight value into a real instant on the day
+// part of `day`.
+func minuteInDay(day time.Time, minute int) time.Time {
+	return time.Date(day.Year(), day.Month(), day.Day(), 0, minute, 0, 0, day.Location())
+}
+
 // markStarted records that she actually began a block, and only the first time.
 // The bool return lets a caller fire one-time side effects, like opening a late
 // night streak, without keeping a second guard of its own.

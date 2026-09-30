@@ -36,6 +36,10 @@ const (
 	// sleepLateStreakMinute is how far past the anchor counts as a late night.
 	sleepLateStreakMinute = 90
 
+	// sleepOnsetBaseMinutes is the floor on how long it takes her to go under after
+	// getting into bed. Flow stretches it out on top of this.
+	sleepOnsetBaseMinutes = 18.0
+
 	// dutyLeadHours is how far ahead a deadline starts weighing on her.
 	dutyLeadHours = 6.0
 )
@@ -274,4 +278,79 @@ func activityLabel(block scheduleBlock) string {
 		return "还没开始，先拖着"
 	}
 	return block.Label
+}
+
+// Consciousness lives here, next to the forces that produce it, so that the
+// availability gate, the force-reply button, the header, the sidebar and the
+// state panel all read one answer instead of each inferring it their own way.
+
+func isSleepBlock(block scheduleBlock) bool { return block.Kind == "sleep" }
+
+// sleepOnset is how long she lies there before she is actually under. The fixed
+// part is ordinary sleep latency; the flow term is what keeps her scrolling. Flow
+// only decays once she is in bed, so she always goes under eventually -- the more
+// wired she is, the longer the ceiling takes. That is where "lay down and could not
+// sleep for two hours" comes from without a single scripted case.
+func sleepOnset(state State) time.Duration {
+	return time.Duration(sleepOnsetBaseMinutes+state.Metric(MetricFlow)*0.9) * time.Minute
+}
+
+// consciousnessAt answers whether she is asleep at `at`, given the plan for that
+// day. The truth is the block she is standing in, not the latch: a started sleep
+// block with the onset paid means she is under, and the moment the block is not a
+// sleep block she is not. Reading the plan rather than the latch is what keeps a
+// stale latch from reporting her asleep at ten in the morning after a restart,
+// and carrySleepFrom hands the started sleep across midnight so a night that
+// spans two plans never wakes her at 00:00.
+func consciousnessAt(state State, plan DayPlan, at time.Time) Consciousness {
+	block := plan.blockAt(at)
+	if !isSleepBlock(block) || block.StartedAt == 0 {
+		return ConsciousAwake
+	}
+	if state.AsleepSince > 0 {
+		return ConsciousAsleep
+	}
+	if at.Sub(time.UnixMilli(block.StartedAt)) >= sleepOnset(state) {
+		return ConsciousAsleep
+	}
+	return ConsciousAwake
+}
+
+// nextWakeAt is when she should surface, which is what the busy notice prints and
+// what a parked message waits on.
+func nextWakeAt(state State, plan DayPlan, at time.Time) time.Time {
+	block := plan.blockAt(at)
+	if isSleepBlock(block) {
+		return minuteInDay(at, block.EndMinute)
+	}
+	// Asleep with no sleep block under her means drift ate it. The block she went
+	// to sleep in still knows when it was going to end.
+	if asleep, ok := plan.blockByID(state.AsleepBlockID); ok {
+		return minuteInDay(at, asleep.EndMinute)
+	}
+	return minuteInDay(at, wakeAnchorMinute)
+}
+
+// settleConsciousness owns the only writes to the consciousness fields. Falling
+// asleep also ends whatever scene was running: she is not in the middle of a
+// conversation and under at the same time, and leaving the stage set would let the
+// reply path read a scene that is really just someone asleep.
+func settleConsciousness(state *State, plan DayPlan, at time.Time) {
+	if consciousnessAt(*state, plan, at) == ConsciousAwake {
+		state.Consciousness = ConsciousAwake
+		if state.AsleepSince > 0 {
+			state.AsleepSince = 0
+			state.AsleepBlockID = ""
+		}
+		return
+	}
+	if state.AsleepSince == 0 {
+		state.AsleepSince = at.UnixMilli()
+		state.AsleepBlockID = plan.blockAt(at).ID
+	}
+	state.Consciousness = ConsciousAsleep
+	if state.SceneStage != "" && state.SceneStage != "none" {
+		state.SceneStage = "none"
+		state.ConsentState = "not_applicable"
+	}
 }

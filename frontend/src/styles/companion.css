@@ -595,6 +595,7 @@
   width: 22px;
   height: 22px;
   flex: 0 0 22px;
+  position: relative;
   place-items: center;
   border: 1px solid var(--hitk-chat-border);
   border-radius: 50%;
@@ -960,4 +961,137 @@
   .hitk-companion-settings-drawer .ant-drawer-content-wrapper {
     width: 94vw !important;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   意识状态：醒还是睡。睡着的配色统一走 --hitk-muted，这样十套主题里都读得出
+   「人不在」，而不是靠某一个主题恰好有的冷色。
+   --------------------------------------------------------------------------- */
+
+/* 头部那枚点：清醒是 signal 实心点，睡眠换成月亮。 */
+.hitk-companion-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hitk-companion-conscious {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  place-items: center;
+  font-size: 11px;
+}
+
+.hitk-companion-conscious.is-awake {
+  color: var(--hitk-signal);
+}
+
+.hitk-companion-conscious.is-asleep {
+  color: var(--hitk-muted);
+}
+
+.hitk-companion-conscious-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 16%, transparent);
+}
+
+/* 睡着时整条头部降一档，余光里就能读出她不在。 */
+.hitk-companion-head.is-asleep {
+  opacity: 0.82;
+}
+
+/* 忙线卡的睡眠态：比「忙」更冷，出口封着。 */
+.hitk-companion-busy.is-asleep {
+  border-color: color-mix(in srgb, var(--hitk-muted) 32%, var(--hitk-divider));
+  border-left-color: var(--hitk-muted);
+  background: color-mix(in srgb, var(--hitk-muted) 8%, var(--hitk-inset-bg));
+}
+
+.hitk-companion-busy.is-asleep .hitk-companion-busy-icon {
+  color: var(--hitk-muted);
+  background: color-mix(in srgb, var(--hitk-muted) 16%, transparent);
+}
+
+.hitk-companion-busy-note {
+  color: var(--hitk-muted);
+  white-space: nowrap;
+}
+
+.hitk-companion-busy-note::before {
+  content: " · ";
+  white-space: nowrap;
+}
+
+/* antd 不在 disabled 按钮上触发 Tooltip，这层 span 负责接住 hover。 */
+.hitk-companion-busy-force-wrap {
+  display: inline-flex;
+}
+
+/* 状态面板顶行：醒/睡 + 在做什么 / 睡了多久。 */
+.hitk-companion-conscious-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--hitk-divider);
+  border-radius: 10px;
+  background: var(--hitk-inset-bg);
+}
+
+.hitk-companion-conscious-row.is-asleep {
+  border-color: color-mix(in srgb, var(--hitk-muted) 32%, var(--hitk-divider));
+  background: color-mix(in srgb, var(--hitk-muted) 8%, var(--hitk-inset-bg));
+}
+
+.hitk-companion-conscious-row .anticon {
+  font-size: 14px;
+}
+
+.hitk-companion-conscious-row.is-awake .anticon {
+  color: var(--hitk-signal);
+}
+
+.hitk-companion-conscious-row.is-asleep .anticon {
+  color: var(--hitk-muted);
+}
+
+.hitk-companion-conscious-row .ant-typography {
+  margin: 0;
+  min-width: 0;
+}
+
+.hitk-companion-conscious-row .ant-typography:last-child {
+  margin-left: auto;
+  text-align: right;
+}
+
+/* 睡着时「需要留意」压暗：指标照跑，但此刻不该照着它叫她。 */
+.hitk-companion-state-notable.is-dim {
+  opacity: 0.55;
+}
+
+/* 侧栏激活角色头像角上的状态点。 */
+.hitk-companion-character-state {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--hitk-chat-bg);
+  border-radius: 50%;
+}
+
+.hitk-companion-character-state.is-awake {
+  background: var(--hitk-chat-signal);
+}
+
+.hitk-companion-character-state.is-asleep {
+  background: var(--hitk-chat-muted);
 }

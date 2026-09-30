@@ -48,21 +48,29 @@ type CharacterSummary struct {
 
 // State is the current, queryable snapshot of the companion's inner life.
 type State struct {
-	Metrics           map[MetricID]float64 `json:"metrics"`
-	Traits            map[TraitID]float64  `json:"traits"`
-	CurrentActivity   string               `json:"currentActivity"`
-	ActivityKind      string               `json:"activityKind"`
-	SceneStage        string               `json:"sceneStage"`
-	ConsentState      string               `json:"consentState"`
-	SceneStartedAt    int64                `json:"sceneStartedAt"`
-	SceneUpdatedAt    int64                `json:"sceneUpdatedAt"`
-	ActivityStartedAt int64                `json:"activityStartedAt"`
-	ActivityEndsAt    int64                `json:"activityEndsAt"`
-	UpdatedAt         int64                `json:"updatedAt"`
-	LastTickAt        int64                `json:"lastTickAt"`
-	LastUserAt        int64                `json:"lastUserAt"`
-	LastProactiveAt   int64                `json:"lastProactiveAt"`
-	LastMemoryDecayAt int64                `json:"lastMemoryDecayAt"`
+	Metrics         map[MetricID]float64 `json:"metrics"`
+	Traits          map[TraitID]float64  `json:"traits"`
+	CurrentActivity string               `json:"currentActivity"`
+	ActivityKind    string               `json:"activityKind"`
+	// Consciousness is whether there is anyone home. It is a hard gate rather than
+	// a schedule weight: asleep means no reply, and no amount of poking wakes her.
+	Consciousness Consciousness `json:"consciousness"`
+	// AsleepSince latches when she actually goes under, and AsleepBlockID records
+	// which block she is sleeping in so the wake check reads the plan instead of
+	// trusting the latch to expire on its own.
+	AsleepSince       int64  `json:"asleepSince"`
+	AsleepBlockID     string `json:"asleepBlockId"`
+	SceneStage        string `json:"sceneStage"`
+	ConsentState      string `json:"consentState"`
+	SceneStartedAt    int64  `json:"sceneStartedAt"`
+	SceneUpdatedAt    int64  `json:"sceneUpdatedAt"`
+	ActivityStartedAt int64  `json:"activityStartedAt"`
+	ActivityEndsAt    int64  `json:"activityEndsAt"`
+	UpdatedAt         int64  `json:"updatedAt"`
+	LastTickAt        int64  `json:"lastTickAt"`
+	LastUserAt        int64  `json:"lastUserAt"`
+	LastProactiveAt   int64  `json:"lastProactiveAt"`
+	LastMemoryDecayAt int64  `json:"lastMemoryDecayAt"`
 	// SleepDebtMinutes accumulates past the sleep anchor and only pays back while
 	// she actually sleeps, capped per session so a big debt takes days to clear.
 	SleepDebtMinutes int `json:"sleepDebtMinutes"`
@@ -73,6 +81,14 @@ type State struct {
 	// Three or more starts dragging her mood down.
 	SleepStreak int `json:"sleepStreak"`
 }
+
+// Consciousness is the binary answer to "is she awake".
+type Consciousness string
+
+const (
+	ConsciousAwake  Consciousness = "awake"
+	ConsciousAsleep Consciousness = "asleep"
+)
 
 // LifeEvent is one meaningful event produced by a simulation step. Minor
 // state drift is applied without creating a row for every fifteen minutes.
@@ -210,6 +226,12 @@ type Overview struct {
 	Unread      int              `json:"unread"`
 	ThreadID    string           `json:"threadId"`
 	ActiveTask  *TurnTaskView    `json:"activeTask,omitempty"`
+	// Consciousness, AsleepUntil and CanForceReply are the derived view of whether
+	// she can be reached right now, computed from the same pure function the tick
+	// and the availability gate use, so no surface can disagree with another.
+	Consciousness Consciousness `json:"consciousness"`
+	AsleepUntil   int64         `json:"asleepUntil,omitempty"`
+	CanForceReply bool          `json:"canForceReply"`
 }
 
 // DecisionInput is the structured input handed to the model adapter.

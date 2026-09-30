@@ -30,6 +30,19 @@ export interface ClockAlignment {
     "nextAvailableAt"?: number;
 }
 
+/**
+ * Consciousness is the binary answer to "is she awake".
+ */
+export enum Consciousness {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ConsciousAwake = "awake",
+    ConsciousAsleep = "asleep",
+};
+
 export interface ConversationEffect {
     "target": MetricID;
     "ratePerHour"?: number;
@@ -209,6 +222,15 @@ export interface Overview {
     "unread": number;
     "threadId": string;
     "activeTask"?: TurnTaskView | null;
+
+    /**
+     * Consciousness, AsleepUntil and CanForceReply are the derived view of whether
+     * she can be reached right now, computed from the same pure function the tick
+     * and the availability gate use, so no surface can disagree with another.
+     */
+    "consciousness": Consciousness;
+    "asleepUntil"?: number;
+    "canForceReply": boolean;
 }
 
 /**
@@ -323,6 +345,20 @@ export interface State {
     "traits": { [_ in TraitID]?: number } | null;
     "currentActivity": string;
     "activityKind": string;
+
+    /**
+     * Consciousness is whether there is anyone home. It is a hard gate rather than
+     * a schedule weight: asleep means no reply, and no amount of poking wakes her.
+     */
+    "consciousness": Consciousness;
+
+    /**
+     * AsleepSince latches when she actually goes under, and AsleepBlockID records
+     * which block she is sleeping in so the wake check reads the plan instead of
+     * trusting the latch to expire on its own.
+     */
+    "asleepSince": number;
+    "asleepBlockId": string;
     "sceneStage": string;
     "consentState": string;
     "sceneStartedAt": number;

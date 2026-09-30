@@ -128,12 +128,29 @@ func (m *Manager) CancelTask(taskID string) error {
 
 // ForceReply 让用户把她从日程里拽出来立刻回消息。
 func (m *Manager) ForceReply(taskID string) error {
+	return m.forceReplyAt(taskID, time.Now())
+}
+
+func (m *Manager) forceReplyAt(taskID string, at time.Time) error {
 	task, err := m.store.TurnTask(taskID)
 	if err != nil {
 		return err
 	}
 	if task.Status != TaskWaiting {
 		return nil
+	}
+	// 前端禁用按钮只是体验，后端必须自己守住，否则绕过 UI 的调用能把人从睡眠里
+	// 拽出来。
+	profile, err := m.store.Profile(m.id)
+	if err != nil {
+		return err
+	}
+	state, err := m.store.State(m.id)
+	if err != nil {
+		return err
+	}
+	if consciousness, wakeAt := m.consciousnessNow(profile, state, at); consciousness == ConsciousAsleep {
+		return fmt.Errorf("%s正在睡觉，预计 %s 醒，叫不醒", profile.Name, wakeAt.Format("15:04"))
 	}
 	task.Forced = true
 	task.NotBefore = time.Now().UnixMilli()

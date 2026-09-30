@@ -34,7 +34,7 @@ export function CharacterSidebarGroup() {
   const error = useCharacterStore((state) => state.error);
   const [expanded, setExpanded] = useState(() => localStorage.getItem(EXPAND_KEY) !== "0");
   const [createOpen, setCreateOpen] = useState(false);
-  const { unread, busy, profile: baseProfile } = useCompanionSummary(activeId);
+  const { unread, busy, asleep, profile: baseProfile } = useCompanionSummary(activeId);
 
   useEffect(() => {
     void useCharacterStore.getState().refresh();
@@ -136,7 +136,9 @@ export function CharacterSidebarGroup() {
                   ? activeName
                     ? `${activeName}正在回复，先等这一轮结束`
                     : "正在回复，先等这一轮结束"
-                  : "";
+                  : isActive && asleep
+                    ? "她正在睡觉"
+                    : "";
               return (
                 <Tooltip key={character.id} title={tooltip}>
                   <Button
@@ -148,6 +150,12 @@ export function CharacterSidebarGroup() {
                   >
                     <span className="hitk-companion-character-avatar" aria-hidden="true">
                       {character.avatar?.trim() || character.name.slice(0, 1) || "陪"}
+                      {/* 只有激活角色会真的睡着，别的角色世界是冻住的，不配这个点。 */}
+                      {isActive ? (
+                        <span
+                          className={`hitk-companion-character-state is-${asleep ? "asleep" : "awake"}`}
+                        />
+                      ) : null}
                     </span>
                     <span className="hitk-companion-character-name">{character.name}</span>
                     <span className="hitk-companion-character-tail">

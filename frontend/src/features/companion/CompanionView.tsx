@@ -17,11 +17,13 @@ import {
   DoubleRightOutlined,
   ExclamationCircleFilled,
   HeartOutlined,
+  MoonFilled,
   ReloadOutlined,
   SendOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
 import {
+  Consciousness,
   companionRepository,
   errorText,
   type CompanionMemory,
@@ -297,15 +299,32 @@ export function CompanionView() {
   const metricValue = (id: string) =>
     (overview.metrics ?? []).find((metric) => metric.id === id)?.value ?? 0;
   const notable = notableMetrics(overview.metrics ?? []);
+  // 醒还是睡只认后端那一个判断，头部、忙线卡、输入框、状态面板共用它。
+  const asleep = overview.consciousness === Consciousness.ConsciousAsleep;
+  const wakeAt = overview.asleepUntil ?? 0;
 
   return (
     <div className="hitk-companion hitk-chat">
-      <header className="hitk-companion-head">
+      <header className={`hitk-companion-head${asleep ? " is-asleep" : ""}`}>
         <div className="hitk-companion-identity">
           <span className="hitk-companion-mark" aria-hidden="true"><HeartOutlined /></span>
           <div className="hitk-companion-title">
             <Title level={3}>{profile.name}</Title>
-            <Text type="secondary">{overview.state.currentActivity}</Text>
+            <Text type="secondary" className="hitk-companion-activity">
+              <span
+                className={`hitk-companion-conscious is-${asleep ? "asleep" : "awake"}`}
+                role="img"
+                aria-label={asleep ? "睡眠中" : "清醒"}
+                title={asleep ? "睡眠中" : "清醒"}
+              >
+                {asleep ? (
+                  <MoonFilled />
+                ) : (
+                  <span className="hitk-companion-conscious-dot" aria-hidden="true" />
+                )}
+              </span>
+              {overview.state.currentActivity}
+            </Text>
           </div>
         </div>
         <div className="hitk-companion-status">
@@ -377,6 +396,8 @@ export function CompanionView() {
               <BusyNotice
                 characterName={profile.name}
                 task={overview.activeTask}
+                asleep={asleep}
+                wakeAt={wakeAt}
                 onForce={(taskID) => void forceReply(taskID)}
               />
             )}
@@ -391,7 +412,12 @@ export function CompanionView() {
                   id="hitk-companion-input"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder={`和${profile.name}说点什么…`}
+                  placeholder={
+                    asleep
+                      ? `${profile.name}正在睡觉，消息会等她醒`
+                      : `和${profile.name}说点什么…`
+                  }
+                  aria-label={asleep ? `${profile.name}正在睡觉，消息排队等她醒` : `和${profile.name}说话`}
                   autoSize={{ minRows: 2, maxRows: 7 }}
                   variant="borderless"
                   disabled={sending && overview.activeTask?.status !== "waiting"}
@@ -461,6 +487,9 @@ export function CompanionView() {
                 activity={overview.state.currentActivity}
                 activityEndsAt={overview.state.activityEndsAt}
                 clock={overview.clock}
+                asleep={asleep}
+                wakeAt={wakeAt}
+                asleepSince={overview.state.asleepSince ?? 0}
               />
             )}
             {inspector.tab === "life" && <LifePanel events={events} />}

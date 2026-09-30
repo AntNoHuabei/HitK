@@ -3,7 +3,7 @@
 // 24 项指标平铺会把真正不对劲的那几项埋掉，所以默认只展开有异常的分组。
 import { useState } from "react";
 import { Progress, Typography } from "antd";
-import { DownOutlined } from "@ant-design/icons";
+import { DownOutlined, MoonFilled, SunFilled } from "@ant-design/icons";
 import type {
   CompanionMetricView,
   CompanionOverview,
@@ -32,22 +32,44 @@ const toneFor = (metric: CompanionMetricView) => {
 // 「需要留意」要点到下面那一行，两边得用同一个 id。
 const metricRowId = (metricId: string) => `hitk-companion-metric-${metricId}`;
 
+const clockAt = (ms: number) =>
+  new Date(ms).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+
+// 「已睡多久」按分钟读，够一小时才带上小时，免得刚躺下就显示 0 小时。
+function sleptLabel(since: number): string {
+  const elapsed = Math.max(0, Date.now() - since);
+  const hours = Math.floor(elapsed / 3_600_000);
+  const minutes = Math.floor((elapsed % 3_600_000) / 60_000);
+  return hours > 0 ? `${hours} 小时 ${minutes} 分钟` : `${minutes} 分钟`;
+}
+
 export function StatePanel({
   metrics,
   derived,
   activity,
   activityEndsAt,
   clock,
+  asleep = false,
+  wakeAt = 0,
+  asleepSince = 0,
 }: {
   metrics: CompanionMetricView[];
   derived: CompanionOverview["derived"];
   activity: string;
   activityEndsAt: number;
   clock: CompanionOverview["clock"];
+  asleep?: boolean;
+  wakeAt?: number;
+  asleepSince?: number;
 }) {
   const [override, setOverride] = useState<Record<string, boolean>>({});
   const notable = notableMetrics(metrics);
   const notableGroups = new Set(notable.map((item) => item.metric.group));
+  const sleepDetail = asleep
+    ? [wakeAt ? `预计 ${clockAt(wakeAt)} 醒` : "", asleepSince ? `已睡 ${sleptLabel(asleepSince)}` : ""]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   const groups = GROUP_ORDER.map((group, index) => {
     const rows = metrics.filter((metric) => metric.group === group);
@@ -64,7 +86,14 @@ export function StatePanel({
   }).filter((group) => group.rows.length > 0);
 
   return (
-    <div className="hitk-companion-state-panel">
+    <div className={`hitk-companion-state-panel${asleep ? " is-asleep" : ""}`}>
+      <div className={`hitk-companion-conscious-row is-${asleep ? "asleep" : "awake"}`}>
+        <span className="hitk-companion-conscious-mark" aria-hidden="true">
+          {asleep ? <MoonFilled /> : <SunFilled />}
+        </span>
+        <Text strong>{asleep ? "睡眠中" : "清醒"}</Text>
+        <Text type="secondary">{asleep ? sleepDetail : activity}</Text>
+      </div>
       <div className="hitk-companion-state-now">
         <Text type="secondary">
           {clock.date} · {clock.weekday} · {clock.season} · {clock.timeOfDay}
@@ -80,7 +109,8 @@ export function StatePanel({
         </Text>
       </div>
 
-      <div className="hitk-companion-state-notable">
+      {/* 睡着时「需要留意」压暗：那些指标照跑，但此刻不打算让人照着它们叫她。 */}
+      <div className={`hitk-companion-state-notable${asleep ? " is-dim" : ""}`}>
         <h4>需要留意</h4>
         {notable.length === 0 ? (
           <Text type="secondary" className="hitk-companion-state-calm">

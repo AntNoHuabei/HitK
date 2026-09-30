@@ -28,6 +28,9 @@ export type {
   WeatherSnapshot as CompanionWeather,
 } from "../../../bindings/github.com/hitk/hitk/internal/companion/models";
 
+// 值是运行时枚举，所以单独走值导出，组件靠它判断醒还是睡。
+export { Consciousness } from "../../../bindings/github.com/hitk/hitk/internal/companion/models";
+
 export type {
   RuntimeProgress,
   RuntimeStatus,
