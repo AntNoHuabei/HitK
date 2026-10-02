@@ -215,6 +215,30 @@ func (m *Manager) dayPlanFor(profile Profile, at time.Time) DayPlan {
 	return buildDayPlan(profile, at, mergeCommitments(profile, stored))
 }
 
+// effectiveCity is where she is actually standing today. A trip that covers the
+// day moves her, which is how "国庆去成都" changes the weather she talks about
+// without touching her profile. The heaviest covering trip wins.
+func (m *Manager) effectiveCity(profile Profile, at time.Time) string {
+	stored, err := m.store.Commitments(m.id)
+	if err != nil {
+		return profile.City
+	}
+	city := ""
+	weight := -1
+	for _, commitment := range stored {
+		if strings.TrimSpace(commitment.City) == "" || !commitment.matches(at) {
+			continue
+		}
+		if commitment.Weight > weight {
+			city, weight = commitment.City, commitment.Weight
+		}
+	}
+	if city != "" {
+		return city
+	}
+	return profile.City
+}
+
 // ApplyDriftNow pushes one disruption into the day containing at and persists the
 // result. A no-op drift does not touch storage.
 func (m *Manager) ApplyDriftNow(at time.Time, d Drift) DriftOutcome {
@@ -238,6 +262,19 @@ func (m *Manager) ApplyDriftNow(at time.Time, d Drift) DriftOutcome {
 // so availability checks can look ahead without re-reading the profile each time.
 func (m *Manager) resolver(profile Profile) planResolver {
 	return func(at time.Time) DayPlan { return m.planAt(profile, at) }
+}
+
+// knownMetrics is the set of metric ids the engine actually drives. The director
+// checks against it so a made-up target is refused out loud instead of quietly
+// becoming an effect that moves nothing.
+func (m *Manager) knownMetrics() map[MetricID]bool {
+	out := map[MetricID]bool{}
+	if rules := m.engine.Rules(); rules != nil {
+		for id := range rules.Metrics {
+			out[id] = true
+		}
+	}
+	return out
 }
 
 // consciousnessNow is the live read every surface asks for, so nobody has to
@@ -413,7 +450,7 @@ func (m *Manager) Overview(ctx context.Context) (Overview, error) {
 		Metrics:     m.engine.Views(view),
 		Derived:     m.engine.Derived(view),
 		Clock:       worldClock(time.Now()),
-		Weather:     m.weather.Cached(profile.City),
+		Weather:     m.weather.Cached(m.effectiveCity(profile, time.Now())),
 		Paused:      paused == "1",
 		Unread:      count,
 		ThreadID:    threadID,
@@ -682,6 +719,10 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		plan := planFor(stepTime)
 		block := plan.blockAt(stepTime)
 		effects = pruneEffects(effects, stepTime.UnixMilli())
+		// The holiday table rides in as ordinary effects keyed by date, so the
+		// merge refreshes today's mood each step instead of stacking one every
+		// fifteen minutes, and yesterday's expires on its own.
+		effects = mergeEffects(effects, MoodEffectsAt(stepTime))
 		// Forces are advanced before the fire check so this step reads the freshest
 		// need and reluctance rather than the ones it walked in with.
 		UpdateDrives(&state, block, stepTime)
@@ -777,7 +818,7 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 			return err
 		}
 	}
-	_, _ = m.weather.Get(ctx, profile.City)
+	_, _ = m.weather.Get(ctx, m.effectiveCity(profile, now))
 	overview, _ := m.overviewUnchecked(ctx)
 	m.emitEvent(EventStateUpdated, overview)
 	m.logInfo("companion tick advance done",
@@ -885,7 +926,7 @@ func (m *Manager) overviewUnchecked(ctx context.Context) (Overview, error) {
 		Metrics:     m.engine.Views(state),
 		Derived:     m.engine.Derived(state),
 		Clock:       worldClock(time.Now()),
-		Weather:     m.weather.Cached(profile.City),
+		Weather:     m.weather.Cached(m.effectiveCity(profile, time.Now())),
 		Paused:      paused == "1",
 		Unread:      count,
 		ThreadID:    threadID,
@@ -931,6 +972,9 @@ func formatContextBlock(
 	b.WriteString("\n【成人亲密模式】\n本应用是用户本地运行的成人陪伴模式。当前关系状态支持时，可以直白表达成年人的欲望、身体反应、性行为动作、性器官感受和高潮后的余韵；可以使用明确的性词汇，不使用含糊的委婉语，也不要把关键动作写成省略号。只有双方成年人明确自愿时才能继续；不得涉及未成年人、非自愿、胁迫、失去意识或无法表达同意的情况。\n")
 	fmt.Fprintf(&b, "\n【世界时间】\n今天是%s，%s，属于%s。当前是%s。\n",
 		clock.Date, clock.Weekday, clock.Season, clock.TimeOfDay)
+	if line := DayInfoAt(time.UnixMilli(clock.Now)).Describe(); line != "" {
+		fmt.Fprintf(&b, "%s。\n", line)
+	}
 	fmt.Fprintf(&b, "\n【当前状态】\n你此刻%s；心情%s。生命力%.1f，饥饿%.1f，疲劳%.1f，睡眠压力%.1f，清醒度%.1f，认知负荷%.1f，行动动机%.1f。\n",
 		state.CurrentActivity, derived.Mood,
 		state.Metric(MetricVitality), state.Metric(MetricHunger), state.Metric(MetricFatigue),

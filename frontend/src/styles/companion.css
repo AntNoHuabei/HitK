@@ -1095,3 +1095,210 @@
 .hitk-companion-character-state.is-asleep {
   background: var(--hitk-chat-muted);
 }
+
+/* ── 导演模式 ───────────────────────────────────────────────────────
+   强调色复用 --hitk-warn 那一族金色，不引入新的硬编码色（I28）。 */
+.hitk-companion-composer {
+  --hitk-director: var(--hitk-warn);
+}
+
+.hitk-companion-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 2px 8px;
+}
+
+.hitk-companion-mode-hint {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hitk-chat-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 导演态下整块 composer 一眼能分辨：左边一道金色竖线，底色跟着偏一点。 */
+.hitk-companion-composer.is-director .hitk-chat-composer-shell {
+  border-left: 3px solid var(--hitk-director);
+  background: color-mix(in srgb, var(--hitk-director) 5%, var(--hitk-chat-surface));
+}
+
+.hitk-companion-direct-btn.ant-btn {
+  gap: 6px;
+  padding-inline: 14px;
+  /* 金色底上的字沿用现有「强调底用 surface 色」的写法，不引入新的硬编码色。 */
+  color: var(--hitk-chat-surface);
+  background: var(--hitk-director);
+  border-color: var(--hitk-director);
+}
+
+.hitk-companion-direct-btn.ant-btn:not(:disabled):hover {
+  color: var(--hitk-chat-surface);
+  background: color-mix(in srgb, var(--hitk-director) 82%, var(--hitk-chat-text));
+  border-color: color-mix(in srgb, var(--hitk-director) 82%, var(--hitk-chat-text));
+}
+
+.hitk-companion-direct-btn.ant-btn:disabled {
+  color: var(--hitk-chat-muted);
+  background: color-mix(in srgb, var(--hitk-director) 22%, var(--hitk-chat-surface));
+  border-color: color-mix(in srgb, var(--hitk-director) 22%, var(--hitk-chat-border));
+}
+
+/* 转录里的旁白行：左对齐、斜体、左侧一道导演色竖线。形状上就和右侧的用户
+   气泡不是一类东西，发错了立刻看得出来。 */
+.hitk-directive-row {
+  margin: 4px 0 14px;
+  padding: 8px 12px 9px;
+  border-left: 2px solid var(--hitk-director);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--hitk-director) 5%, transparent);
+}
+
+.hitk-directive-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hitk-directive-mark {
+  color: var(--hitk-director);
+  font-size: 13px;
+}
+
+.hitk-directive-prefix {
+  color: var(--hitk-director);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.hitk-directive-text {
+  min-width: 0;
+  color: var(--hitk-chat-text);
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.hitk-directive-row.is-partial {
+  border-left-color: var(--hitk-warn);
+}
+
+.hitk-directive-row.is-pending {
+  opacity: 0.75;
+}
+
+.hitk-directive-row.is-rejected {
+  border-left-color: var(--hitk-danger);
+  background: color-mix(in srgb, var(--hitk-danger) 6%, transparent);
+}
+
+.hitk-directive-row.is-rejected .hitk-directive-mark,
+.hitk-directive-row.is-rejected .hitk-directive-prefix {
+  color: var(--hitk-danger);
+}
+
+.hitk-directive-row.is-reverted {
+  opacity: 0.55;
+}
+
+.hitk-directive-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--hitk-danger);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.hitk-directive-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hitk-directive-chip.is-locked {
+  opacity: 0.72;
+}
+
+.hitk-directive-note {
+  margin-top: 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* 介入台账 */
+.hitk-directive-ledger {
+  display: grid;
+  gap: 10px;
+}
+
+.hitk-directive-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--hitk-divider);
+  border-left: 3px solid var(--hitk-director);
+  border-radius: 10px;
+  background: var(--hitk-inset-bg);
+}
+
+.hitk-directive-item.is-reverted {
+  border-left-color: var(--hitk-chat-muted);
+  opacity: 0.55;
+}
+
+.hitk-directive-time {
+  color: var(--hitk-chat-muted);
+  font-size: 11px;
+}
+
+.hitk-directive-raw,
+.hitk-directive-ledger-reason {
+  overflow-wrap: anywhere;
+}
+
+.hitk-directive-ledger-reason {
+  font-size: 12px;
+}
+
+.hitk-directive-change-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hitk-directive-change-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.hitk-directive-locked {
+  color: var(--hitk-warn);
+}
+
+.hitk-directive-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .hitk-companion-mode-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .hitk-companion-mode-hint {
+    flex-basis: 100%;
+  }
+}

@@ -14,7 +14,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -23,8 +23,10 @@ import * as $models from "./models.js";
 /**
  * Catalog lists the built-in providers and their preset models.
  */
-export function Catalog(): $CancellablePromise<$models.CatalogProviderView[] | null> {
-    return $Call.ByID(1311385212);
+export function Catalog(): $CancellablePromise<$models.CatalogProviderView[]> {
+    return $Call.ByID(1311385212).then(($result: any) => {
+        return $$createType1($result);
+    });
 }
 
 /**
@@ -47,8 +49,10 @@ export function DisableModel(providerID: string, model: string): $CancellablePro
  * saved first, so the dialog can populate its picker from a URL the user is
  * still typing.
  */
-export function DiscoverModels($in: $models.ProviderInput): $CancellablePromise<$models.DiscoveredModelView[] | null> {
-    return $Call.ByID(158703724, $in);
+export function DiscoverModels($in: $models.ProviderInput): $CancellablePromise<$models.DiscoveredModelView[]> {
+    return $Call.ByID(158703724, $in).then(($result: any) => {
+        return $$createType3($result);
+    });
 }
 
 /**
@@ -69,35 +73,45 @@ export function GetPreference(key: string): $CancellablePromise<string> {
  * ModeDefaults reports the model each agent mode starts with.
  */
 export function ModeDefaults(): $CancellablePromise<$models.ModeDefaultsView> {
-    return $Call.ByID(1371535008);
+    return $Call.ByID(1371535008).then(($result: any) => {
+        return $$createType4($result);
+    });
 }
 
 /**
  * ModelOptions flattens every enabled model so the composer can offer one list.
  */
-export function ModelOptions(): $CancellablePromise<$models.ModelOptionView[] | null> {
-    return $Call.ByID(1637237384);
+export function ModelOptions(): $CancellablePromise<$models.ModelOptionView[]> {
+    return $Call.ByID(1637237384).then(($result: any) => {
+        return $$createType6($result);
+    });
 }
 
 /**
  * Preferences returns every stored preference in one round trip.
  */
-export function Preferences(): $CancellablePromise<{ [_ in string]?: string } | null> {
-    return $Call.ByID(3181334353);
+export function Preferences(): $CancellablePromise<{ [_ in string]?: string }> {
+    return $Call.ByID(3181334353).then(($result: any) => {
+        return $$createType7($result);
+    });
 }
 
 /**
  * Providers lists every configured provider with its enabled models.
  */
-export function Providers(): $CancellablePromise<$models.ProviderView[] | null> {
-    return $Call.ByID(1676786449);
+export function Providers(): $CancellablePromise<$models.ProviderView[]> {
+    return $Call.ByID(1676786449).then(($result: any) => {
+        return $$createType9($result);
+    });
 }
 
 /**
  * SaveProvider creates or updates a provider and refreshes the live registry.
  */
 export function SaveProvider($in: $models.ProviderInput): $CancellablePromise<$models.ProviderView> {
-    return $Call.ByID(335757713, $in);
+    return $Call.ByID(335757713, $in).then(($result: any) => {
+        return $$createType8($result);
+    });
 }
 
 /**
@@ -133,5 +147,20 @@ export function SetProviderModel(providerID: string, model: string): $Cancellabl
  * TestProvider sends a tiny completion to verify credentials and endpoint.
  */
 export function TestProvider($in: $models.ProviderInput): $CancellablePromise<$models.TestResult> {
-    return $Call.ByID(487914416, $in);
+    return $Call.ByID(487914416, $in).then(($result: any) => {
+        return $$createType10($result);
+    });
 }
+
+// Private type creation functions
+const $$createType0 = $models.CatalogProviderView.createFrom;
+const $$createType1 = $Create.Array($$createType0);
+const $$createType2 = $models.DiscoveredModelView.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = $models.ModeDefaultsView.createFrom;
+const $$createType5 = $models.ModelOptionView.createFrom;
+const $$createType6 = $Create.Array($$createType5);
+const $$createType7 = $Create.Map($Create.Any, $Create.Any);
+const $$createType8 = $models.ProviderView.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = $models.TestResult.createFrom;

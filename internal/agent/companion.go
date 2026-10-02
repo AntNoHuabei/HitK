@@ -64,6 +64,13 @@ func (a *Agent) AppendCompanionTurnTask(threadID, taskID, summary string, meta m
 	if err != nil {
 		return err
 	}
+	// One card per task. A turn that runs twice must not put two cards on the
+	// screen -- the card is the record of that task, not an event per call.
+	for _, existing := range thread.Items {
+		if existing.TurnID == taskID && existing.Type == protocol.ItemCompanionTurn {
+			return nil
+		}
+	}
 	now := time.Now().UnixMilli()
 	item := &protocol.Item{
 		ID:        newItemID(),

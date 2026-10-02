@@ -56,7 +56,7 @@ func (m *Manager) submitUserTurnAt(ctx context.Context, threadID, text, provider
 	if err != nil {
 		return TurnTask{}, err
 	}
-	available, activity, notBefore := taskAvailability(state, m.resolver(profile), now)
+	avail := evaluate(state, m.resolver(profile), now)
 	task := TurnTask{
 		ID:                 "task_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12],
 		ThreadID:           threadID,
@@ -68,13 +68,16 @@ func (m *Manager) submitUserTurnAt(ctx context.Context, threadID, text, provider
 		Inputs:             []TurnTaskInput{{Text: text, At: now.UnixMilli()}},
 		RequestedAt:        now.UnixMilli(),
 		LastMessageAt:      now.UnixMilli(),
-		NotBefore:          notBefore,
-		CurrentActivity:    activity,
-		AvailabilityReason: activity,
+		NotBefore:          avail.NextFree.UnixMilli(),
+		Blocked:            avail.Blocked,
 	}
-	if available {
+	// 可用时不写活动。以前这里无条件写，于是忙线卡拿到「亲密中」就演成
+	// 「她正在忙，暂时没看手机」，而她手机就在手里。活动只在真被拦时才有意义。
+	if avail.Blocked {
+		task.CurrentActivity = avail.Activity
+		task.AvailabilityReason = avail.Activity
+	} else {
 		task.NotBefore = now.UnixMilli()
-		task.AvailabilityReason = ""
 	}
 	if err := m.appendUserMessage(threadID, text); err != nil {
 		return TurnTask{}, err
@@ -155,6 +158,7 @@ func (m *Manager) forceReplyAt(taskID string, at time.Time) error {
 	task.Forced = true
 	task.NotBefore = time.Now().UnixMilli()
 	task.AvailabilityReason = ""
+	task.Blocked = false
 	if err := m.store.SaveTurnTask(task); err != nil {
 		return err
 	}
@@ -166,6 +170,95 @@ func (m *Manager) forceReplyAt(taskID string, at time.Time) error {
 // SubmitProactiveTurn creates the same task type used by user replies.
 func (m *Manager) SubmitProactiveTurn(ctx context.Context) (TurnTask, bool, error) {
 	return m.submitProactiveTurnAt(ctx, time.Now())
+}
+
+// SubmitDirective writes one director instruction into her world. It is not a
+// message to her: nothing is appended to the conversation as a user turn, and the
+// task it starts is a world edit rather than a request for a reply.
+func (m *Manager) SubmitDirective(
+	ctx context.Context, threadID, text, providerID, model, reasoningEffort string,
+) (DirectorDirective, error) {
+	return m.submitDirectiveAt(ctx, threadID, text, providerID, model, reasoningEffort, time.Now())
+}
+
+func (m *Manager) submitDirectiveAt(
+	ctx context.Context, threadID, text, providerID, model, reasoningEffort string, now time.Time,
+) (DirectorDirective, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return DirectorDirective{}, errDirectiveEmpty
+	}
+	if strings.TrimSpace(threadID) == "" {
+		resolved, err := m.ensureThread(ctx)
+		if err != nil {
+			return DirectorDirective{}, err
+		}
+		threadID = resolved
+	}
+	m.taskMu.Lock()
+	defer m.taskMu.Unlock()
+
+	// One intervention at a time. Two world edits landing on the same day inside
+	// one minute is how a plan stops being traceable to the instruction that made
+	// it, and the ledger is the whole point of this mode.
+	if _, active, err := m.store.ActiveTurnTask(threadID); err != nil {
+		return DirectorDirective{}, err
+	} else if active {
+		return DirectorDirective{}, errors.New("她手上那件事还没处理完，稍后再写入世界")
+	}
+
+	profile, err := m.store.Profile(m.id)
+	if err != nil {
+		return DirectorDirective{}, err
+	}
+	state, err := m.store.State(m.id)
+	if err != nil {
+		return DirectorDirective{}, err
+	}
+	// The asleep answer is captured here so the ledger records what was known
+	// when the words arrived. The apply step re-reads it, because a turn may sit
+	// for a moment before the model gets to it.
+	consciousness, _ := m.consciousnessNow(profile, state, now)
+
+	taskID := newTurnTaskID()
+	directiveID := newDirectiveID()
+	directive := DirectorDirective{
+		ID: directiveID, CharacterID: m.id, ThreadID: threadID, Text: text,
+		Status: DirectivePending, TaskID: taskID, CreatedAt: now.UnixMilli(),
+	}
+	// The raw words are written before anything can fail. An instruction that
+	// never made it through the model still shows up in the ledger as rejected.
+	if err := m.store.SaveDirective(m.id, directive); err != nil {
+		return directive, err
+	}
+	task := TurnTask{
+		ID:              taskID,
+		ThreadID:        threadID,
+		Trigger:         TriggerDirector,
+		Status:          TaskWaiting,
+		Provider:        providerID,
+		Model:           model,
+		ReasoningEffort: reasoningEffort,
+		Inputs:          []TurnTaskInput{{Text: text, At: now.UnixMilli()}},
+		RequestedAt:     now.UnixMilli(),
+		LastMessageAt:   now.UnixMilli(),
+		NotBefore:       now.UnixMilli(),
+		DirectiveID:     directiveID,
+		CurrentActivity: state.CurrentActivity,
+	}
+	if consciousness == ConsciousAsleep {
+		task.AvailabilityReason = "她在睡觉"
+	}
+	if err := m.store.SaveTurnTask(task); err != nil {
+		return directive, err
+	}
+	m.emitTask(task)
+	m.kickTurnTask(ctx, task)
+	return directive, nil
+}
+
+func newTurnTaskID() string {
+	return "task_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 }
 
 func (m *Manager) submitProactiveTurnAt(ctx context.Context, now time.Time) (TurnTask, bool, error) {
@@ -187,8 +280,14 @@ func (m *Manager) submitProactiveTurnAt(ctx context.Context, now time.Time) (Tur
 	if err != nil {
 		return TurnTask{}, false, err
 	}
-	available, activity, notBefore := taskAvailability(state, m.resolver(profile), now)
-	if !available {
+	// 主动消息第一关就是可达性。不可达直接不建任务，连退避都不必问。
+	avail := evaluate(state, m.resolver(profile), now)
+	if avail.Blocked {
+		return TurnTask{}, false, nil
+	}
+	// Backoff runs before a task is ever created. Unanswered messages close this
+	// door rather than opening it wider.
+	if allowed, _ := proactiveBackoff(state.UnrepliedProactive, state.LastProactiveAt, now); !allowed {
 		return TurnTask{}, false, nil
 	}
 	task := TurnTask{
@@ -199,9 +298,7 @@ func (m *Manager) submitProactiveTurnAt(ctx context.Context, now time.Time) (Tur
 		RequestedAt:     now.UnixMilli(),
 		LastMessageAt:   now.UnixMilli(),
 		NotBefore:       now.UnixMilli(),
-		CurrentActivity: activity,
 	}
-	_ = notBefore
 	if err := m.store.SaveTurnTask(task); err != nil {
 		return TurnTask{}, false, err
 	}
@@ -246,6 +343,10 @@ func (m *Manager) recoverTurnTasks(ctx context.Context) {
 	for _, task := range tasks {
 		switch task.Status {
 		case TaskAligning, TaskResolved, TaskGenerating:
+			if replayed, ok := m.replayAfterCrash(task, now); ok {
+				m.kickTurnTask(ctx, replayed)
+				continue
+			}
 			task.Status = TaskInterrupted
 			task.Error = "应用在生成过程中退出，本轮未自动重放"
 			task.CompletedAt = now.UnixMilli()
@@ -255,6 +356,55 @@ func (m *Manager) recoverTurnTasks(ctx context.Context) {
 			m.kickTurnTask(ctx, task)
 		}
 	}
+}
+
+const (
+	// maxTurnRecoveries bounds replay so a crash loop cannot keep reviving one
+	// turn and eventually emit the same answer several times.
+	maxTurnRecoveries = 2
+	// replayWindow is how recent a dead turn has to be to be worth answering. A
+	// question from two days ago should not suddenly get its reply on a restart.
+	replayWindow = 6 * time.Hour
+)
+
+// replayAfterCrash resets a turn whose answer never reached anyone back to
+// waiting and reports whether it did. It persists but does not schedule: the
+// caller owns kicking, so the decision stays testable without a goroutine
+// racing the assertions.
+//
+// A user who asked something and got nothing deserves the answer, so user turns
+// come back. A proactive impulse that died in the crash is stale: replaying it
+// would push a "just saw this" message about a moment that already passed, so
+// those stay retired. A director edit replays only while its ledger row is still
+// pending, which is exactly what a crash leaves behind -- anything already
+// settled must not be run a second time.
+func (m *Manager) replayAfterCrash(task TurnTask, now time.Time) (TurnTask, bool) {
+	switch task.Trigger {
+	case TriggerUser:
+	case TriggerDirector:
+		directive, err := m.store.Directive(m.id, task.DirectiveID)
+		if err != nil || directive.Status != DirectivePending {
+			return task, false
+		}
+	default:
+		return task, false
+	}
+	if task.Recoveries >= maxTurnRecoveries {
+		return task, false
+	}
+	if task.RequestedAt < now.Add(-replayWindow).UnixMilli() {
+		return task, false
+	}
+	task.Status = TaskWaiting
+	task.Recoveries++
+	task.Error = ""
+	task.StartedAt = 0
+	task.NotBefore = now.UnixMilli()
+	if err := m.store.SaveTurnTask(task); err != nil {
+		return task, false
+	}
+	m.emitTask(task)
+	return task, true
 }
 
 func (m *Manager) processDueTurnTasks(ctx context.Context, now time.Time) {
@@ -278,6 +428,7 @@ func (m *Manager) processDueTurnTasks(ctx context.Context, now time.Time) {
 				task.NotBefore = now.UnixMilli()
 				task.CurrentActivity = activity
 				task.AvailabilityReason = ""
+				task.Blocked = false
 				if err := m.store.SaveTurnTask(task); err != nil {
 					continue
 				}
@@ -356,22 +507,32 @@ func (m *Manager) runTurnTask(ctx context.Context, task TurnTask, now time.Time)
 		return
 	}
 	// 复用上面已经按真实时间衰减过的那份 state。
-	available, activity, nextAt := taskAvailability(state, m.resolver(profile), now)
-	// 用户按过「让她现在回」就不再拿日程把她塞回等待。
-	if !available && !task.Forced {
+	avail := evaluate(state, m.resolver(profile), now)
+	available, activity, nextAt := avail.admitNew(), avail.Activity, avail.NextFree.UnixMilli()
+	consciousness, _ := m.consciousnessNow(profile, state, now)
+	asleep := consciousness == ConsciousAsleep
+	// 用户按过「让她现在回」就不再拿日程把她塞回等待。导演指令也不走这一关：
+	// 它是在改她的世界，不是排队等她有空回话。这里绝不能复用 Forced ——
+	// Forced 的语义是「把她叫回来立刻回」，那等于用导演模式把人叫醒。
+	if avail.Blocked && !task.Forced && task.Trigger != TriggerDirector {
 		task.Status = TaskWaiting
 		task.NotBefore = nextAt
 		task.CurrentActivity = activity
 		task.AvailabilityReason = activity
+		task.Blocked = true
 		task.StartedAt = 0
 		_ = m.store.SaveTurnTask(task)
 		m.emitTask(task)
 		return
 	}
+	// 走到这里她要开口了，忙线标记必须清掉，否则卡会一直挂在流上。
+	task.Blocked = false
+	task.AvailabilityReason = ""
 	events, _ := m.store.RecentEvents(now.Add(-72*time.Hour).UnixMilli(), 8)
 	thoughts, _ := m.store.ActiveThoughts(6)
 	memories, _ := m.store.Memories(12)
-	weather, _ := m.weather.Get(ctx, profile.City)
+	// A trip that covers today moves the weather she talks about with her.
+	weather, _ := m.weather.Get(ctx, m.effectiveCity(profile, now))
 	recent := m.recentMessages(task.ThreadID, 8)
 
 	m.mu.Lock()
@@ -405,9 +566,18 @@ func (m *Manager) runTurnTask(ctx context.Context, task TurnTask, now time.Time)
 		}
 	}
 	brief = decorateTurnBrief(brief, state, now, activity, available, nextAt, sceneChanged)
-	brief = validateTurnBrief(brief, state, now)
+	brief = validateTurnBrief(brief, state, now, avail.Shape)
 	if task.Trigger == TriggerUser {
 		brief.Reply.Send = true
+	}
+	if task.Trigger == TriggerDirector {
+		// 背景安排不该打扰人。只有这事值得她此刻开口，她才开口；
+		// 她睡着的时候一律不开口，导演改不了她的意识状态。
+		brief.Reply.Send = brief.Resolution.World != nil &&
+			brief.Resolution.World.ShouldReply != nil && *brief.Resolution.World.ShouldReply
+		if asleep {
+			brief.Reply.Send = false
+		}
 	}
 
 	task.Brief = &brief
@@ -425,7 +595,7 @@ func (m *Manager) runTurnTask(ctx context.Context, task TurnTask, now time.Time)
 		return
 	}
 	m.emitTask(task)
-	if task.Trigger == TriggerProactive && !brief.Reply.Send {
+	if (task.Trigger == TriggerProactive || task.Trigger == TriggerDirector) && !brief.Reply.Send {
 		task.Status = TaskCompleted
 		task.CompletedAt = time.Now().UnixMilli()
 		_ = m.store.SaveTurnTask(task)
@@ -482,7 +652,17 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 		now,
 		task.Trigger == TriggerUser,
 	))
-	state.LastUserAt = task.LastMessageAt
+	// 导演指令不是「有人出现了」。她世界里下了场雨不等于有人陪她，
+	// 所以既不算用户在场，也不刷新上次互动时间，思念和孤独照原样走。
+	if task.Trigger != TriggerDirector {
+		state.LastUserAt = task.LastMessageAt
+	}
+	// Only he himself clears the unanswered count. A proactive turn of her own
+	// must not wipe the very number that is supposed to hold her back, and a
+	// director edit is not someone showing up either.
+	if task.Trigger == TriggerUser {
+		state.UnrepliedProactive = 0
+	}
 	state.UpdatedAt = now.UnixMilli()
 	resolution := TurnResolution{
 		AppliedAt: now.UnixMilli(), ActionMinutes: brief.Resolution.ActionMinutes,
@@ -549,13 +729,61 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 			resolution.ThoughtIDs = append(resolution.ThoughtIDs, thought.ID)
 		}
 	}
+	// Plans the user actually voiced become dated commitments in the same
+	// transaction as the turn that produced them, so the promise and the calendar
+	// cannot drift apart. Whether she keeps it is still the forces' decision.
+	var commitments []Commitment
+	if len(brief.Resolution.Commitments) > 0 {
+		held, _ := m.store.Commitments(m.id)
+		commitments = NormalizeTurnCommitments(brief.Resolution.Commitments, held, now)
+		for _, commitment := range commitments {
+			resolution.CommitmentIDs = append(resolution.CommitmentIDs, commitment.ID)
+		}
+	}
+	// A director turn edits her world through the primitives the simulation
+	// already owns, and its ledger entry lands in this same transaction so the
+	// record of an intervention can never drift from the intervention.
+	var directive *DirectorDirective
+	if task.Trigger == TriggerDirector {
+		draft := WorldDraft{}
+		if brief.Resolution.World != nil {
+			draft = *brief.Resolution.World
+		}
+		profile, profileErr := m.store.Profile(m.id)
+		if profileErr != nil {
+			return TurnResolution{}, profileErr
+		}
+		consciousness, wakeAt := m.consciousnessNow(profile, state, now)
+		directiveID := task.DirectiveID
+		if directiveID == "" {
+			directiveID = newDirectiveID()
+		}
+		compiled := compileDirective(directiveInput{
+			CharacterID: m.id, ThreadID: task.ThreadID, TaskID: task.ID,
+			DirectiveID: directiveID, Text: task.InputText(), Draft: draft,
+			Asleep:  consciousness == ConsciousAsleep,
+			WakeAt:  wakeAt,
+			Now:     now,
+			Metrics: m.knownMetrics(),
+		})
+		settled, directedCommitments, directedEffects, directedEvents := m.applyDirectivePlan(compiled, now)
+		directive = &settled
+		commitments = append(commitments, directedCommitments...)
+		effects = mergeEffects(effects, directedEffects)
+		extraEvents = append(extraEvents, directedEvents...)
+		resolution.DirectiveID = settled.ID
+		resolution.Narration = settled.Narration
+		for _, commitment := range directedCommitments {
+			resolution.CommitmentIDs = append(resolution.CommitmentIDs, commitment.ID)
+		}
+	}
 	resolution.GenerationFacts = generationFacts(brief, resolution)
 	task.Status = TaskResolved
 	task.Applied = true
 	task.Resolution = &resolution
 	if err := m.store.CommitTick(TickCommit{ID: m.id,
 		State: state, Effects: effects, Events: extraEvents, Memories: memories,
-		Thought: thought, Task: task,
+		Thought: thought, Task: task, Commitments: commitments, Directive: directive,
 	}); err != nil {
 		return TurnResolution{}, err
 	}
@@ -590,6 +818,12 @@ func (m *Manager) failTurnTask(task TurnTask, err error) {
 	task.Error = err.Error()
 	task.CompletedAt = time.Now().UnixMilli()
 	_ = m.store.SaveTurnTask(task)
+	// Settle the ledger before announcing the failure: the UI re-lists
+	// directives when it hears about a failed turn, and it should not be able to
+	// read a row that is still pending.
+	if task.Trigger == TriggerDirector && task.DirectiveID != "" {
+		m.markDirectiveFailed(task.DirectiveID, err.Error())
+	}
 	m.emitTask(task)
 }
 
@@ -620,7 +854,7 @@ func (m *Manager) PrepareCompanionTurn(ctx context.Context, threadID, turnID, ta
 	}
 	profile, _ := m.store.Profile(m.id)
 	state, _ := m.store.State(m.id)
-	return formatTurnBriefContext(profile, state, *task.Brief, *task.Resolution, userText), nil
+	return formatTurnBriefContext(profile, state, *task.Brief, *task.Resolution, task.Trigger, userText), nil
 }
 
 func (m *Manager) CompleteCompanionTurn(threadID, turnID, taskID, userText, assistantText string) {
@@ -636,12 +870,9 @@ func (m *Manager) CompleteCompanionTurn(threadID, turnID, taskID, userText, assi
 	task.MessageItemID = "assistant"
 	_ = m.store.SaveTurnTask(task)
 	if task.Trigger == TriggerProactive {
-		state, stateErr := m.store.State(m.id)
-		if stateErr == nil {
-			state.LastProactiveAt = task.CompletedAt
-			state.UpdatedAt = task.CompletedAt
-			_ = m.store.SaveState(m.id, state)
-		}
+		// Atomic: a tick landing between the read and the write would swallow
+		// the count, and the backoff rule is only as good as that count.
+		_, _ = m.store.RecordProactiveSent(m.id, task.CompletedAt)
 		_ = m.store.MarkThoughtsShared(task.CompletedAt)
 		_, _ = m.store.AddUnread(1)
 	}
@@ -686,7 +917,7 @@ func (m *Manager) extractMemoriesAfterTurn(task TurnTask, userText, assistantTex
 	}()
 }
 
-func validateTurnBrief(brief TurnBrief, state State, now time.Time) TurnBrief {
+func validateTurnBrief(brief TurnBrief, state State, now time.Time, shape ReplyShape) TurnBrief {
 	if brief.Clock.Now <= 0 {
 		brief.Clock.Now = now.UnixMilli()
 	}
@@ -717,6 +948,9 @@ func validateTurnBrief(brief TurnBrief, state State, now time.Time) TurnBrief {
 	if brief.Reply.MaxChars > 2000 {
 		brief.Reply.MaxChars = 2000
 	}
+	// 身体状态给回复长度封顶。只做上界不做替代：她想更短随时可以，更长不行。
+	// 场景正酣时憋出六百字长文比晚回更出戏，这里是唯一拦住它的地方。
+	brief.Reply.MaxChars = clampShape(shape, brief.Reply.MaxChars)
 	if brief.Confidence < 0 {
 		brief.Confidence = 0
 	}
@@ -791,10 +1025,20 @@ func generationFacts(brief TurnBrief, resolution TurnResolution) string {
 	if len(resolution.EventIDs) > 0 {
 		fmt.Fprintf(&b, "本轮结算了%d个事件。", len(resolution.EventIDs))
 	}
+	if len(resolution.CommitmentIDs) > 0 {
+		fmt.Fprintf(&b, "你记下了%d个新安排，那天会真的出现在你的日程里。", len(resolution.CommitmentIDs))
+	}
 	return b.String()
 }
 
-func formatTurnBriefContext(profile Profile, state State, brief TurnBrief, resolution TurnResolution, userText string) string {
+func formatTurnBriefContext(
+	profile Profile,
+	state State,
+	brief TurnBrief,
+	resolution TurnResolution,
+	trigger TurnTaskTrigger,
+	userText string,
+) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "【本轮任务】\n陪伴者：%s。当前活动：%s。真实时间：%s，%s。\n",
 		profile.Name, firstNonEmpty(brief.Clock.Activity, state.CurrentActivity), brief.Clock.LocalTime, brief.Clock.AvailabilityNote)
@@ -821,7 +1065,15 @@ func formatTurnBriefContext(profile Profile, state State, brief TurnBrief, resol
 	if resolution.GenerationFacts != "" {
 		fmt.Fprintf(&b, "已结算事实：%s\n", resolution.GenerationFacts)
 	}
-	fmt.Fprintf(&b, "最新用户消息：%s\n", userText)
+	if trigger == TriggerDirector {
+		// 旁白不是「对方对你说的话」。她世界里下了场雨不等于有人陪着她，
+		// 走用户消息那条语义会把思念和孤独算成有人在场，那是假的。
+		fmt.Fprintf(&b, "【世界旁白】\n%s\n",
+			firstNonEmpty(resolution.Narration, "她的世界里刚发生了一点变化。"))
+		b.WriteString("这不是对方对你说的话，而是你世界里客观发生的事。不要当成有人对你提要求，也不要说「你让我」「系统」「被安排」这类暴露幕后的说法。\n")
+	} else {
+		fmt.Fprintf(&b, "最新用户消息：%s\n", userText)
+	}
 	b.WriteString(`
 输出格式必须严格使用以下标签：
 <action>动作描写</action>

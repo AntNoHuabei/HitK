@@ -138,7 +138,7 @@ func (b *companionModelBridge) AlignTurn(ctx context.Context, input companion.Tu
 		    "clock":{"type":"object","properties":{"now":{"type":"number"},"localTime":{"type":"string"},"elapsedMinutes":{"type":"number"},"absenceHours":{"type":"number"},"daysCrossed":{"type":"number"},"activity":{"type":"string"},"available":{"type":"boolean"},"availabilityNote":{"type":"string"},"nextAvailableAt":{"type":"number"}}},
 		    "scene":{"type":"object","properties":{"stage":{"type":"string"},"consentState":{"type":"string"},"startedAt":{"type":"number"},"durationMinutes":{"type":"number"},"location":{"type":"string"},"participants":{"type":"array","items":{"type":"string"}},"physicalState":{"type":"string"},"continuityNote":{"type":"string"},"timeConstraintNote":{"type":"string"},"autoAdvancedByClock":{"type":"boolean"}}},
 		    "input":{"type":"object","properties":{"intent":{"type":"string"},"explicitRequests":{"type":"array","items":{"type":"string"}},"impliedNeeds":{"type":"array","items":{"type":"string"}},"boundaries":{"type":"array","items":{"type":"string"}},"roleplayNote":{"type":"string"},"factClaims":{"type":"array","items":{"type":"string"}},"missingDetails":{"type":"array","items":{"type":"string"}},"ambiguities":{"type":"array","items":{"type":"string"}}}},
-		    "resolution":{"type":"object","properties":{"actionMinutes":{"type":"number"},"sceneStage":{"type":"string"},"consentState":{"type":"string"},"impulses":{"type":"object","additionalProperties":{"type":"number"}},"traitChanges":{"type":"object","additionalProperties":{"type":"number"}},"effects":{"type":"array","items":{"type":"object","properties":{"target":{"type":"string"},"ratePerHour":{"type":"number"},"baselineDelta":{"type":"number"},"recoveryDelta":{"type":"number"},"durationMinutes":{"type":"number"},"curve":{"type":"string"}}}},"events":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"},"shareable":{"type":"boolean"},"deltas":{"type":"object","additionalProperties":{"type":"number"}}}}},"memories":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"}}}},"thoughts":{"type":"array","items":{"type":"string"}}}},
+		    "resolution":{"type":"object","properties":{"actionMinutes":{"type":"number"},"sceneStage":{"type":"string"},"consentState":{"type":"string"},"impulses":{"type":"object","additionalProperties":{"type":"number"}},"traitChanges":{"type":"object","additionalProperties":{"type":"number"}},"effects":{"type":"array","items":{"type":"object","properties":{"target":{"type":"string"},"ratePerHour":{"type":"number"},"baselineDelta":{"type":"number"},"recoveryDelta":{"type":"number"},"durationMinutes":{"type":"number"},"curve":{"type":"string"}}}},"events":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"},"shareable":{"type":"boolean"},"deltas":{"type":"object","additionalProperties":{"type":"number"}}}}},"memories":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"}}}},"thoughts":{"type":"array","items":{"type":"string"}},"commitments":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["work","meal","exam","dinner","trip","errand","social","user"]},"label":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"duration":{"type":"number"},"weight":{"type":"number"},"city":{"type":"string"}},"required":["label","date"]}}},"world":{"type":"object","properties":{"arrangements":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["work","meal","exam","dinner","trip","errand","social","user"]},"label":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"duration":{"type":"number"},"weight":{"type":"number"},"city":{"type":"string"},"mustAttend":{"type":"boolean"}},"required":["label","date"]}},"disruptions":{"type":"array","items":{"type":"object","properties":{"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"minutes":{"type":"number"},"severity":{"type":"number"},"reason":{"type":"string"},"startBlock":{"type":"string"},"completeBlock":{"type":"string"}},"required":["reason","minutes"]}},"moodEffects":{"type":"array","items":{"type":"object","properties":{"target":{"type":"string"},"ratePerHour":{"type":"number"},"baselineDelta":{"type":"number"},"recoveryDelta":{"type":"number"},"durationMinutes":{"type":"number"},"label":{"type":"string"},"curve":{"type":"string"},"setTo":{"type":"number"}},"required":["target"]}},"events":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"importance":{"type":"number"},"shareable":{"type":"boolean"}},"required":["content"]}},"place":{"type":"object","properties":{"city":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"days":{"type":"number"}},"required":["city"]},"narration":{"type":"string"},"shouldReply":{"type":"boolean"}}}},
 		    "reply":{"type":"object","properties":{"send":{"type":"boolean"},"goal":{"type":"string"},"tone":{"type":"string"},"beats":{"type":"array","items":{"type":"string"}},"mustInclude":{"type":"array","items":{"type":"string"}},"mustNotInclude":{"type":"array","items":{"type":"string"}},"maxChars":{"type":"number"},"delivery":{"type":"string"}}},
 		    "warnings":{"type":"array","items":{"type":"string"}},
 		    "confidence":{"type":"number"}
@@ -394,7 +394,7 @@ func turnAlignmentSystemPrompt() string {
   "clock":{"now":0,"localTime":"","elapsedMinutes":0,"absenceHours":0,"daysCrossed":0,"activity":"","available":true,"availabilityNote":"","nextAvailableAt":0},
   "scene":{"stage":"none|flirt|active|climax|aftercare|stopped","consentState":"not_applicable|affirmed|roleplay|ambiguous|withdrawn","startedAt":0,"durationMinutes":0,"location":"","participants":[],"physicalState":"","continuityNote":"","timeConstraintNote":"","autoAdvancedByClock":false},
   "input":{"intent":"","explicitRequests":[],"impliedNeeds":[],"boundaries":[],"roleplayNote":"","factClaims":[],"missingDetails":[],"ambiguities":[]},
-  "resolution":{"actionMinutes":0,"sceneStage":"none|flirt|active|climax|aftercare|stopped","consentState":"not_applicable|affirmed|roleplay|ambiguous|withdrawn","impulses":{},"traitChanges":{},"effects":[],"events":[],"memories":[],"thoughts":[]},
+  "resolution":{"actionMinutes":0,"sceneStage":"none|flirt|active|climax|aftercare|stopped","consentState":"not_applicable|affirmed|roleplay|ambiguous|withdrawn","impulses":{},"traitChanges":{},"effects":[],"events":[],"memories":[],"thoughts":[],"commitments":[],"world":{"arrangements":[],"disruptions":[],"moodEffects":[],"events":[],"place":null,"narration":"","shouldReply":false}},
   "reply":{"send":true,"goal":"","tone":"","beats":[],"mustInclude":[],"mustNotInclude":[],"maxChars":800,"delivery":"either"},
   "warnings":[],
   "confidence":0.0
@@ -415,14 +415,42 @@ func turnAlignmentSystemPrompt() string {
 - impulses、traitChanges、effects 都是最终变化量，系统不会再用其他倍率缩放。
 - 只写上下文支持的状态变化；无法确认的事情写入 ambiguities，不要自行补全。
 - reply 阶段不得新增未在 resolution 或已有事实中确认的地点、人物、行为、承诺和事件。
-- 主动消息由 reply.send 决定；用户消息通常为 true。`
+- resolution.commitments 只记对话里明确说了的安排，例如「初六过来找你」「下周三面试」「国庆去成都」。没说过就不要写，宁缺毋滥。
+- commitments 的 date 必须是绝对日期 YYYY-MM-DD。上下文给了今天和接下来几天的日历，相对说法（明天、初六、节前、下周三）都要据此换算成具体日期；换算不出来就不要写这条。
+- 「每周三健身」这类长期习惯不属于 commitments，那是她的性格设定，不要写进来。
+- 每条至少要有 label 和 date。start 是 HH:MM，duration 是分钟，weight 是 1-10 的重要程度，说不清就用默认。
+- 涉及出行可以带 city，她那几天会按那个城市的天气来聊。
+- 没有明确安排时 commitments 就是空数组，不要为了填字段而编。
+- 主动消息由 reply.send 决定；用户消息通常为 true。
+
+导演模式（任务来源为 director）专用规则：
+- 这一轮不是对方在跟你说话，而是有人在她的世界里下指令。把命令式的要求翻译成她世界里客观发生的事实，填进 resolution.world；其余字段照常按事实填。
+- resolution.world.narration 用她在世界里成立的说法写，用第三人称或无人称，绝不出现「控制」「安排」「让你」「有人要求」「系统」「指令」这类暴露幕后的字眼。例：指令「让她妈明天来看她」→ narration「她妈说明天要过来坐坐」。
+- arrangements 是把这件事落到某一天：必须有绝对日期 YYYY-MM-DD，相对说法按上下文日历换算，weight 是 1-10 的重要程度。
+- 绝对不要给 mustAttend。这个世界里不存在非去不可的行程，只有重要程度够不够，填了会被系统拒绝。
+- disruptions 是往今天推进去的一段时间，比如「路上堵车两小时」「临时被拉住说话」。minutes 是分钟数，severity 是 1 到 10 的不可抗力程度。startBlock 和 completeBlock 一律留空：可以让她撞上事，不能替她开始或完成一件事。
+- moodEffects 只能写带 durationMinutes（至少 15 分钟）的影响，靠 curve 自然衰减。setTo 一律留空：不能把任何状态直接按到某个数值上，填了会被系统拒绝。
+- events 是此刻在她身上发生、她之后会提起来的事。
+- place 是她在哪个城市待几天，会连带改变她聊的天气。
+- shouldReply 决定她现在要不要就这事开口。突发的事给 true；只是往后几天排个安排给 false，不要去打扰对方。
+- 翻译不出任何世界变化时 world 各段留空，不要硬凑。`
 }
 
 func turnAlignmentUserPrompt(input companion.TurnAlignmentInput) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "任务来源：%s\n", input.Task.Trigger)
 	fmt.Fprintf(&b, "真实时间：%s %s %s\n", input.Clock.Date, input.Clock.Weekday, input.Clock.LocalTime)
+	now := time.UnixMilli(input.Clock.Now)
+	if input.Clock.Now <= 0 {
+		now = time.Now()
+	}
+	if line := companion.DayInfoAt(now).Describe(); line != "" {
+		fmt.Fprintf(&b, "日历：%s。\n", line)
+	}
+	b.WriteString("近期日历，把「明天」「初六」「节前」「下周三」按这个换算成绝对日期：\n")
+	b.WriteString(companion.CalendarStrip(now, 14))
 	fmt.Fprintf(&b, "当前活动：%s\n", input.State.CurrentActivity)
+	fmt.Fprintf(&b, "意识状态：%s\n", input.State.Consciousness)
 	fmt.Fprintf(&b, "场景：%s；同意：%s；场景开始：%d；当前时间：%d\n",
 		input.State.SceneStage, input.State.ConsentState, input.State.SceneStartedAt, input.Clock.Now)
 	fmt.Fprintf(&b, "上次用户互动：%d；任务请求时间：%d；任务可执行时间：%d\n",
@@ -452,10 +480,20 @@ func turnAlignmentUserPrompt(input companion.TurnAlignmentInput) string {
 			fmt.Fprintf(&b, "- %s\n", memory.Content)
 		}
 	}
-	if input.Task.Trigger == companion.TriggerUser {
-		fmt.Fprintf(&b, "本轮用户消息：%s\n", input.Task.InputText())
-	} else {
+	switch input.Task.Trigger {
+	case companion.TriggerDirector:
+		// 指令原文只进对齐这一趟。她拿到的是 narration，不是这句话。
+		fmt.Fprintf(&b, "本轮是导演指令，不是对方对你说的话。把命令翻译成她世界里客观发生的事实写进 resolution.world。\n")
+		fmt.Fprintf(&b, "指令原文：%s\n", input.Task.InputText())
+	case companion.TriggerProactive:
 		fmt.Fprintf(&b, "本轮是主动联系判断。若没有值得自然分享的内容，reply.send=false。\n")
+		if unanswered := input.State.UnrepliedProactive; unanswered > 0 {
+			// She needs to know the pile is there. Without it every tick looks
+			// like the first one and she keeps rediscovering that he is quiet.
+			fmt.Fprintf(&b, "你已经连发 %d 条消息，他一条都没回。这时候再多说一句是打扰，不是陪伴。除非有明确必须说的事（约好的时间地点、出了什么状况），本轮默认 reply.send=false，也不要再重复「我不催你」「随你」这类表态。\n", unanswered)
+		}
+	default:
+		fmt.Fprintf(&b, "本轮用户消息：%s\n", input.Task.InputText())
 	}
 	return b.String()
 }
@@ -952,6 +990,40 @@ func (s *CompanionService) ForceReply(taskID string) error {
 		return err
 	}
 	return manager.ForceReply(taskID)
+}
+
+// SubmitDirective writes one director instruction into the active character's
+// world. The returned directive is still pending: the ledger row exists so the
+// raw words survive even if alignment never answers.
+func (s *CompanionService) SubmitDirective(text, providerID, model, reasoningEffort string) (companion.DirectorDirective, error) {
+	thread, err := s.GetThread()
+	if err != nil {
+		return companion.DirectorDirective{}, err
+	}
+	manager, err := s.manager()
+	if err != nil {
+		return companion.DirectorDirective{}, err
+	}
+	return manager.SubmitDirective(context.Background(), thread.ID, text, providerID, model, reasoningEffort)
+}
+
+// ListDirectives returns the active character's intervention ledger.
+func (s *CompanionService) ListDirectives(limit int) ([]companion.DirectorDirective, error) {
+	manager, err := s.manager()
+	if err != nil {
+		return []companion.DirectorDirective{}, nil
+	}
+	return manager.ListDirectives(clampLimit(limit, 50, 200))
+}
+
+// RevertDirective takes an intervention back. Disruptions never come back; the
+// minutes they pushed into her day already happened.
+func (s *CompanionService) RevertDirective(id string) error {
+	manager, err := s.manager()
+	if err != nil {
+		return err
+	}
+	return manager.RevertDirective(id)
 }
 
 func (s *CompanionService) Running() bool {

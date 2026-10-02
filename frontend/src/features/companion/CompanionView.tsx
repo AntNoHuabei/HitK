@@ -12,13 +12,17 @@ import {
   Typography,
 } from "antd";
 import {
+  ControlOutlined,
   CloudOutlined,
   DoubleLeftOutlined,
   DoubleRightOutlined,
   ExclamationCircleFilled,
+  GiftOutlined,
   HeartOutlined,
+  MessageOutlined,
   MoonFilled,
   ReloadOutlined,
+  ScheduleOutlined,
   SendOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
@@ -26,6 +30,7 @@ import {
   Consciousness,
   companionRepository,
   errorText,
+  type CompanionDirective,
   type CompanionMemory,
   type CompanionOverview,
   type CompanionProfile,
@@ -43,8 +48,12 @@ import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { StatePanel } from "./components/panels/StatePanel";
 import { StatusMeter } from "./components/panels/StatusMeter";
 import { BusyNotice } from "./components/BusyNotice";
+import { DirectorNarrationRow, mergeDirectives } from "./components/DirectorNarration";
+import { DirectivePanel } from "./components/panels/DirectivePanel";
 import { useCharacterStore } from "./model/characterStore";
 import { useCharacterModel } from "./model/useCharacterModel";
+import { useComposerMode } from "./model/composerMode";
+import type { ComposerMode } from "./model/composerMode";
 import { useInspectorState, type InspectorTab } from "./model/inspectorState";
 import { notableMetrics } from "./model/metricSalience";
 import { useCompanionStore } from "./model/companionStore";
@@ -62,10 +71,13 @@ export function CompanionView() {
   const [profile, setProfile] = useState<CompanionProfile | null>(null);
   const [events, setEvents] = useState<LifeEvent[]>([]);
   const [memories, setMemories] = useState<CompanionMemory[]>([]);
+  const [directives, setDirectives] = useState<CompanionDirective[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const inspector = useInspectorState();
+  const composer = useComposerMode(activeId);
+  const directing = composer.mode === "director";
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(() => localStorage.getItem(NOTICE_KEY) !== "1");
   const [memoryEditor, setMemoryEditor] = useState<CompanionMemory | null>(null);
@@ -74,17 +86,19 @@ export function CompanionView() {
   const refresh = useCallback(async () => {
     // 抓住发起时的角色，回来时若已切走就整批丢弃，避免旧角色数据盖到新角色上。
     const characterId = useCharacterStore.getState().activeId;
-    const [nextOverview, nextEvents, nextMemories, thread] = await Promise.all([
+    const [nextOverview, nextEvents, nextMemories, thread, nextDirectives] = await Promise.all([
       companionRepository.overview(),
       companionRepository.listEvents(),
       companionRepository.listMemories(),
       companionRepository.getThread(),
+      companionRepository.listDirectives(),
     ]);
     if (useCharacterStore.getState().activeId !== characterId) return null;
     setOverview(nextOverview);
     setProfile(nextOverview.profile);
     setEvents(nextEvents);
     setMemories(nextMemories);
+    setDirectives(nextDirectives);
     useCompanionStore.getState().openThread(characterId, thread);
     useCompanionStore.getState().setRunning(await companionRepository.running());
     return nextOverview;
@@ -144,6 +158,14 @@ export function CompanionView() {
       if (event.kind === "task.updated" && !event.overview.activeTask) {
         setSending(false);
       }
+      // 导演指令落定也走 task.updated。台账得跟着这一趟刷新，否则旁白会一直
+      // 停在「处理中」，而背景安排根本不会触发协议事件，没有别的机会补。
+      if (event.kind === "task.updated") {
+        const status = event.overview.activeTask?.status;
+        if (!status || status === "resolved" || status === "completed" || status === "failed") {
+          void companionRepository.listDirectives().then(setDirectives).catch(() => undefined);
+        }
+      }
       if (event.kind === "reset") {
         void refresh().catch(() => undefined);
       }
@@ -162,17 +184,15 @@ export function CompanionView() {
     });
   }, [overview?.profile]);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || !models.active) return;
+  const sendChat = useCallback(async (text: string) => {
     setSending(true);
     useCompanionStore.getState().setError("");
     useCompanionStore.getState().setRunning(true);
     try {
       const task = await companionRepository.submitTurn(
         text,
-        models.active.provider,
-        models.active.model,
+        models.active!.provider,
+        models.active!.model,
         profile?.reasoningEffort ?? "off",
       );
       setInput("");
@@ -183,7 +203,38 @@ export function CompanionView() {
       useCompanionStore.getState().setRunning(false);
       useCompanionStore.getState().setError(errorText(err));
     }
-  }, [input, models.active, profile?.reasoningEffort]);
+  }, [models.active, profile?.reasoningEffort]);
+
+  // 导演模式不往对话里塞用户消息，只写台账。旁白行是台账合成出来的，
+  // 所以这里发完只要把台账拉回来一次，剩下的交给 task.updated。
+  const sendDirective = useCallback(async (text: string) => {
+    setSending(true);
+    useCompanionStore.getState().setError("");
+    try {
+      await companionRepository.submitDirective(
+        text,
+        models.active!.provider,
+        models.active!.model,
+        profile?.reasoningEffort ?? "off",
+      );
+      setInput("");
+      setDirectives(await companionRepository.listDirectives());
+    } catch (err) {
+      useCompanionStore.getState().setError(errorText(err));
+    } finally {
+      setSending(false);
+    }
+  }, [models.active, profile?.reasoningEffort]);
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text || !models.active) return;
+    if (directing) {
+      await sendDirective(text);
+      return;
+    }
+    await sendChat(text);
+  }, [directing, input, models.active, sendChat, sendDirective]);
 
   const stop = useCallback(async () => {
     try {
@@ -264,6 +315,16 @@ export function CompanionView() {
     }
   }, [message]);
 
+  const revertDirective = useCallback(async (id: string) => {
+    try {
+      await companionRepository.revertDirective(id);
+      setDirectives(await companionRepository.listDirectives());
+      message.success("已经撤掉了能撤的部分");
+    } catch (err) {
+      message.error(errorText(err));
+    }
+  }, [message]);
+
   const activeModelKey = models.active
     ? optionKey(models.active.provider, models.active.model)
     : "";
@@ -276,6 +337,11 @@ export function CompanionView() {
   );
 
   const onlyOneCharacter = characters.length <= 1;
+  // 旁白不是消息，但要在转录里按时间占住它那一行，所以在这里并进同一份列表。
+  const transcript = useMemo(
+    () => mergeDirectives(store.items, directives),
+    [store.items, directives],
+  );
   const deleteDisabled = onlyOneCharacter || sending;
   const deleteTooltip = onlyOneCharacter
     ? "至少保留一个角色"
@@ -337,6 +403,27 @@ export function CompanionView() {
             </>
           ) : null}
           <Tag bordered={false}>{overview.derived.mood}</Tag>
+          {/* 节日和调休是日历给的答案，跟天气一样先让人一眼看见，省得她说明天放假而对方忘了。 */}
+          {overview.clock.isEve ? (
+            <Tooltip title={`${overview.clock.eve}，熬夜也说得过去`}>
+              <Tag icon={<GiftOutlined />} bordered={false} color="magenta">
+                {overview.clock.eve}
+              </Tag>
+            </Tooltip>
+          ) : overview.clock.isHoliday ? (
+            <Tooltip title={`${overview.clock.holiday} 假期${overview.clock.holidayProgress ? ` · ${overview.clock.holidayProgress}` : ""}`}>
+              <Tag icon={<GiftOutlined />} bordered={false} color="gold">
+                {overview.clock.holiday}
+                {overview.clock.holidayProgress ? ` · ${overview.clock.holidayProgress}` : ""}
+              </Tag>
+            </Tooltip>
+          ) : overview.clock.isMakeupWorkday ? (
+            <Tooltip title="调休补班日：周末，但要上班">
+              <Tag icon={<ScheduleOutlined />} bordered={false} color="volcano">
+                调休上班
+              </Tag>
+            </Tooltip>
+          ) : null}
           {overview.weather ? (
             <Tooltip title={`${overview.weather.city} · 城市级天气`}>
               <Tag icon={<CloudOutlined />} bordered={false}>
@@ -376,7 +463,7 @@ export function CompanionView() {
       <div className={`hitk-companion-body${inspector.collapsed ? " is-collapsed" : ""}`}>
         <section className="hitk-companion-conversation" aria-label={`与${profile.name}的对话`}>
           <div className="hitk-companion-messages">
-            {store.items.length === 0 ? (
+            {transcript.length === 0 ? (
               <div className="hitk-companion-empty">
                 <span className="hitk-companion-empty-mark"><HeartOutlined /></span>
                 <Title level={4}>{profile.name}在这里，继续自己的生活</Title>
@@ -384,11 +471,15 @@ export function CompanionView() {
               </div>
             ) : (
               <ConversationMessages
-                items={store.items}
+                items={transcript}
                 buffers={store.buffers}
                 running={store.running || sending}
                 modelLabel={models.activeLabel}
                 usage={store.usage}
+                renderNotice={(item) => {
+                  const directive = item.meta?.directive as CompanionDirective | undefined;
+                  return directive ? <DirectorNarrationRow directive={directive} /> : null;
+                }}
               />
             )}
             {/* 忙线时这就是一条系统消息，紧跟在最后那句话后面，不再挂在页面顶上。 */}
@@ -405,19 +496,43 @@ export function CompanionView() {
             {store.error && <div className="hitk-companion-error">{store.error}</div>}
           </div>
 
-          <div className="hitk-chat-composer hitk-companion-composer">
+          <div className={`hitk-chat-composer hitk-companion-composer${directing ? " is-director" : ""}`}>
             <Flex justify="center" className="hitk-chat-composer-track">
               <div className="hitk-chat-composer-shell">
+                <div className="hitk-companion-mode-bar">
+                  <Segmented
+                    size="small"
+                    value={composer.mode}
+                    onChange={(value) => composer.setMode(value as ComposerMode)}
+                    options={[
+                      { label: "对她说话", value: "chat", icon: <MessageOutlined /> },
+                      { label: "导演", value: "director", icon: <ControlOutlined /> },
+                    ]}
+                  />
+                  <span className="hitk-companion-mode-hint">
+                    {directing ? "改她的世界，不是对她说话" : "直接跟她说"}
+                  </span>
+                </div>
                 <Input.TextArea
                   id="hitk-companion-input"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   placeholder={
-                    asleep
-                      ? `${profile.name}正在睡觉，消息会等她醒`
-                      : `和${profile.name}说点什么…`
+                    directing
+                      ? asleep
+                        ? "对她所在的世界下指令，例：突然下起大雨 / 她妈明天来看她。即时的事她醒着才收得到"
+                        : "对她所在的世界下指令，例：突然下起大雨 / 她妈明天来看她"
+                      : asleep
+                        ? `${profile.name}正在睡觉，消息会等她醒`
+                        : `和${profile.name}说点什么…`
                   }
-                  aria-label={asleep ? `${profile.name}正在睡觉，消息排队等她醒` : `和${profile.name}说话`}
+                  aria-label={
+                    directing
+                      ? "对世界下导演指令"
+                      : asleep
+                        ? `${profile.name}正在睡觉，消息排队等她醒`
+                        : `和${profile.name}说话`
+                  }
                   autoSize={{ minRows: 2, maxRows: 7 }}
                   variant="borderless"
                   disabled={sending && overview.activeTask?.status !== "waiting"}
@@ -446,17 +561,33 @@ export function CompanionView() {
                       onConfigureModels={() => navigate("settings")}
                       onChangeReasoningEffort={(effort) => void changeReasoningEffort(effort)}
                     />
-                    <Tooltip title={sending ? "停止生成" : "发送"}>
-                      <Button
-                        type="primary"
-                        className={`hitk-chat-send-btn${sending ? " hitk-stop-btn" : ""}`}
-                        shape="circle"
-                        aria-label={sending ? "停止生成" : "发送"}
-                        icon={sending ? <span className="hitk-stop-btn-glyph" /> : <SendOutlined />}
-                        disabled={!sending && (!input.trim() || !models.hasUsableModel)}
-                        onClick={() => void (sending ? stop() : send())}
-                      />
-                    </Tooltip>
+                    {directing ? (
+                      <Tooltip title={sending ? "正在写入她的世界" : "把这件事写进她的世界"}>
+                        <Button
+                          type="primary"
+                          shape="round"
+                          className="hitk-companion-direct-btn"
+                          aria-label="写入世界"
+                          icon={<ControlOutlined />}
+                          disabled={!sending && (!input.trim() || !models.hasUsableModel)}
+                          onClick={() => void (sending ? stop() : send())}
+                        >
+                          写入世界
+                        </Button>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title={sending ? "停止生成" : "发送"}>
+                        <Button
+                          type="primary"
+                          className={`hitk-chat-send-btn${sending ? " hitk-stop-btn" : ""}`}
+                          shape="circle"
+                          aria-label={sending ? "停止生成" : "发送"}
+                          icon={sending ? <span className="hitk-stop-btn-glyph" /> : <SendOutlined />}
+                          disabled={!sending && (!input.trim() || !models.hasUsableModel)}
+                          onClick={() => void (sending ? stop() : send())}
+                        />
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               </div>
@@ -477,6 +608,7 @@ export function CompanionView() {
               { label: "状态", value: "state" },
               { label: "近日生活", value: "life" },
               { label: "记忆", value: "memories" },
+              { label: "介入", value: "directives" },
             ]}
           />
           <div className="hitk-companion-panel">
@@ -515,6 +647,13 @@ export function CompanionView() {
                   setMemoryModalOpen(true);
                 }}
                 onDelete={(id) => void deleteMemory(id)}
+              />
+            )}
+            {inspector.tab === "directives" && (
+              <DirectivePanel
+                directives={directives}
+                characterName={profile.name}
+                onRevert={(id) => void revertDirective(id)}
               />
             )}
           </div>

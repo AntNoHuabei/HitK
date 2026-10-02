@@ -8,7 +8,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -21,7 +21,9 @@ import * as protocol$0 from "../protocol/models.js";
  * ActiveCharacter returns the one character whose world is live.
  */
 export function ActiveCharacter(): $CancellablePromise<companion$0.CharacterSummary> {
-    return $Call.ByID(1149034267);
+    return $Call.ByID(1149034267).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 export function CancelTask(taskID: string): $CancellablePromise<void> {
@@ -33,7 +35,9 @@ export function CancelTask(taskID: string): $CancellablePromise<void> {
  * when the current one is idle; otherwise it is created without switching.
  */
 export function CreateCharacter(profile: companion$0.Profile): $CancellablePromise<companion$0.CharacterSummary> {
-    return $Call.ByID(187851985, profile);
+    return $Call.ByID(187851985, profile).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 /**
@@ -55,11 +59,15 @@ export function ForceReply(taskID: string): $CancellablePromise<void> {
 }
 
 export function GetTask(taskID: string): $CancellablePromise<companion$0.TurnTaskView> {
-    return $Call.ByID(1966684867, taskID);
+    return $Call.ByID(1966684867, taskID).then(($result: any) => {
+        return $$createType1($result);
+    });
 }
 
 export function GetThread(): $CancellablePromise<protocol$0.Thread> {
-    return $Call.ByID(2281989546);
+    return $Call.ByID(2281989546).then(($result: any) => {
+        return $$createType2($result);
+    });
 }
 
 export function Interrupt(): $CancellablePromise<void> {
@@ -69,20 +77,37 @@ export function Interrupt(): $CancellablePromise<void> {
 /**
  * ListCharacters returns every companion character, active one first.
  */
-export function ListCharacters(): $CancellablePromise<companion$0.CharacterSummary[] | null> {
-    return $Call.ByID(354562494);
+export function ListCharacters(): $CancellablePromise<companion$0.CharacterSummary[]> {
+    return $Call.ByID(354562494).then(($result: any) => {
+        return $$createType3($result);
+    });
 }
 
-export function ListEvents(limit: number): $CancellablePromise<companion$0.LifeEvent[] | null> {
-    return $Call.ByID(2699599403, limit);
+/**
+ * ListDirectives returns the active character's intervention ledger.
+ */
+export function ListDirectives(limit: number): $CancellablePromise<companion$0.DirectorDirective[]> {
+    return $Call.ByID(137413472, limit).then(($result: any) => {
+        return $$createType5($result);
+    });
 }
 
-export function ListMemories(limit: number): $CancellablePromise<companion$0.Memory[] | null> {
-    return $Call.ByID(366288453, limit);
+export function ListEvents(limit: number): $CancellablePromise<companion$0.LifeEvent[]> {
+    return $Call.ByID(2699599403, limit).then(($result: any) => {
+        return $$createType7($result);
+    });
 }
 
-export function ListTasks(activeOnly: boolean): $CancellablePromise<companion$0.TurnTaskView[] | null> {
-    return $Call.ByID(1893634528, activeOnly);
+export function ListMemories(limit: number): $CancellablePromise<companion$0.Memory[]> {
+    return $Call.ByID(366288453, limit).then(($result: any) => {
+        return $$createType9($result);
+    });
+}
+
+export function ListTasks(activeOnly: boolean): $CancellablePromise<companion$0.TurnTaskView[]> {
+    return $Call.ByID(1893634528, activeOnly).then(($result: any) => {
+        return $$createType10($result);
+    });
 }
 
 export function MarkRead(): $CancellablePromise<void> {
@@ -90,11 +115,21 @@ export function MarkRead(): $CancellablePromise<void> {
 }
 
 export function Overview(): $CancellablePromise<companion$0.Overview> {
-    return $Call.ByID(1864104145);
+    return $Call.ByID(1864104145).then(($result: any) => {
+        return $$createType11($result);
+    });
 }
 
 export function Reset(): $CancellablePromise<void> {
     return $Call.ByID(1609387845);
+}
+
+/**
+ * RevertDirective takes an intervention back. Disruptions never come back; the
+ * minutes they pushed into her day already happened.
+ */
+export function RevertDirective(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3107542321, id);
 }
 
 export function Running(): $CancellablePromise<boolean> {
@@ -102,19 +137,36 @@ export function Running(): $CancellablePromise<boolean> {
 }
 
 export function SaveMemory(memory: companion$0.Memory): $CancellablePromise<companion$0.Memory> {
-    return $Call.ByID(1815832504, memory);
+    return $Call.ByID(1815832504, memory).then(($result: any) => {
+        return $$createType8($result);
+    });
 }
 
 export function SaveProfile(profile: companion$0.Profile): $CancellablePromise<companion$0.Profile> {
-    return $Call.ByID(2275490416, profile);
+    return $Call.ByID(2275490416, profile).then(($result: any) => {
+        return $$createType12($result);
+    });
 }
 
 export function SetPaused(paused: boolean): $CancellablePromise<void> {
     return $Call.ByID(1426480992, paused);
 }
 
+/**
+ * SubmitDirective writes one director instruction into the active character's
+ * world. The returned directive is still pending: the ledger row exists so the
+ * raw words survive even if alignment never answers.
+ */
+export function SubmitDirective(text: string, providerID: string, model: string, reasoningEffort: string): $CancellablePromise<companion$0.DirectorDirective> {
+    return $Call.ByID(2684038127, text, providerID, model, reasoningEffort).then(($result: any) => {
+        return $$createType4($result);
+    });
+}
+
 export function SubmitTurn(text: string, providerID: string, model: string, reasoningEffort: string): $CancellablePromise<companion$0.TurnTaskView> {
-    return $Call.ByID(448127961, text, providerID, model, reasoningEffort);
+    return $Call.ByID(448127961, text, providerID, model, reasoningEffort).then(($result: any) => {
+        return $$createType1($result);
+    });
 }
 
 /**
@@ -127,3 +179,18 @@ export function SwitchCharacter(id: string): $CancellablePromise<void> {
 export function TickNow(): $CancellablePromise<void> {
     return $Call.ByID(144696209);
 }
+
+// Private type creation functions
+const $$createType0 = companion$0.CharacterSummary.createFrom;
+const $$createType1 = companion$0.TurnTaskView.createFrom;
+const $$createType2 = protocol$0.Thread.createFrom;
+const $$createType3 = $Create.Array($$createType0);
+const $$createType4 = companion$0.DirectorDirective.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = companion$0.LifeEvent.createFrom;
+const $$createType7 = $Create.Array($$createType6);
+const $$createType8 = companion$0.Memory.createFrom;
+const $$createType9 = $Create.Array($$createType8);
+const $$createType10 = $Create.Array($$createType1);
+const $$createType11 = companion$0.Overview.createFrom;
+const $$createType12 = companion$0.Profile.createFrom;

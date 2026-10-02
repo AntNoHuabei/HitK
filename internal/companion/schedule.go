@@ -460,17 +460,31 @@ func minBlockMinutes(kind string) int {
 }
 
 // sleepWindow is the body's own rhythm, which is the one part of the day she does
-// not negotiate. Everything else gets fitted around it.
-func sleepWindow(profile Profile, at time.Time) (wake int, sleepStart int) {
+// not negotiate. Everything else gets fitted around it. The day type shifts the
+// whole window first -- she sleeps late on the first day of a holiday and gets up
+// earlier on a 调休 Saturday -- and only then does the per-day jitter land.
+func sleepWindow(profile Profile, at time.Time, info DayInfo) (wake int, sleepStart int) {
 	key := at.Format("2006-01-02")
-	wake = wakeAnchorMinute + jitter(profile.ID, key, "wake-jitter", -30, 30)
-	sleepStart = sleepAnchorMinute + jitter(profile.ID, key, "sleep-jitter", -30, 45)
+	shiftWake, shiftSleep := ActiveCalendar().SleepShift(info)
+	wake = wakeAnchorMinute + shiftWake + jitter(profile.ID, key, "wake-jitter", -30, 30)
+	sleepStart = sleepAnchorMinute + shiftSleep + jitter(profile.ID, key, "sleep-jitter", -30, 45)
 	// The jitter must not overshoot midnight, or the day ends up with no bedtime at
 	// all and the sleep ledger never gets to repay anything.
+	wake = clampMinute(wake)
 	if sleepStart > 1435 {
 		sleepStart = 1435
 	}
 	return wake, sleepStart
+}
+
+func clampMinute(minute int) int {
+	if minute < 5 {
+		return 5
+	}
+	if minute > 1435 {
+		return 1435
+	}
+	return minute
 }
 
 // dayBuilder assembles one day as a set of non-overlapping, sorted blocks. Fitting
@@ -666,11 +680,9 @@ func openLabel(startMinute int) string {
 // room is left. Anything still unfilled is open time.
 func buildDayPlan(profile Profile, at time.Time, commitments []Commitment) DayPlan {
 	date := at.Format("2006-01-02")
-	kind := "workday"
-	if isWeekend(at) {
-		kind = "weekend"
-	}
-	wake, sleepStart := sleepWindow(profile, at)
+	info := DayInfoAt(at)
+	kind := string(info.Kind)
+	wake, sleepStart := sleepWindow(profile, at, info)
 	midnight := time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, at.Location()).UnixMilli()
 
 	builder := &dayBuilder{}
@@ -785,10 +797,6 @@ func parseClock(value string) int {
 	return hour*60 + minute
 }
 
-func isWeekend(at time.Time) bool {
-	return at.Weekday() == time.Saturday || at.Weekday() == time.Sunday
-}
-
 // templateBlockFor answers what the bare body plus default commitments says for a
 // moment, ignoring any saved plan. Used for first-run seeding and tests.
 func templateBlockFor(profile Profile, at time.Time) scheduleBlock {
@@ -802,7 +810,7 @@ func blockBounds(block scheduleBlock, day time.Time) (int64, int64) {
 }
 
 func worldClock(at time.Time) WorldClock {
-	weekday := [...]string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}[at.Weekday()]
+	info := DayInfoAt(at)
 	timeOfDay := "深夜"
 	switch {
 	case at.Hour() >= 5 && at.Hour() < 9:
@@ -829,11 +837,29 @@ func worldClock(at time.Time) WorldClock {
 		Now:       at.UnixMilli(),
 		Date:      at.Format("2006年1月2日"),
 		LocalTime: at.Format("15:04"),
-		Weekday:   weekday,
+		Weekday:   weekdayName(at.Weekday()),
 		TimeOfDay: timeOfDay,
 		Season:    season,
-		IsWeekend: at.Weekday() == time.Saturday || at.Weekday() == time.Sunday,
+		// IsWeekend stays the literal Saturday/Sunday fact. It is not the rest-day
+		// answer -- IsRestDay is -- and on a 调休 Saturday the two disagree on
+		// purpose.
+		IsWeekend:       at.Weekday() == time.Saturday || at.Weekday() == time.Sunday,
+		Holiday:         info.Holiday,
+		IsHoliday:       info.Kind == DayHoliday,
+		IsMakeupWorkday: info.Kind == DayMakeup,
+		IsRestDay:       info.IsRestDay(),
+		HolidayProgress: holidayProgress(info),
+		IsEve:           info.Eve != "",
+		Eve:             info.Eve,
 	}
+}
+
+// holidayProgress reads 假期第3天共7天, and is empty when there is no run.
+func holidayProgress(info DayInfo) string {
+	if info.Kind != DayHoliday || info.TotalDays <= 1 {
+		return ""
+	}
+	return fmt.Sprintf("第%d天共%d天", info.DayIndex, info.TotalDays)
 }
 
 func jitter(id, date, key string, low, high int) int {

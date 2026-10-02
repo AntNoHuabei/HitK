@@ -1,7 +1,6 @@
 package companion
 
 import (
-	"fmt"
 	"strings"
 	"time"
 )
@@ -25,6 +24,9 @@ type TurnTaskTrigger string
 const (
 	TriggerUser      TurnTaskTrigger = "user"
 	TriggerProactive TurnTaskTrigger = "proactive"
+	// TriggerDirector is a world edit rather than a message to her. It never
+	// parks on availability and never counts as the user showing up.
+	TriggerDirector TurnTaskTrigger = "director"
 )
 
 // TurnTaskInput is one user message folded into a task.
@@ -51,14 +53,26 @@ type TurnTask struct {
 	CompletedAt        int64           `json:"completedAt,omitempty"`
 	CurrentActivity    string          `json:"currentActivity,omitempty"`
 	AvailabilityReason string          `json:"availabilityReason,omitempty"`
+	// Blocked 是后端算好的「她现在被事情拽离了手机」。前端只认这个字段决定
+	// 要不要出忙线卡，不再从 status 和活动字符串猜。以前没有这个字段，一条
+	// 可用任务带着活动字符串就能在忙线位上演出「她在忙 · 亲密中」。
+	Blocked            bool            `json:"blocked,omitempty"`
 	Brief              *TurnBrief      `json:"brief,omitempty"`
 	Resolution         *TurnResolution `json:"resolution,omitempty"`
 	MessageItemID      string          `json:"messageItemId,omitempty"`
 	Error              string          `json:"error,omitempty"`
 	Applied            bool            `json:"applied,omitempty"`
+	// DirectiveID ties a director turn to its ledger entry. The id is minted
+	// before the model runs so the user's raw words stay durable even if the
+	// alignment call never comes back.
+	DirectiveID string `json:"directiveId,omitempty"`
 	// Forced 是用户按了「让她现在回」。有了它，日程可用性这一关直接跳过，
 	// 否则 processTurnTaskAt 会照着日程把她再塞回等待。
 	Forced bool `json:"forced,omitempty"`
+	// Recoveries counts how many times a restart has re-queued this turn. Without
+	// a cap a crash loop would keep reviving the same turn and could emit the
+	// same answer several times.
+	Recoveries int `json:"recoveries,omitempty"`
 }
 
 // InputText joins the user messages folded into this task.
@@ -140,6 +154,24 @@ type ResolutionDraft struct {
 	Events        []ResolutionEvent    `json:"events,omitempty"`
 	Memories      []ResolutionMemory   `json:"memories,omitempty"`
 	Thoughts      []string             `json:"thoughts,omitempty"`
+	// Commitments are plans the user actually voiced this turn. Relative time has
+	// to arrive already converted to an absolute date; Go refuses anything it
+	// cannot place on the calendar.
+	Commitments []CommitmentDraft `json:"commitments,omitempty"`
+	// World is the director's edit, present only on director turns.
+	World *WorldDraft `json:"world,omitempty"`
+}
+
+// CommitmentDraft is one arrangement heard in conversation. Only things the user
+// plainly said belong here -- "初六过来" or "下周三面试" -- never a guess.
+type CommitmentDraft struct {
+	Kind     string `json:"kind,omitempty"`
+	Label    string `json:"label"`
+	Date     string `json:"date"` // YYYY-MM-DD, already resolved
+	Start    string `json:"start,omitempty"`
+	Duration int    `json:"duration,omitempty"` // minutes
+	Weight   int    `json:"weight,omitempty"`
+	City     string `json:"city,omitempty"`
 }
 
 // ReplyBrief is the only creative instruction handed to the narration model.
@@ -167,14 +199,22 @@ type TurnBrief struct {
 
 // TurnResolution records what Go actually committed.
 type TurnResolution struct {
-	AppliedAt       int64                `json:"appliedAt"`
-	ActionMinutes   int                  `json:"actionMinutes"`
-	MetricDeltas    map[MetricID]float64 `json:"metricDeltas,omitempty"`
-	TraitChanges    map[TraitID]float64  `json:"traitChanges,omitempty"`
-	EventIDs        []string             `json:"eventIds,omitempty"`
-	MemoryIDs       []string             `json:"memoryIds,omitempty"`
-	ThoughtIDs      []string             `json:"thoughtIds,omitempty"`
-	GenerationFacts string               `json:"generationFacts,omitempty"`
+	AppliedAt     int64                `json:"appliedAt"`
+	ActionMinutes int                  `json:"actionMinutes"`
+	MetricDeltas  map[MetricID]float64 `json:"metricDeltas,omitempty"`
+	TraitChanges  map[TraitID]float64  `json:"traitChanges,omitempty"`
+	EventIDs      []string             `json:"eventIds,omitempty"`
+	MemoryIDs     []string             `json:"memoryIds,omitempty"`
+	ThoughtIDs    []string             `json:"thoughtIds,omitempty"`
+	// CommitmentIDs are plans she just agreed to, which now show up on the day
+	// they were promised for.
+	CommitmentIDs   []string `json:"commitmentIds,omitempty"`
+	GenerationFacts string   `json:"generationFacts,omitempty"`
+	// DirectiveID is set when this turn was a director intervention.
+	DirectiveID string `json:"directiveId,omitempty"`
+	// Narration is the in-world wording a directive produced. It is what she is
+	// told, carried on the resolution so generation never sees the raw command.
+	Narration string `json:"narration,omitempty"`
 }
 
 // TurnAlignmentInput is the structured input to the alignment model.
@@ -204,17 +244,19 @@ type TurnTaskView struct {
 	CompletedAt        int64           `json:"completedAt,omitempty"`
 	CurrentActivity    string          `json:"currentActivity,omitempty"`
 	AvailabilityReason string          `json:"availabilityReason,omitempty"`
+	Blocked            bool            `json:"blocked,omitempty"`
 	Brief              *TurnBrief      `json:"brief,omitempty"`
 	Error              string          `json:"error,omitempty"`
 	Forced             bool            `json:"forced,omitempty"`
 }
 
-func (t TurnTask) View() TurnTaskView {
+	func (t TurnTask) View() TurnTaskView {
 	return TurnTaskView{
 		ID: t.ID, ThreadID: t.ThreadID, Trigger: t.Trigger, Status: t.Status,
 		RequestedAt: t.RequestedAt, NotBefore: t.NotBefore, StartedAt: t.StartedAt,
 		ResolvedAt: t.ResolvedAt, CompletedAt: t.CompletedAt,
 		CurrentActivity: t.CurrentActivity, AvailabilityReason: t.AvailabilityReason,
+		Blocked:         t.Blocked,
 		Brief: t.Brief, Error: t.Error, Forced: t.Forced,
 	}
 }
@@ -232,44 +274,11 @@ func (t TurnTask) Active() bool {
 // the next free block without knowing how plans are stored.
 type planResolver func(time.Time) DayPlan
 
+// taskAvailability 是 evaluate 的冷消息投影：可不可用、显示什么、下次再试是何时。
+// 新代码请直接读 Availability，三个问题在那里是分开的。
 func taskAvailability(state State, resolve planResolver, at time.Time) (bool, string, int64) {
-	plan := resolve(at)
-	// 场景还活着，人就在这段对话里，日程表上写什么都拦不住回消息。
-	// 之前亲密场景进行中发一条，会被判成「处理工作和日常琐事，18:30 再回」，
-	// 活活晾五个半小时。
-	if sceneLive(state, at) {
-		return true, displayActivity(state), 0
-	}
-	// 睡着是生理事实，不是日程偏好，所以走单独一条路，不往下过 blockReplyable。
-	// 「重块还没开始所以可达」对睡眠是反的：躺下没睡着是另一种可达状态，
-	// 真睡过去就谁也叫不醒。
-	if consciousnessAt(state, plan, at) == ConsciousAsleep {
-		return false, "她在睡觉", nextWakeAt(state, plan, at).UnixMilli()
-	}
-	// 躺床上还没睡着就是刷手机时间。睡眠块权重再高也拦不住，因为她人还醒着，
-	// 走下面的通用规则会被「已开始的重量级块」扣住，等于把失眠当成昏迷。
-	if bed := plan.blockAt(at); isSleepBlock(bed) && bed.StartedAt > 0 {
-		return true, "躺床上还没睡着", 0
-	}
-	// blockAt always answers. The old loop searched for the block containing this
-	// minute and, when the plan had a gap, fell off the bottom into "空闲" and let a
-	// parked message out while she was nowhere near free.
-	block := plan.blockAt(at)
-	if blockReplyable(block) {
-		return true, block.Label, 0
-	}
-	label := fmt.Sprintf("%s，暂时不能回复", block.Label)
-	if next, ok := nextFreeStart(plan, block.EndMinute, at); ok {
-		return false, label, next
-	}
-	tomorrow := at.AddDate(0, 0, 1)
-	if next, ok := nextFreeStart(resolve(tomorrow), 0, tomorrow); ok {
-		return false, label, next
-	}
-	// Nothing light is coming up. Retry in an hour rather than failing open: a
-	// parked message should wait on a schedule it can name, not escape because the
-	// lookup ran out of blocks.
-	return false, label, at.Add(time.Hour).UnixMilli()
+	a := evaluate(state, resolve, at)
+	return a.admitNew(), a.Activity, a.NextFree.UnixMilli()
 }
 
 // nextFreeStart finds the first block at or after fromMinute that she can be
@@ -294,14 +303,6 @@ func nextFreeStart(plan DayPlan, fromMinute int, day time.Time) (int64, bool) {
 	return time.Date(day.Year(), day.Month(), day.Day(), 0, best, 0, 0, day.Location()).UnixMilli(), true
 }
 
-// blockReplyable is one rule instead of a lookup table: a light block never holds
-// her, and a heavy one only holds her once she has actually started it. A weight
-// 8 job she has not begun is her putting it off, which is exactly when she is
-// reachable, and exactly why the old kind table got it backwards.
-func blockReplyable(block scheduleBlock) bool {
-	return block.Weight <= replyWeightCeiling || block.StartedAt == 0
-}
-
 // earlyRelease answers a narrower question than taskAvailability: once she has
 // told him "busy until five", is there anything that makes it honest to write
 // back before five? Only two things qualify. A scene that pulled her back into
@@ -313,20 +314,10 @@ func blockReplyable(block scheduleBlock) bool {
 // into an unstarted lunch. A promise she does not keep is worse than a promise
 // she keeps a little late.
 func earlyRelease(state State, resolve planResolver, at time.Time) (bool, string) {
-	if sceneLive(state, at) {
-		return true, displayActivity(state)
-	}
-	plan := resolve(at)
-	// 睡着绝不提前放行。轻块那条本来就拦得住 weight 10 的睡眠，但这里写死，
-	// 免得以后有人调权重把睡眠调成可打扰。
-	if consciousnessAt(state, plan, at) == ConsciousAsleep {
-		return false, ""
-	}
-	block := plan.blockAt(at)
-	if block.Weight <= replyWeightCeiling {
-		return true, block.Label
-	}
-	return false, ""
+	// 读的是和冷消息同一份 evaluate，所以两条规则不可能各自漂移。睡着绝不提前
+	// 放行由 ReasonAsleep 落进 default 守住：轻块那条本来就拦得住 weight 10 的
+	// 睡眠，但这里写死，免得以后有人调权重把睡眠调成可打扰。
+	return releaseEarly(evaluate(state, resolve, at))
 }
 
 // sceneLive 报告场景是否仍在进行。时间边界写在这里而不是依赖 sceneStage 已被衰减，

@@ -34,7 +34,14 @@ export function CharacterSidebarGroup() {
   const error = useCharacterStore((state) => state.error);
   const [expanded, setExpanded] = useState(() => localStorage.getItem(EXPAND_KEY) !== "0");
   const [createOpen, setCreateOpen] = useState(false);
-  const { unread, busy, asleep, profile: baseProfile } = useCompanionSummary(activeId);
+  const {
+    unread,
+    turnInFlight,
+    parked,
+    replying,
+    asleep,
+    profile: baseProfile,
+  } = useCompanionSummary(activeId);
 
   useEffect(() => {
     void useCharacterStore.getState().refresh();
@@ -83,7 +90,7 @@ export function CharacterSidebarGroup() {
     [navigate],
   );
 
-  const locked = busy || switching !== "";
+  const locked = turnInFlight || switching !== "";
   const activeName = characters.find((character) => character.id === activeId)?.name ?? "";
 
   return (
@@ -130,15 +137,16 @@ export function CharacterSidebarGroup() {
               const isSwitching = switching === character.id;
               // 正在切过去的那一行保持正常亮度，它靠尾部转圈表达状态，不该看起来像被禁用。
               const disabled = locked && !isActive && !isSwitching;
+              const who = activeName || "她";
               const tooltip = isSwitching
                 ? "正在切换…"
-                : disabled && busy
-                  ? activeName
-                    ? `${activeName}正在回复，先等这一轮结束`
-                    : "正在回复，先等这一轮结束"
-                  : isActive && asleep
-                    ? "她正在睡觉"
-                    : "";
+                : disabled && parked
+                  ? `${who}这会儿回不了，消息会等她空下来`
+                  : disabled && replying
+                    ? `${who}正在回复，先等这一轮结束`
+                    : isActive && asleep
+                      ? "她正在睡觉"
+                      : "";
               return (
                 <Tooltip key={character.id} title={tooltip}>
                   <Button

@@ -359,3 +359,58 @@ func TestPlanRoundTripsThroughStore(t *testing.T) {
 		t.Fatalf("unknown date should read as absent, ok=%v err=%v", ok, err)
 	}
 }
+
+func TestNationalDayHasNoWorkOrCommute(t *testing.T) {
+	profile := DefaultProfile(1)
+	plan := buildDayPlan(profile, at(2026, time.October, 2), defaultCommitments(profile))
+	if plan.Kind != "holiday" {
+		t.Fatalf("kind = %q, want holiday", plan.Kind)
+	}
+	if got := blocksOfKind(plan, "work"); len(got) != 0 {
+		t.Fatalf("国庆 should not schedule work: %+v", got)
+	}
+	if got := blocksOfKind(plan, "commute"); len(got) != 0 {
+		t.Fatalf("国庆 should not schedule a commute: %+v", got)
+	}
+}
+
+func TestMakeupSaturdayGoesToWork(t *testing.T) {
+	profile := DefaultProfile(1)
+	plan := buildDayPlan(profile, at(2026, time.October, 10), defaultCommitments(profile))
+	if plan.Kind != "makeup" {
+		t.Fatalf("kind = %q, want makeup", plan.Kind)
+	}
+	if len(blocksOfKind(plan, "work")) == 0 {
+		t.Fatalf("a 调休 Saturday is a working day and should carry the job: %+v", plan.Blocks)
+	}
+}
+
+func TestPlainSaturdayStillHasNoWork(t *testing.T) {
+	profile := DefaultProfile(1)
+	plan := buildDayPlan(profile, at(2026, time.September, 19), defaultCommitments(profile))
+	if plan.Kind != "weekend" {
+		t.Fatalf("kind = %q, want weekend", plan.Kind)
+	}
+	if len(blocksOfKind(plan, "work")) != 0 {
+		t.Fatalf("an ordinary Saturday should stay clear: %+v", plan.Blocks)
+	}
+}
+
+func TestBodyClockMovesWithTheDayType(t *testing.T) {
+	profile := DefaultProfile(1)
+	// The head sleep block runs midnight to wake, so its end is the alarm.
+	wakeOf := func(day time.Time) int {
+		return buildDayPlan(profile, day, nil).Blocks[0].EndMinute
+	}
+	workday := wakeOf(at(2026, time.September, 28))
+	holiday := wakeOf(at(2026, time.October, 1))
+	weekend := wakeOf(at(2026, time.September, 19))
+	makeup := wakeOf(at(2026, time.October, 10))
+	// Daily jitter is +/-30, so a gap of at least 30 can only come from the shift.
+	if holiday-workday < 30 {
+		t.Fatalf("holiday wake %d vs workday %d: the first holiday day should sleep in", holiday, workday)
+	}
+	if weekend-makeup < 30 {
+		t.Fatalf("weekend wake %d vs makeup wake %d: 调休 should be crueler, not kinder", weekend, makeup)
+	}
+}

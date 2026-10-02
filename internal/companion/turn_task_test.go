@@ -431,3 +431,109 @@ func TestForceReplyIgnoresNonWaitingTask(t *testing.T) {
 		t.Fatalf("status changed %s -> %s", before.Status, after.Status)
 	}
 }
+
+func TestTurnCommitmentLandsOnTheDayItWasPromisedFor(t *testing.T) {
+	manager := openTestManager(t)
+	now := time.Date(2030, 10, 1, 9, 0, 0, 0, time.Local)
+	task := TurnTask{ID: "task_cmt", ThreadID: "thread_cmt", Trigger: TriggerUser, RequestedAt: now.UnixMilli()}
+
+	resolution, err := manager.applyTurnBrief(&task, TurnBrief{
+		Resolution: ResolutionDraft{
+			SceneStage: "none", ConsentState: "not_applicable",
+			Commitments: []CommitmentDraft{
+				{Kind: "dinner", Label: "和他吃饭", Date: "2030-10-05", Start: "19:00", Duration: 120, Weight: 7},
+			},
+		},
+		Confidence: 0.8,
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resolution.CommitmentIDs) != 1 {
+		t.Fatalf("commitment ids = %v, want one", resolution.CommitmentIDs)
+	}
+
+	held, err := manager.store.Commitments(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(held) != 1 || held[0].Date != "2030-10-05" || held[0].Source != "user" {
+		t.Fatalf("stored = %+v, want the promised dinner on 2030-10-05", held)
+	}
+
+	// The promised day carries the block without anybody rebuilding it.
+	profile, err := manager.Profile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := manager.dayPlanFor(profile, time.Date(2030, 10, 5, 12, 0, 0, 0, time.Local))
+	var found bool
+	for _, block := range plan.Blocks {
+		if block.Label == "和他吃饭" {
+			found = true
+			if block.StartMinute != 19*60 {
+				t.Fatalf("block starts at %d minutes, want 19:00", block.StartMinute)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("the promised dinner is not on her 10-05 day: %+v", plan.Blocks)
+	}
+
+	// A neighbouring day must not pick it up.
+	other := manager.dayPlanFor(profile, time.Date(2030, 10, 6, 12, 0, 0, 0, time.Local))
+	for _, block := range other.Blocks {
+		if block.Label == "和他吃饭" {
+			t.Fatal("a one-off promise must not leak into the next day")
+		}
+	}
+}
+
+func TestSamePromiseMentionedTwiceIsNotBookedTwice(t *testing.T) {
+	manager := openTestManager(t)
+	now := time.Date(2030, 10, 1, 9, 0, 0, 0, time.Local)
+	draft := []CommitmentDraft{{Kind: "dinner", Label: "和他吃饭", Date: "2030-10-05", Start: "19:00", Duration: 120, Weight: 7}}
+	brief := TurnBrief{Resolution: ResolutionDraft{
+		SceneStage: "none", ConsentState: "not_applicable", Commitments: draft,
+	}}
+
+	first := TurnTask{ID: "task_a", ThreadID: "t", Trigger: TriggerUser, RequestedAt: now.UnixMilli()}
+	if _, err := manager.applyTurnBrief(&first, brief, now); err != nil {
+		t.Fatal(err)
+	}
+
+	second := TurnTask{ID: "task_b", ThreadID: "t", Trigger: TriggerUser, RequestedAt: now.UnixMilli()}
+	res, err := manager.applyTurnBrief(&second, brief, now.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.CommitmentIDs) != 0 {
+		t.Fatalf("the second mention booked %v, want nothing", res.CommitmentIDs)
+	}
+	held, _ := manager.store.Commitments(manager.id)
+	if len(held) != 1 {
+		t.Fatalf("stored %d commitments, want the original not a duplicate", len(held))
+	}
+}
+
+func TestFarFuturePromiseIsRefused(t *testing.T) {
+	manager := openTestManager(t)
+	now := time.Date(2030, 10, 1, 9, 0, 0, 0, time.Local)
+	task := TurnTask{ID: "task_far", ThreadID: "t", Trigger: TriggerUser, RequestedAt: now.UnixMilli()}
+	res, err := manager.applyTurnBrief(&task, TurnBrief{
+		Resolution: ResolutionDraft{
+			SceneStage: "none", ConsentState: "not_applicable",
+			Commitments: []CommitmentDraft{{Label: "后年再说", Date: "2032-03-01"}},
+		},
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.CommitmentIDs) != 0 {
+		t.Fatalf("a promise two years out should be refused, got %v", res.CommitmentIDs)
+	}
+	held, _ := manager.store.Commitments(manager.id)
+	if len(held) != 0 {
+		t.Fatalf("refused promise still got stored: %+v", held)
+	}
+}

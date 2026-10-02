@@ -2,6 +2,7 @@ import { Companion } from "./bindings";
 import { list } from "./helpers";
 import type {
   CompanionCharacter,
+  CompanionDirective,
   CompanionMemory,
   CompanionOverview,
   CompanionProfile,
@@ -64,6 +65,20 @@ export const companionRepository = {
 
   // 按「让她现在回」：跳过日程可用性这一关，立刻把等待中的这一轮推起来。
   forceReply: (taskID: string): Promise<void> => Companion.ForceReply(taskID),
+
+  // 导演模式：往她的世界里写一件事，不是对她说话。
+  submitDirective: (
+    text: string,
+    providerID: string,
+    model: string,
+    reasoningEffort: string,
+  ): Promise<CompanionDirective> =>
+    Companion.SubmitDirective(text, providerID, model, reasoningEffort),
+
+  listDirectives: async (limit = 50): Promise<CompanionDirective[]> =>
+    list(await Companion.ListDirectives(limit)),
+
+  revertDirective: (id: string): Promise<void> => Companion.RevertDirective(id),
 
   interrupt: (): Promise<void> => Companion.Interrupt(),
 

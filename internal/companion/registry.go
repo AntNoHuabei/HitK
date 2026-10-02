@@ -178,6 +178,13 @@ func (r *Registry) SetLogger(logger *slog.Logger) {
 		manager.SetLogger(logger)
 	}
 	r.mu.Unlock()
+	// The holiday table only speaks up for a year it has no notice for, and only
+	// once, so an unannounced year is visible without becoming tick noise.
+	ActiveCalendar().SetLogger(func(msg string, args ...any) {
+		if logger != nil {
+			logger.Warn(msg, args...)
+		}
+	})
 }
 
 // Start launches the active character's loops. Inactive worlds stay stopped.

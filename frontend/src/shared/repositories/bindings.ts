@@ -14,6 +14,8 @@ export { App, Chat, Companion, KB, Model, Runtime, Settings };
 
 export type {
   CharacterSummary as CompanionCharacter,
+  DirectorDirective as CompanionDirective,
+  DirectiveChange as CompanionDirectiveChange,
   DerivedState as CompanionDerivedState,
   Event as CompanionEvent,
   EventKind as CompanionEventKind,
@@ -28,8 +30,11 @@ export type {
   WeatherSnapshot as CompanionWeather,
 } from "../../../bindings/github.com/hitk/hitk/internal/companion/models";
 
-// 值是运行时枚举，所以单独走值导出，组件靠它判断醒还是睡。
-export { Consciousness } from "../../../bindings/github.com/hitk/hitk/internal/companion/models";
+// 值是运行时枚举，所以单独走值导出，组件靠它判断醒还是睡、这一轮走到哪一步。
+export {
+  Consciousness,
+  TurnTaskStatus,
+} from "../../../bindings/github.com/hitk/hitk/internal/companion/models";
 
 export type {
   RuntimeProgress,

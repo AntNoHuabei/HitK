@@ -13,6 +13,9 @@ import type * as companion$0 from "../../../../hitk/hitk/internal/companion/mode
 import type * as protocol$0 from "../../../../hitk/hitk/internal/protocol/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import type * as skillmodel$0 from "../../../../hitk/hitk/internal/skillmodel/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import type * as skillruntime$0 from "../../../../hitk/hitk/internal/skillruntime/models.js";
 
 declare module "@wailsio/runtime" {

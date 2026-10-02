@@ -2,6 +2,8 @@ package service
 
 import (
 	"path/filepath"
+	"strings"
+	"time"
 	"testing"
 
 	"github.com/hitk/hitk/internal/companion"
@@ -82,5 +84,44 @@ func TestCompanionReasoningMetadataIsAdapterGated(t *testing.T) {
 	}
 	if got := companionReasoningMetadata("anthropic", "high")["thinking_budget"]; got != "8192" {
 		t.Fatalf("anthropic budget = %q, want 8192", got)
+	}
+}
+
+// TestDirectorPromptKeepsTheHandHidden is the contract behind I32. The alignment
+// model is told, in as many words, that narration must never leak that anything
+// was commanded. If this breaks, the wording was softened and she starts talking
+// about being controlled.
+func TestDirectorPromptKeepsTheHandHidden(t *testing.T) {
+	prompt := turnAlignmentSystemPrompt()
+	for _, want := range []string{"导演模式", "resolution.world.narration", "控制", "幕后", "mustAttend", "setTo"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("alignment prompt is missing %q; the director contract was weakened", want)
+		}
+	}
+}
+
+func TestDirectorTurnIsNotFramedAsAMessageToHer(t *testing.T) {
+	directive := turnAlignmentUserPrompt(companion.TurnAlignmentInput{
+		Clock: companion.WorldClock{Now: time.Date(2026, 10, 2, 10, 0, 0, 0, time.Local).UnixMilli()},
+		Task: companion.TurnTask{
+			Trigger: companion.TriggerDirector,
+			Inputs:  []companion.TurnTaskInput{{Text: "让她妈明天来看她"}},
+		},
+	})
+	if strings.Contains(directive, "本轮用户消息") {
+		t.Fatal("a directive must not be handed over as the user's message")
+	}
+	if !strings.Contains(directive, "导演指令") || !strings.Contains(directive, "让她妈明天来看她") {
+		t.Fatal("the directive should arrive labelled as a directive")
+	}
+
+	chat := turnAlignmentUserPrompt(companion.TurnAlignmentInput{
+		Task: companion.TurnTask{
+			Trigger: companion.TriggerUser,
+			Inputs:  []companion.TurnTaskInput{{Text: "今天怎么样"}},
+		},
+	})
+	if !strings.Contains(chat, "本轮用户消息：今天怎么样") {
+		t.Fatal("ordinary turns must still read as the user's message")
 	}
 }

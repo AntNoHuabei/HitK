@@ -2,7 +2,7 @@
 //
 // 界面只渲染 Item:模型文本、推理、工具调用、计划、提示、错误都是 Item,所以
 // 这里是一张按 item.type 分派的表,而不是每种内容一段特例逻辑。
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button, Flex, Image, Tooltip, Typography } from "antd";
 import {
   BulbOutlined,
@@ -30,6 +30,8 @@ interface MessagesProps {
   running: boolean;
   modelLabel: string;
   usage: Usage | null;
+  /** 提示行的自定义渲染。陪伴模块用它把导演旁白画成旁白，而不是普通提示。 */
+  renderNotice?: (item: Item) => ReactNode;
 }
 
 /**
@@ -48,7 +50,7 @@ function mergeRefs(refs: (Reference | null)[]): Reference[] {
   return [...best.values()].sort((a, b) => b.score - a.score).slice(0, MAX_REFS);
 }
 
-export function ConversationMessages({ items, buffers, running, modelLabel, usage }: MessagesProps) {
+export function ConversationMessages({ items, buffers, running, modelLabel, usage, renderNotice }: MessagesProps) {
   const refs = mergeRefs(items.flatMap((item) => item.refs ?? []));
   const lastAssistantIndex = items.findLastIndex((item) => item.type === ItemType.ItemAgentMessage);
 
@@ -63,6 +65,7 @@ export function ConversationMessages({ items, buffers, running, modelLabel, usag
           modelLabel={modelLabel}
           usage={item.usage ?? (index === lastAssistantIndex ? usage : null)}
           refs={index === lastAssistantIndex ? refs : []}
+          renderNotice={renderNotice}
         />
       ))}
     </>
@@ -76,9 +79,10 @@ interface RowProps {
   modelLabel: string;
   usage: Usage | null;
   refs: Reference[];
+  renderNotice?: (item: Item) => ReactNode;
 }
 
-function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps) {
+function ItemRow({ item, buffers, streaming, modelLabel, usage, refs, renderNotice }: RowProps) {
   switch (item.type) {
     case ItemType.ItemUserMessage:
       return (
@@ -128,6 +132,7 @@ function ItemRow({ item, buffers, streaming, modelLabel, usage, refs }: RowProps
       return <CompanionTurnRow item={item} />;
 
     case ItemType.ItemNotice:
+      if (renderNotice) return <>{renderNotice(item)}</>;
       return (
         <div className="hitk-agent-process">
           <Text type="secondary" style={{ fontSize: 13 }}>

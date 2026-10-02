@@ -43,6 +43,16 @@ function sleptLabel(since: number): string {
   return hours > 0 ? `${hours} 小时 ${minutes} 分钟` : `${minutes} 分钟`;
 }
 
+// 日历那一句只在真的需要知道的时候出现：节日、调休、除夕。普通周末不必多说。
+function calendarNote(clock: CompanionOverview["clock"]): string {
+  if (clock.isEve) return `今天是${clock.eve}`;
+  if (clock.isHoliday) {
+    return `今天是${clock.holiday}${clock.holidayProgress ? `，${clock.holidayProgress}` : ""}`;
+  }
+  if (clock.isMakeupWorkday) return "调休补班，周末但上班";
+  return "";
+}
+
 export function StatePanel({
   metrics,
   derived,
@@ -96,7 +106,12 @@ export function StatePanel({
       </div>
       <div className="hitk-companion-state-now">
         <Text type="secondary">
-          {clock.date} · {clock.weekday} · {clock.season} · {clock.timeOfDay}
+          {[
+            `${clock.date} · ${clock.weekday} · ${clock.season} · ${clock.timeOfDay}`,
+            calendarNote(clock),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </Text>
         <Text strong>{activity}</Text>
         <Text type="secondary">

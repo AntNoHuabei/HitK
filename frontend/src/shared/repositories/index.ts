@@ -26,6 +26,8 @@ export type {
   ToolCall,
   Usage,
   CompanionCharacter,
+  CompanionDirective,
+  CompanionDirectiveChange,
   CompanionEvent,
   CompanionEventKind,
   CompanionDerivedState,
@@ -58,4 +60,5 @@ export {
   SkillKind,
   SourceKind,
   TrustLevel,
+  TurnTaskStatus,
 } from "./bindings";

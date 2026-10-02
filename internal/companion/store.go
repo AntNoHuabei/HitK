@@ -28,6 +28,9 @@ var (
 	bucketPlans = []byte("day_plans")
 	// Commitments are the environment layer: extras beyond the profile defaults.
 	bucketCommitments = []byte("commitments")
+	// Directives are the director's ledger: what was asked, what actually landed,
+	// and whether it can be taken back. Audit lives here, not in the transcript.
+	bucketDirectives = []byte("directives")
 )
 
 const (
@@ -57,9 +60,17 @@ type TickCommit struct {
 	Effects  []ActiveEffect
 	Triggers map[string]TriggerState
 	Task     *TurnTask
+	// Commitments are plans she just agreed to in conversation. They land in the
+	// same transaction as the turn that produced them so a crash cannot leave the
+	// promise remembered but the calendar unaware.
+	Commitments []Commitment
 	// Plan is the day she is living through, carried along so a block starting or
 	// drifting lands in the same transaction as the state it caused.
 	Plan *DayPlan
+	// Directive is the director's ledger entry for this turn, written alongside
+	// the rows it created so the record of an intervention cannot drift away
+	// from the intervention itself.
+	Directive *DirectorDirective
 }
 
 // OpenStore opens or creates a companion database.
@@ -75,6 +86,7 @@ func OpenStore(path string) (*Store, error) {
 		for _, bucket := range [][]byte{
 			bucketMeta, bucketProfile, bucketState, bucketEvents, bucketThoughts, bucketMemories,
 			bucketEffects, bucketTraits, bucketTriggers, bucketTasks, bucketPlans, bucketCommitments,
+			bucketDirectives,
 		} {
 			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
 				return err
@@ -196,6 +208,16 @@ func (s *Store) CommitTick(commit TickCommit) error {
 		}
 		for _, memory := range commit.Memories {
 			if err := putJSON(tx.Bucket(bucketMemories), memory.ID, memory); err != nil {
+				return err
+			}
+		}
+		for _, commitment := range commit.Commitments {
+			if err := putJSON(tx.Bucket(bucketCommitments), characterID+"|"+commitment.ID, commitment); err != nil {
+				return err
+			}
+		}
+		if commit.Directive != nil {
+			if err := putJSON(tx.Bucket(bucketDirectives), characterID+"|"+commit.Directive.ID, *commit.Directive); err != nil {
 				return err
 			}
 		}
@@ -380,6 +402,80 @@ func (s *Store) Commitments(characterID string) ([]Commitment, error) {
 func (s *Store) DeleteCommitment(characterID, commitmentID string) error {
 	return s.update(func(tx *bolt.Tx) error {
 		return tx.Bucket(bucketCommitments).Delete([]byte(characterID + "|" + commitmentID))
+	})
+}
+
+// SaveDirective inserts or replaces one director ledger entry.
+func (s *Store) SaveDirective(characterID string, directive DirectorDirective) error {
+	if strings.TrimSpace(directive.ID) == "" {
+		return fmt.Errorf("directive id is empty")
+	}
+	return s.update(func(tx *bolt.Tx) error {
+		return putJSON(tx.Bucket(bucketDirectives), characterID+"|"+directive.ID, directive)
+	})
+}
+
+// Directive returns one director ledger entry.
+func (s *Store) Directive(characterID, id string) (DirectorDirective, error) {
+	var directive DirectorDirective
+	err := s.view(func(tx *bolt.Tx) error {
+		raw := tx.Bucket(bucketDirectives).Get([]byte(characterID + "|" + id))
+		if len(raw) == 0 {
+			return fmt.Errorf("directive %q not found", id)
+		}
+		return json.Unmarshal(raw, &directive)
+	})
+	return directive, err
+}
+
+// Directives returns this character's interventions, newest first.
+func (s *Store) Directives(characterID string, limit int) ([]DirectorDirective, error) {
+	prefix := characterID + "|"
+	var out []DirectorDirective
+	err := s.view(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketDirectives).ForEach(func(k, raw []byte) error {
+			if !strings.HasPrefix(string(k), prefix) {
+				return nil
+			}
+			var directive DirectorDirective
+			if err := json.Unmarshal(raw, &directive); err != nil {
+				return nil
+			}
+			out = append(out, directive)
+			return nil
+		})
+	})
+	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, err
+}
+
+// DeleteEvent removes one life event. Events are keyed by occurrence time plus
+// id, so the lookup goes by the id suffix rather than recomputing the key.
+func (s *Store) DeleteEvent(eventID string) error {
+	if strings.TrimSpace(eventID) == "" {
+		return nil
+	}
+	suffix := ":" + eventID
+	return s.update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bucketEvents)
+		var remove [][]byte
+		if err := bucket.ForEach(func(key, _ []byte) error {
+			if strings.HasSuffix(string(key), suffix) {
+				remove = append(remove, append([]byte(nil), key...))
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		for _, key := range remove {
+			if err := bucket.Delete(key); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -742,6 +838,48 @@ func (s *Store) AddUnread(delta int) (int, error) {
 			next = 0
 		}
 		return bucket.Put([]byte(metaUnread), []byte(strconv.Itoa(next)))
+	})
+	return next, err
+}
+
+// RecordProactiveSent stamps when a proactive message went out and raises the
+// unanswered count, in one transaction. The manager must not read State, tweak
+// these two fields, and write it back: a tick landing in between would silently
+// swallow the count, and the whole backoff rule depends on that count being
+// real. Returns the new unanswered total.
+func (s *Store) RecordProactiveSent(characterID string, at int64) (int, error) {
+	next := 0
+	err := s.update(func(tx *bolt.Tx) error {
+		var state State
+		raw := tx.Bucket(bucketState).Get([]byte(characterID))
+		if len(raw) == 0 {
+			state = DefaultState(time.Now().UnixMilli())
+		} else if err := json.Unmarshal(raw, &state); err != nil {
+			return err
+		}
+		// putState rewrites the trait bucket from the struct, so traits have to
+		// be loaded from this same tx or they would be lost.
+		traits := map[TraitID]float64{}
+		_ = tx.Bucket(bucketTraits).ForEach(func(key, raw []byte) error {
+			var value float64
+			if err := json.Unmarshal(raw, &value); err == nil {
+				traits[TraitID(string(key))] = value
+			}
+			return nil
+		})
+		if len(traits) == 0 {
+			traits = defaultTraitValues()
+		}
+		state.Traits = traits
+
+		next = state.UnrepliedProactive + 1
+		if next < 0 {
+			next = 0
+		}
+		state.UnrepliedProactive = next
+		state.LastProactiveAt = at
+		state.UpdatedAt = at
+		return putState(tx, characterID, state)
 	})
 	return next, err
 }

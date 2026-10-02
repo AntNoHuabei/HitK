@@ -13,7 +13,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -30,7 +30,9 @@ export function ClearThreadItems(id: string): $CancellablePromise<void> {
  * CreateThread starts a new conversation using the current defaults.
  */
 export function CreateThread(mode: string): $CancellablePromise<protocol$0.Thread> {
-    return $Call.ByID(3958897464, mode);
+    return $Call.ByID(3958897464, mode).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 /**
@@ -52,7 +54,9 @@ export function ExportThread(threadID: string, saveToFile: boolean): $Cancellabl
  * GetThread loads a conversation with its items.
  */
 export function GetThread(id: string): $CancellablePromise<protocol$0.Thread> {
-    return $Call.ByID(3436335512, id);
+    return $Call.ByID(3436335512, id).then(($result: any) => {
+        return $$createType0($result);
+    });
 }
 
 /**
@@ -65,8 +69,10 @@ export function Interrupt(threadID: string): $CancellablePromise<void> {
 /**
  * ListThreads returns the conversation list.
  */
-export function ListThreads(): $CancellablePromise<protocol$0.ThreadSummary[] | null> {
-    return $Call.ByID(3244329933);
+export function ListThreads(): $CancellablePromise<protocol$0.ThreadSummary[]> {
+    return $Call.ByID(3244329933).then(($result: any) => {
+        return $$createType2($result);
+    });
 }
 
 /**
@@ -113,3 +119,8 @@ export function SubmitTurn(op: protocol$0.Op): $CancellablePromise<void> {
 export function UpdateThreadSettings(threadID: string, providerID: string, model: string, mode: string): $CancellablePromise<void> {
     return $Call.ByID(1089762068, threadID, providerID, model, mode);
 }
+
+// Private type creation functions
+const $$createType0 = protocol$0.Thread.createFrom;
+const $$createType1 = protocol$0.ThreadSummary.createFrom;
+const $$createType2 = $Create.Array($$createType1);

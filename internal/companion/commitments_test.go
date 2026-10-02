@@ -186,3 +186,149 @@ func TestCommitmentsRoundTripThroughStore(t *testing.T) {
 		t.Fatalf("other character has %d commitments, want 0", len(other))
 	}
 }
+
+func TestWorkdayScopeCoversMakeupSaturday(t *testing.T) {
+	job := Commitment{ID: "w", Kind: "work", Label: "上班", Weight: 6,
+		CalendarScope: ScopeWorkday, Start: "09:00", Duration: 480, Source: "profile"}
+	if !job.matches(monday) {
+		t.Fatal("an ordinary Monday should carry it")
+	}
+	if !job.matches(at(2026, time.October, 10)) {
+		t.Fatal("调休 Saturday is a working day and must carry it too")
+	}
+	if job.matches(at(2026, time.October, 2)) {
+		t.Fatal("国庆 is a rest day; the job stays off")
+	}
+	if job.matches(at(2026, time.September, 19)) {
+		t.Fatal("an ordinary Saturday is not a working day")
+	}
+}
+
+func TestRestdayScopeOnlyFallsOnRestDays(t *testing.T) {
+	rest := Commitment{ID: "r", Kind: "errand", Label: "睡到自然醒", Weight: 3,
+		CalendarScope: ScopeRestday, Start: "10:00", Duration: 60, Source: "profile"}
+	if !rest.matches(at(2026, time.September, 19)) {
+		t.Fatal("plain Saturday is a rest day")
+	}
+	if !rest.matches(at(2026, time.October, 2)) {
+		t.Fatal("a holiday is a rest day")
+	}
+	if rest.matches(monday) {
+		t.Fatal("a workday is not a rest day")
+	}
+	if rest.matches(at(2026, time.October, 10)) {
+		t.Fatal("调休 Saturday is not a rest day")
+	}
+}
+
+func TestExplicitDateOutranksScope(t *testing.T) {
+	dinner := Commitment{ID: "d", Kind: "dinner", Label: "饭局", Weight: 7,
+		Date: "2026-10-10", CalendarScope: ScopeRestday, Start: "19:00", Duration: 120, Source: "user"}
+	if !dinner.matches(at(2026, time.October, 10)) {
+		t.Fatal("an explicit date is the whole answer; a scope must not veto it")
+	}
+}
+
+func TestNormalizeTurnCommitmentsKeepsOnlyWhatIsReal(t *testing.T) {
+	now := time.Date(2026, 10, 1, 9, 0, 0, 0, time.Local)
+	held := []Commitment{{ID: "old", Kind: "dinner", Label: "和朋友吃饭", Date: "2026-10-05", Start: "19:00", Duration: 120, Source: "user"}}
+
+	got := NormalizeTurnCommitments([]CommitmentDraft{
+		{Kind: "dinner", Label: "和朋友吃饭", Date: "2026-10-05", Start: "19:00", Duration: 120, Weight: 7},
+		{Kind: "exam", Label: "考科三", Date: "2026-10-06", Start: "14:00", Duration: 90, Weight: 9},
+		{Label: "没给日期的安排", Start: "10:00"},
+		{Label: "上周那顿饭", Date: "2026-09-25"},
+		{Label: "明年再说", Date: "2027-05-01"},
+		{Label: "周三加班", Date: "2026-10-07", Start: "20:00", Duration: 120, Weight: 5},
+		{Label: "   "},
+	}, held, now)
+
+	if len(got) != 2 {
+		t.Fatalf("accepted %d commitments, want the duplicate, undated, past, over-horizon and blank ones all dropped: %+v", len(got), got)
+	}
+	if got[0].Label != "考科三" || got[0].Date != "2026-10-06" || got[0].Kind != "exam" {
+		t.Fatalf("first = %+v", got[0])
+	}
+	if got[0].Start != "14:00" || got[0].Duration != 90 || got[0].Weight != 9 {
+		t.Fatalf("first should keep what it was given: %+v", got[0])
+	}
+	if got[0].Source != "user" {
+		t.Fatalf("source = %q, want user", got[0].Source)
+	}
+	if got[1].Label != "周三加班" {
+		t.Fatalf("second = %+v", got[1])
+	}
+}
+
+func TestNormalizeTurnCommitmentsFillsSaneDefaults(t *testing.T) {
+	now := time.Date(2026, 10, 1, 9, 0, 0, 0, time.Local)
+	got := NormalizeTurnCommitments([]CommitmentDraft{
+		{Label: "过来找我", Date: "2026-10-06"},
+	}, nil, now)
+	if len(got) != 1 {
+		t.Fatalf("got %d, want 1", len(got))
+	}
+	one := got[0]
+	if one.Start != "09:00" {
+		t.Fatalf("start = %q, want the 09:00 default", one.Start)
+	}
+	if one.Duration != 60 {
+		t.Fatalf("duration = %d, want 60", one.Duration)
+	}
+	if one.Weight != 6 {
+		t.Fatalf("weight = %d, want 6", one.Weight)
+	}
+	if one.Kind != "user" {
+		t.Fatalf("kind = %q, want the user fallback", one.Kind)
+	}
+	if one.ID == "" {
+		t.Fatal("needs an id to be storable")
+	}
+}
+
+func TestNormalizeTurnCommitmentsCapsAtThree(t *testing.T) {
+	now := time.Date(2026, 10, 1, 9, 0, 0, 0, time.Local)
+	var drafts []CommitmentDraft
+	for i := 0; i < 6; i++ {
+		drafts = append(drafts, CommitmentDraft{
+			Label: "安排" + string(rune('A'+i)),
+			Date:  time.Date(2026, 10, 2+i, 0, 0, 0, 0, time.Local).Format("2006-01-02"),
+		})
+	}
+	got := NormalizeTurnCommitments(drafts, nil, now)
+	if len(got) != maxTurnCommitments {
+		t.Fatalf("accepted %d, want the cap of %d", len(got), maxTurnCommitments)
+	}
+}
+
+func TestNormalizeTurnCommitmentsDropsNothingWhenEmpty(t *testing.T) {
+	if got := NormalizeTurnCommitments(nil, nil, time.Now()); got != nil {
+		t.Fatalf("no drafts should mean no commitments, got %+v", got)
+	}
+}
+
+func TestTripCommitmentMovesHerWeatherCity(t *testing.T) {
+	manager := openTestManager(t)
+	profile, err := manager.Profile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := profile.City
+	now := time.Date(2026, 10, 2, 12, 0, 0, 0, time.Local)
+	if got := manager.effectiveCity(profile, now); got != home {
+		t.Fatalf("city = %q, want the profile city with no trip on", got)
+	}
+
+	trip := Commitment{ID: NewCommitmentID(), Kind: "trip", Label: "国庆去成都", Weight: 7,
+		Date: "2026-10-02", Start: "00:00", Duration: 1439, Source: "user", City: "成都"}
+	if err := manager.store.SaveCommitment(manager.id, trip); err != nil {
+		t.Fatal(err)
+	}
+	if got := manager.effectiveCity(profile, now); got != "成都" {
+		t.Fatalf("city = %q, want 成都 while the trip covers today", got)
+	}
+	// Once the trip stops covering the day she is home again.
+	if got := manager.effectiveCity(profile, time.Date(2026, 10, 3, 12, 0, 0, 0, time.Local)); got != home {
+		t.Fatalf("city = %q, want back home after the trip", got)
+	}
+}

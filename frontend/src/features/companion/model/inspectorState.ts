@@ -4,12 +4,12 @@
 // 而不是组件 state，免得每切一次人就把面板重置回默认视图。
 import { useCallback, useState } from "react";
 
-export type InspectorTab = "state" | "life" | "memories";
+export type InspectorTab = "state" | "life" | "memories" | "directives";
 
 const COLLAPSED_KEY = "hitk.companion.inspector.collapsed";
 const TAB_KEY = "hitk.companion.inspector.tab";
 
-const TABS: InspectorTab[] = ["state", "life", "memories"];
+const TABS: InspectorTab[] = ["state", "life", "memories", "directives"];
 
 function readCollapsed(): boolean {
   return localStorage.getItem(COLLAPSED_KEY) === "1";

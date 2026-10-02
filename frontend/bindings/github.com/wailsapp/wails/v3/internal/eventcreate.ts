@@ -6,4 +6,30 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
-Object.freeze($Create.Events);
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as companion$0 from "../../../../hitk/hitk/internal/companion/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as protocol$0 from "../../../../hitk/hitk/internal/protocol/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as skillmodel$0 from "../../../../hitk/hitk/internal/skillmodel/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as skillruntime$0 from "../../../../hitk/hitk/internal/skillruntime/models.js";
+
+function configure() {
+    Object.freeze(Object.assign($Create.Events, {
+        "hitk:companion": $$createType0,
+        "hitk:event": $$createType1,
+        "hitk:runtime-progress": $$createType2,
+    }));
+}
+
+// Private type creation functions
+const $$createType0 = companion$0.Event.createFrom;
+const $$createType1 = protocol$0.Event.createFrom;
+const $$createType2 = skillmodel$0.RuntimeProgress.createFrom;
+
+configure();

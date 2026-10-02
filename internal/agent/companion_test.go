@@ -85,3 +85,45 @@ func TestCompanionHistoryCutoffKeepsRecentTurns(t *testing.T) {
 		t.Fatalf("short history cutoff = %d, want 0", got)
 	}
 }
+
+// TestCompanionTurnCardIsIdempotentPerTask guards the duplicate-card bug: a task
+// that reaches the append step twice must leave one card, not two messages on the
+// screen.
+func TestCompanionTurnCardIsIdempotentPerTask(t *testing.T) {
+	h := newHarness(t, nil)
+
+	for i := 0; i < 3; i++ {
+		if err := h.agent.AppendCompanionTurnTask(h.thread.ID, "task_dup", "对齐卡片", nil); err != nil {
+			t.Fatalf("append %d: %v", i, err)
+		}
+	}
+
+	thread, err := h.sessions.Get(h.thread.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	cards := 0
+	for _, item := range thread.Items {
+		if item.Type == protocol.ItemCompanionTurn && item.TurnID == "task_dup" {
+			cards++
+		}
+	}
+	if cards != 1 {
+		t.Fatalf("cards = %d, want exactly 1 for one task", cards)
+	}
+
+	// A different task still gets its own card.
+	if err := h.agent.AppendCompanionTurnTask(h.thread.ID, "task_other", "另一张", nil); err != nil {
+		t.Fatalf("append other: %v", err)
+	}
+	thread, _ = h.sessions.Get(h.thread.ID)
+	cards = 0
+	for _, item := range thread.Items {
+		if item.Type == protocol.ItemCompanionTurn {
+			cards++
+		}
+	}
+	if cards != 2 {
+		t.Fatalf("cards = %d, want 2 across two distinct tasks", cards)
+	}
+}

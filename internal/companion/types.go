@@ -4,6 +4,12 @@
 // The package owns its own persisted state and exposes ports for model calls
 // and conversations. It does not import the agent or Wails layers, so the
 // simulation remains testable without either.
+//
+// Before changing behaviour here, read docs/companion-design.md. It records the
+// invariants this module is built on -- single sources of truth, the three-force
+// trigger rule, the consciousness gate, the calendar's "never invent a makeup
+// day" rule -- and each one is held by a test. Overriding an invariant means
+// updating that doc and its test together, with a reason.
 package companion
 
 const (
@@ -71,6 +77,11 @@ type State struct {
 	LastUserAt        int64  `json:"lastUserAt"`
 	LastProactiveAt   int64  `json:"lastProactiveAt"`
 	LastMemoryDecayAt int64  `json:"lastMemoryDecayAt"`
+	// UnrepliedProactive counts the proactive messages she has sent that the
+	// user has not answered. It is the backoff signal: every unanswered message
+	// raises the bar for the next one, because talking to someone who is not
+	// there is not company, it is noise. Cleared the moment the user speaks.
+	UnrepliedProactive int `json:"unrepliedProactive"`
 	// SleepDebtMinutes accumulates past the sleep anchor and only pays back while
 	// she actually sleeps, capped per session so a big debt takes days to clear.
 	SleepDebtMinutes int `json:"sleepDebtMinutes"`
@@ -265,5 +276,21 @@ type WorldClock struct {
 	Weekday   string `json:"weekday"`
 	TimeOfDay string `json:"timeOfDay"`
 	Season    string `json:"season"`
-	IsWeekend bool   `json:"isWeekend"`
+	// IsWeekend is the literal Saturday/Sunday fact, kept for display. It is not
+	// the "does she have to work" answer; IsRestDay is, and on a 调休 Saturday
+	// the two deliberately disagree.
+	IsWeekend bool `json:"isWeekend"`
+	// Holiday is the statutory holiday name, empty when there is none.
+	Holiday string `json:"holiday,omitempty"`
+	// IsHoliday and IsMakeupWorkday are the two calendar surprises: a day off that
+	// is not a weekend, and a working day that looks like one.
+	IsHoliday       bool `json:"isHoliday"`
+	IsMakeupWorkday bool `json:"isMakeupWorkday"`
+	// IsRestDay is the one the simulation reads: holiday or weekend.
+	IsRestDay bool `json:"isRestDay"`
+	// HolidayProgress reads 第3天共7天, empty outside a holiday run.
+	HolidayProgress string `json:"holidayProgress,omitempty"`
+	// IsEve marks 除夕 and 跨年夜, the two nights staying up is expected of her.
+	IsEve bool   `json:"isEve,omitempty"`
+	Eve   string `json:"eve,omitempty"`
 }
