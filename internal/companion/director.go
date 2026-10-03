@@ -305,13 +305,18 @@ func compileDirective(in directiveInput) directivePlan {
 		if full() {
 			break
 		}
-		target := MetricID(strings.TrimSpace(item.Target))
-		name := firstNonEmpty(strings.TrimSpace(item.Label), string(target))
+		written := strings.TrimSpace(item.Target)
+		name := firstNonEmpty(strings.TrimSpace(item.Label), written)
 		if item.SetTo != nil {
 			reject("不能把「" + name + "」直接按到某个数上。只能给带时长和衰减的影响，剩下的交给她自己的身体去平衡。")
 			continue
 		}
-		if !in.Metrics[target] {
+		// Resolve through the shared alias table instead of demanding the model
+		// guess the exact id. "arousal" meaning libido is a naming repair, not a
+		// new numeric channel, so the director still only writes existing
+		// primitives.
+		target, resolved := ResolveMetricName(written, in.Metrics)
+		if !resolved {
 			reject("认不出「" + name + "」这个状态。")
 			continue
 		}

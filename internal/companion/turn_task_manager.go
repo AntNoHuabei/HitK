@@ -656,6 +656,20 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 		brief.Resolution.SceneStage = "none"
 		brief.Resolution.ConsentState = "not_applicable"
 	}
+	// On a director turn resolution.world is the only source of world changes.
+	// The generic channels and the world draft describe the same intervention and
+	// both were being applied: one directive put four events on her timeline for
+	// two things that happened. The generic copies are also invisible to the
+	// directive ledger, so reverting the directive would leave them behind while
+	// claiming to have undone everything. Raw impulses are out of contract for
+	// the same reason -- a delta with no duration and no revert handle is the one
+	// thing this mode must never write.
+	if task.Trigger == TriggerDirector {
+		brief.Resolution.Events = nil
+		brief.Resolution.Impulses = nil
+		brief.Resolution.Effects = nil
+		brief.Resolution.TraitChanges = nil
+	}
 	effects, _ := m.store.ActiveEffects()
 	outcome := ConversationOutcome{
 		SceneStage: brief.Resolution.SceneStage, ConsentState: brief.Resolution.ConsentState,
@@ -789,6 +803,13 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 		resolution.Narration = settled.Narration
 		for _, commitment := range directedCommitments {
 			resolution.CommitmentIDs = append(resolution.CommitmentIDs, commitment.ID)
+		}
+		// The turn record has to name the events the directive actually made, not
+		// just the ones the generic path would have made. Without this the
+		// resolution reads as an empty turn that nonetheless put things on her
+		// timeline.
+		for _, event := range directedEvents {
+			resolution.EventIDs = append(resolution.EventIDs, event.ID)
 		}
 	}
 	resolution.GenerationFacts = generationFacts(brief, resolution)

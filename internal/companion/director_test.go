@@ -635,3 +635,134 @@ func mustDayPlan(t *testing.T, manager *Manager, date string) DayPlan {
 	}
 	return plan
 }
+
+// TestDirectorResolvesEnglishMetricGuesses is the bug that made the narration
+// and her actual state disagree. The model wrote target "arousal" and "mood",
+// neither of which is a metric id, so both mood effects were rejected outright:
+// the text said she was burning up and her libido never moved.
+func TestDirectorResolvesEnglishMetricGuesses(t *testing.T) {
+	now := time.Date(2026, 10, 3, 18, 0, 0, 0, time.Local)
+	manager := directorTestManager(t)
+
+	plan := compileDraft(t, manager, WorldDraft{
+		MoodEffects: []DirectorMoodDraft{
+			{Target: "arousal", Label: "突然的性奋", DurationMinutes: 90, RatePerHour: 15},
+			{Target: "Mood", Label: "情绪", DurationMinutes: 60, BaselineDelta: 8},
+		},
+		Narration: "门口有快递，她脸一下子烧了起来",
+	}, false, now)
+	settled, _, effects, _ := manager.applyDirectivePlan(plan, now)
+
+	if settled.Status != DirectiveApplied {
+		t.Fatalf("status = %s (%s), want applied", settled.Status, settled.Reason)
+	}
+	if len(effects) != 2 {
+		t.Fatalf("effects = %+v, want two", effects)
+	}
+	targets := map[MetricID]bool{}
+	for _, effect := range effects {
+		targets[effect.Target] = true
+	}
+	if !targets[MetricLibido] {
+		t.Fatalf("targets = %+v, want arousal to land on libido", targets)
+	}
+	if !targets[MetricMoodValence] {
+		t.Fatalf("targets = %+v, want Mood to land on moodValence", targets)
+	}
+}
+
+// TestDirectorStillRefusesNamesThatAreNotMetrics keeps the alias table from
+// turning into a rubber stamp. A name with no honest mapping is still a rejection
+// said out loud, not a guess at what she was supposed to feel.
+func TestDirectorStillRefusesNamesThatAreNotMetrics(t *testing.T) {
+	now := time.Date(2026, 10, 3, 18, 0, 0, 0, time.Local)
+	manager := directorTestManager(t)
+
+	plan := compileDraft(t, manager, WorldDraft{
+		MoodEffects: []DirectorMoodDraft{
+			{Target: "vibes", Label: "氛围感", DurationMinutes: 60, RatePerHour: 5},
+		},
+		Narration: "她感觉氛围不对",
+	}, false, now)
+	settled, _, effects, _ := manager.applyDirectivePlan(plan, now)
+
+	if settled.Status != DirectiveRejected {
+		t.Fatalf("status = %s, want rejected", settled.Status)
+	}
+	if len(effects) != 0 {
+		t.Fatalf("effects = %+v, want none", effects)
+	}
+	if !strings.Contains(settled.Reason, "氛围感") {
+		t.Fatalf("reason = %q, want it to name what was refused", settled.Reason)
+	}
+}
+
+// TestDirectorTurnDoesNotApplyTheSameEventTwice is the duplication found in the
+// live ledger: one directive filled both resolution.events and
+// resolution.world.events with the same facts paraphrased, and both paths ran,
+// putting four rows on her timeline for two things that happened. The generic
+// copies are also invisible to the directive ledger, so a revert would have left
+// them behind while claiming to have undone everything.
+func TestDirectorTurnDoesNotApplyTheSameEventTwice(t *testing.T) {
+	now := time.Date(2026, 10, 3, 18, 21, 0, 0, time.Local)
+	manager := directorTestManager(t)
+	task := &TurnTask{
+		ID: "task_dir_dupe", ThreadID: "thread_test", Trigger: TriggerDirector,
+		LastMessageAt: now.UnixMilli(),
+		Inputs:        []TurnTaskInput{{Text: "门口有快递敲门", At: now.UnixMilli()}},
+	}
+	brief := TurnBrief{Resolution: ResolutionDraft{
+		Events: []ResolutionEvent{
+			{Content: "傍晚门口有快递敲门，她一脸懵地签收了一个不明包裹"},
+		},
+		Impulses: map[MetricID]float64{MetricLibido: 15},
+		World: &WorldDraft{
+			Events: []DirectorEventDraft{{Content: "门口有快递敲门，她签收了一个不明包裹"}},
+		},
+	}}
+
+	resolution, err := manager.applyTurnBrief(task, brief, now)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if len(resolution.EventIDs) != 1 {
+		t.Fatalf("event ids = %v, want only the one the directive ledger tracks", resolution.EventIDs)
+	}
+	if len(resolution.MetricDeltas) != 0 {
+		t.Fatalf("metric deltas = %+v; a director writes timed effects, not raw impulses", resolution.MetricDeltas)
+	}
+	events, err := manager.store.RecentEvents(now.Add(-time.Hour).UnixMilli(), 10)
+	if err != nil {
+		t.Fatalf("events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("timeline holds %d events, want 1: %+v", len(events), events)
+	}
+}
+
+// TestUserTurnStillAppliesItsOwnEvents is the control: the suppression above is
+// scoped to director turns and must not quietly starve ordinary conversation of
+// the events it legitimately produces.
+func TestUserTurnStillAppliesItsOwnEvents(t *testing.T) {
+	now := time.Date(2026, 10, 3, 19, 0, 0, 0, time.Local)
+	manager := directorTestManager(t)
+	task := &TurnTask{
+		ID: "task_user_events", ThreadID: "thread_test", Trigger: TriggerUser,
+		LastMessageAt: now.UnixMilli(),
+		Inputs:        []TurnTaskInput{{Text: "今天好累", At: now.UnixMilli()}},
+	}
+	brief := TurnBrief{Resolution: ResolutionDraft{
+		Events:   []ResolutionEvent{{Content: "他说今天很累"}},
+		Impulses: map[MetricID]float64{MetricMoodValence: -4},
+	}}
+	resolution, err := manager.applyTurnBrief(task, brief, now)
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if len(resolution.EventIDs) != 1 {
+		t.Fatalf("event ids = %v, want the conversation event kept", resolution.EventIDs)
+	}
+	if len(resolution.MetricDeltas) != 1 {
+		t.Fatalf("metric deltas = %+v, want the conversation impulse kept", resolution.MetricDeltas)
+	}
+}

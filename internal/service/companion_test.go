@@ -2,9 +2,10 @@ package service
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/hitk/hitk/internal/companion"
 	"github.com/hitk/hitk/internal/config"
@@ -123,5 +124,37 @@ func TestDirectorTurnIsNotFramedAsAMessageToHer(t *testing.T) {
 	})
 	if !strings.Contains(chat, "本轮用户消息：今天怎么样") {
 		t.Fatal("ordinary turns must still read as the user's message")
+	}
+}
+
+// TestAlignmentMetricVocabularyMatchesCatalog holds the three places the metric
+// vocabulary lives to one list: the catalog the engine drives, the enum in the
+// structured-output schema, and the spelled-out list in the system prompt.
+//
+// This drift is not theoretical. The prompt used to name no metric ids at all,
+// so the model invented "arousal" and "mood", every mood effect was rejected,
+// and the narration described a feeling her state never got.
+func TestAlignmentMetricVocabularyMatchesCatalog(t *testing.T) {
+	rules, err := companion.LoadRuleSet()
+	if err != nil {
+		t.Fatalf("load rule set: %v", err)
+	}
+	prompt := turnAlignmentSystemPrompt()
+
+	for _, id := range turnAlignmentMetricTargets {
+		if _, ok := rules.Metrics[companion.MetricID(id)]; !ok {
+			t.Errorf("target %q is not a metric in the catalog", id)
+		}
+		if !strings.Contains(prompt, id) {
+			t.Errorf("target %q is not named in the alignment prompt", id)
+		}
+		if !strings.Contains(turnAlignmentSchemaJSON, `"`+id+`"`) {
+			t.Errorf("target %q is not in the schema enum", id)
+		}
+	}
+	for id := range rules.Metrics {
+		if !slices.Contains(turnAlignmentMetricTargets, string(id)) {
+			t.Errorf("catalog metric %q is never offered to the alignment model", id)
+		}
 	}
 }

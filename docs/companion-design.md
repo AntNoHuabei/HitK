@@ -202,6 +202,15 @@ Go 侧只接受 `YYYY-MM-DD`，解不出来就丢弃。对齐 prompt 必须带�
 drift 永不撤销 —— 时间不会倒流 —— 且界面必须标明哪条撤不回。
 `pending` 状态也不许撤：那一轮还在往她世界里写，此刻标成已撤销会被随后的结算覆盖掉，等于悄悄撤销了一次「没撤成」的撤销。后端直接拒，不靠前端按钮置灰兜底。
 
+**I56 · 指标词表只有一份，且三处必须一致。**
+`metricNameAliases` 是对话路径（`impulses` / `traitChanges` / `effects`）和导演路径（`world.moodEffects`）**共用**的唯一别名表，配 `foldMetricKey` 抹掉大小写、空格、下划线、连字符和尾缀 `level`/`value`。模型能写的 target 词表同时活在三个地方：`metric_catalog.yaml`（引擎真正驱动的）、结构化输出 schema 的 `enum`、system prompt 里列出来的那份中文对照。`TestAlignmentMetricVocabularyMatchesCatalog` 把三者钉在一起。
+
+这条不是洁癖，是修一个真实故障。之前 prompt **根本没告诉模型有哪些 id**，只把她的状态用中文标签摆出来（`性欲 62.0`），模型填 JSON key 时只好自己造英文名 —— `arousal`、`mood` —— 全都不在表里，`moodEffects` 整段被拒。结果旁白写「她脸一下子烧了起来」，她的 `libido` 一动没动，用户看到的就是「旁白没影响对话」。
+
+**I57 · 导演轮次 `resolution.world` 是世界变化的唯一来源。**
+`applyTurnBrief` 在 `TriggerDirector` 时清空 generic 的 `events` / `impulses` / `effects` / `traitChanges`。之前两条路都跑：模型同时填了 `resolution.events` 和 `resolution.world.events`，一条指令在时间线上留下**四条**事件而实际只发生了两件事。更糟的是 generic 那份不在 directive 台账里，撤销会把它们留在原地，却声称已经全部撤回。
+raw impulse 同样出契约：没有时长、没有衰减曲线、没有撤销把手的数值变化，正是这个模式唯一不许写的东西（I29 / §11）。
+
 ### 主动消息
 
 **I35 · 主动消息必须因未回而退避。**
@@ -632,6 +641,8 @@ value 夹到 [min, max]
 26. **不要把亲密当成一种日程块。** 沉浸度走 `sceneFlow`，`flowBoost` 里不许出现 `intimacy`。（I52）
 27. **改场景时长只改 `sceneHorizon`。** 在 `sceneLive` / `advanceSceneByWallClock` / `sceneFlow` 里各写一份小时数，迟早会分叉。（I53）
 28. **别把 flirt 加进 `sceneLive`。** 它可以有沉浸度，但不可以让她不可达。（I55）
+29. **加指标时三处一起改。** catalog YAML、schema 的 `target` enum、prompt 里那份中文对照，少一处模型就瞄不到它；`TestAlignmentMetricVocabularyMatchesCatalog` 会先响。（I56）
+30. **别给导演轮次开 generic 的世界变化通道。** `resolution.world` 是唯一入口，generic 的 events / impulses / effects / traitChanges 在那一轮必须清空，否则双写，而且撤不干净。（I57）
 
 ---
 
@@ -652,6 +663,8 @@ value 夹到 [min, max]
 | I53 场景时间窗单一来源 | `TestSceneFlowDiesWithTheSceneClock` |
 | I54 沉浸取最大不相加 | `TestSceneDoesNotStackOnTopOfAStartedBlock` |
 | I55 flirt 有沉浸但不可达 | `TestFlirtFeedsFlowWithoutEverHoldingHer` |
+| I56 指标词表三处一致 / 英文猜测落地 | `TestAlignmentMetricVocabularyMatchesCatalog` / `TestDirectorResolvesEnglishMetricGuesses` / `TestDirectorStillRefusesNamesThatAreNotMetrics` |
+| I57 导演轮次不双写世界变化 | `TestDirectorTurnDoesNotApplyTheSameEventTwice` / `TestUserTurnStillAppliesItsOwnEvents` |
 | 沉浸拦得住觉，但欠债照样赢 | `TestSceneReachesImmersionNoBlockCan` / `TestDebtStillWinsMidScene` |
 | I8 触发公式 / 三股力 | [drives_test.go](../internal/companion/drives_test.go) |
 | I9/I10 计划记录与忙线承诺 | [schedule_test.go](../internal/companion/schedule_test.go) |

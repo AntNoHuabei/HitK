@@ -122,6 +122,34 @@ func (b *companionModelBridge) ExtractMemories(ctx context.Context, input compan
 	return out, nil
 }
 
+// turnAlignmentSchemaJSON is the structured-output schema for turn alignment.
+// Pulled out of the call so a test can hold its metric enums against the catalog the
+// engine actually drives -- an id in the schema that is not in the catalog is a
+// promise the runtime cannot keep.
+const turnAlignmentSchemaJSON = `{
+		  "type":"object",
+		  "properties":{
+		    "clock":{"type":"object","properties":{"now":{"type":"number"},"localTime":{"type":"string"},"elapsedMinutes":{"type":"number"},"absenceHours":{"type":"number"},"daysCrossed":{"type":"number"},"activity":{"type":"string"},"available":{"type":"boolean"},"availabilityNote":{"type":"string"},"nextAvailableAt":{"type":"number"}}},
+		    "scene":{"type":"object","properties":{"stage":{"type":"string"},"consentState":{"type":"string"},"startedAt":{"type":"number"},"durationMinutes":{"type":"number"},"location":{"type":"string"},"participants":{"type":"array","items":{"type":"string"}},"physicalState":{"type":"string"},"continuityNote":{"type":"string"},"timeConstraintNote":{"type":"string"},"autoAdvancedByClock":{"type":"boolean"}}},
+		    "input":{"type":"object","properties":{"intent":{"type":"string"},"explicitRequests":{"type":"array","items":{"type":"string"}},"impliedNeeds":{"type":"array","items":{"type":"string"}},"boundaries":{"type":"array","items":{"type":"string"}},"roleplayNote":{"type":"string"},"factClaims":{"type":"array","items":{"type":"string"}},"missingDetails":{"type":"array","items":{"type":"string"}},"ambiguities":{"type":"array","items":{"type":"string"}}}},
+		    "resolution":{"type":"object","properties":{"actionMinutes":{"type":"number"},"sceneStage":{"type":"string"},"consentState":{"type":"string"},"impulses":{"type":"object","additionalProperties":{"type":"number"}},"traitChanges":{"type":"object","additionalProperties":{"type":"number"}},"effects":{"type":"array","items":{"type":"object","properties":{"target":{"type":"string","enum":["vitality","hunger","fatigue","sleepPressure","alertness","cognitiveLoad","motivation","flow","moodValence","stress","anxiety","irritability","boredom","loneliness","socialEnergy","libido","sexualSatisfaction","missing","trust","intimacy"]},"ratePerHour":{"type":"number"},"baselineDelta":{"type":"number"},"recoveryDelta":{"type":"number"},"durationMinutes":{"type":"number"},"curve":{"type":"string"}}}},"events":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"},"shareable":{"type":"boolean"},"deltas":{"type":"object","additionalProperties":{"type":"number"}}}}},"memories":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"}}}},"thoughts":{"type":"array","items":{"type":"string"}},"commitments":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["work","meal","exam","dinner","trip","errand","social","user"]},"label":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"duration":{"type":"number"},"weight":{"type":"number"},"city":{"type":"string"}},"required":["label","date"]}}},"world":{"type":"object","properties":{"arrangements":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["work","meal","exam","dinner","trip","errand","social","user"]},"label":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"duration":{"type":"number"},"weight":{"type":"number"},"city":{"type":"string"},"mustAttend":{"type":"boolean"}},"required":["label","date"]}},"disruptions":{"type":"array","items":{"type":"object","properties":{"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"minutes":{"type":"number"},"severity":{"type":"number"},"reason":{"type":"string"},"startBlock":{"type":"string"},"completeBlock":{"type":"string"}},"required":["reason","minutes"]}},"moodEffects":{"type":"array","items":{"type":"object","properties":{"target":{"type":"string","enum":["vitality","hunger","fatigue","sleepPressure","alertness","cognitiveLoad","motivation","flow","moodValence","stress","anxiety","irritability","boredom","loneliness","socialEnergy","libido","sexualSatisfaction","missing","trust","intimacy"]},"ratePerHour":{"type":"number"},"baselineDelta":{"type":"number"},"recoveryDelta":{"type":"number"},"durationMinutes":{"type":"number"},"label":{"type":"string"},"curve":{"type":"string"},"setTo":{"type":"number"}},"required":["target"]}},"events":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"importance":{"type":"number"},"shareable":{"type":"boolean"}},"required":["content"]}},"place":{"type":"object","properties":{"city":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"days":{"type":"number"}},"required":["city"]},"narration":{"type":"string"},"shouldReply":{"type":"boolean"}}}},
+		    "reply":{"type":"object","properties":{"send":{"type":"boolean"},"goal":{"type":"string"},"tone":{"type":"string"},"beats":{"type":"array","items":{"type":"string"}},"mustInclude":{"type":"array","items":{"type":"string"}},"mustNotInclude":{"type":"array","items":{"type":"string"}},"maxChars":{"type":"number"},"delivery":{"type":"string"}}},
+		    "warnings":{"type":"array","items":{"type":"string"}},
+		    "confidence":{"type":"number"}
+		  },
+		  "required":["clock","scene","input","resolution","reply","confidence"]
+		}`
+
+// turnAlignmentMetricTargets is the metric vocabulary the alignment model is
+// allowed to aim at. Kept next to the schema so the prompt list, the schema enum
+// and this slice are one decision rather than three.
+var turnAlignmentMetricTargets = []string{
+	"vitality", "hunger", "fatigue", "sleepPressure", "alertness", "cognitiveLoad",
+	"motivation", "flow", "moodValence", "stress", "anxiety", "irritability",
+	"boredom", "loneliness", "socialEnergy", "libido", "sexualSatisfaction",
+	"missing", "trust", "intimacy",
+}
+
 func (b *companionModelBridge) AlignTurn(ctx context.Context, input companion.TurnAlignmentInput) (companion.TurnBrief, error) {
 	raw, err := b.completeJSON(
 		ctx,
@@ -132,19 +160,7 @@ func (b *companionModelBridge) AlignTurn(ctx context.Context, input companion.Tu
 		1800,
 		"align_companion_turn",
 		"Return the validated turn brief before companion narration is generated.",
-		json.RawMessage(`{
-		  "type":"object",
-		  "properties":{
-		    "clock":{"type":"object","properties":{"now":{"type":"number"},"localTime":{"type":"string"},"elapsedMinutes":{"type":"number"},"absenceHours":{"type":"number"},"daysCrossed":{"type":"number"},"activity":{"type":"string"},"available":{"type":"boolean"},"availabilityNote":{"type":"string"},"nextAvailableAt":{"type":"number"}}},
-		    "scene":{"type":"object","properties":{"stage":{"type":"string"},"consentState":{"type":"string"},"startedAt":{"type":"number"},"durationMinutes":{"type":"number"},"location":{"type":"string"},"participants":{"type":"array","items":{"type":"string"}},"physicalState":{"type":"string"},"continuityNote":{"type":"string"},"timeConstraintNote":{"type":"string"},"autoAdvancedByClock":{"type":"boolean"}}},
-		    "input":{"type":"object","properties":{"intent":{"type":"string"},"explicitRequests":{"type":"array","items":{"type":"string"}},"impliedNeeds":{"type":"array","items":{"type":"string"}},"boundaries":{"type":"array","items":{"type":"string"}},"roleplayNote":{"type":"string"},"factClaims":{"type":"array","items":{"type":"string"}},"missingDetails":{"type":"array","items":{"type":"string"}},"ambiguities":{"type":"array","items":{"type":"string"}}}},
-		    "resolution":{"type":"object","properties":{"actionMinutes":{"type":"number"},"sceneStage":{"type":"string"},"consentState":{"type":"string"},"impulses":{"type":"object","additionalProperties":{"type":"number"}},"traitChanges":{"type":"object","additionalProperties":{"type":"number"}},"effects":{"type":"array","items":{"type":"object","properties":{"target":{"type":"string"},"ratePerHour":{"type":"number"},"baselineDelta":{"type":"number"},"recoveryDelta":{"type":"number"},"durationMinutes":{"type":"number"},"curve":{"type":"string"}}}},"events":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"},"shareable":{"type":"boolean"},"deltas":{"type":"object","additionalProperties":{"type":"number"}}}}},"memories":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string"},"content":{"type":"string"},"importance":{"type":"number"}}}},"thoughts":{"type":"array","items":{"type":"string"}},"commitments":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["work","meal","exam","dinner","trip","errand","social","user"]},"label":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"duration":{"type":"number"},"weight":{"type":"number"},"city":{"type":"string"}},"required":["label","date"]}}},"world":{"type":"object","properties":{"arrangements":{"type":"array","items":{"type":"object","properties":{"kind":{"type":"string","enum":["work","meal","exam","dinner","trip","errand","social","user"]},"label":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"duration":{"type":"number"},"weight":{"type":"number"},"city":{"type":"string"},"mustAttend":{"type":"boolean"}},"required":["label","date"]}},"disruptions":{"type":"array","items":{"type":"object","properties":{"start":{"type":"string","pattern":"^[0-9]{2}:[0-9]{2}$"},"minutes":{"type":"number"},"severity":{"type":"number"},"reason":{"type":"string"},"startBlock":{"type":"string"},"completeBlock":{"type":"string"}},"required":["reason","minutes"]}},"moodEffects":{"type":"array","items":{"type":"object","properties":{"target":{"type":"string"},"ratePerHour":{"type":"number"},"baselineDelta":{"type":"number"},"recoveryDelta":{"type":"number"},"durationMinutes":{"type":"number"},"label":{"type":"string"},"curve":{"type":"string"},"setTo":{"type":"number"}},"required":["target"]}},"events":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"importance":{"type":"number"},"shareable":{"type":"boolean"}},"required":["content"]}},"place":{"type":"object","properties":{"city":{"type":"string"},"date":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"days":{"type":"number"}},"required":["city"]},"narration":{"type":"string"},"shouldReply":{"type":"boolean"}}}},
-		    "reply":{"type":"object","properties":{"send":{"type":"boolean"},"goal":{"type":"string"},"tone":{"type":"string"},"beats":{"type":"array","items":{"type":"string"}},"mustInclude":{"type":"array","items":{"type":"string"}},"mustNotInclude":{"type":"array","items":{"type":"string"}},"maxChars":{"type":"number"},"delivery":{"type":"string"}}},
-		    "warnings":{"type":"array","items":{"type":"string"}},
-		    "confidence":{"type":"number"}
-		  },
-		  "required":["clock","scene","input","resolution","reply","confidence"]
-		}`),
+		json.RawMessage(turnAlignmentSchemaJSON),
 	)
 	if err != nil {
 		return companion.TurnBrief{}, err
@@ -413,6 +429,9 @@ func turnAlignmentSystemPrompt() string {
 - delivery 只能是 either、both、action_only、speech_only。动作与台词至少一个非空；两者都适合时优先 both，只有动作时 action_only，只有台词时 speech_only。
 - 先解释用户本轮真正想表达什么，再决定世界变化。拒绝、角色扮演抵抗、玩笑和真实撤回同意必须结合上下文区分。
 - impulses、traitChanges、effects 都是最终变化量，系统不会再用其他倍率缩放。
+- 状态指标只有下面这些 id，写 effects / impulses 的 target 时必须原样用，不要自己造名字：
+  vitality 生命力 · hunger 饥饿 · fatigue 疲劳 · sleepPressure 睡眠压力 · alertness 清醒度 · cognitiveLoad 认知负荷 · motivation 动机 · flow 沉浸 · moodValence 情绪 · stress 压力 · anxiety 焦虑 · irritability 易怒 · boredom 无聊 · loneliness 孤独 · socialEnergy 社交电量 · libido 性欲 · sexualSatisfaction 性满足 · missing 思念 · trust 信任 · intimacy 亲密
+  「性奋/燥热」是 libido，「情绪」是 moodValence。arousal、desire、mood、energy 这类自造词不在表里，写了会被丢掉。
 - 只写上下文支持的状态变化；无法确认的事情写入 ambiguities，不要自行补全。
 - reply 阶段不得新增未在 resolution 或已有事实中确认的地点、人物、行为、承诺和事件。
 - resolution.commitments 只记对话里明确说了的安排，例如「初六过来找你」「下周三面试」「国庆去成都」。没说过就不要写，宁缺毋滥。
@@ -430,6 +449,7 @@ func turnAlignmentSystemPrompt() string {
 - 绝对不要给 mustAttend。这个世界里不存在非去不可的行程，只有重要程度够不够，填了会被系统拒绝。
 - disruptions 是往今天推进去的一段时间，比如「路上堵车两小时」「临时被拉住说话」。minutes 是分钟数，severity 是 1 到 10 的不可抗力程度。startBlock 和 completeBlock 一律留空：可以让她撞上事，不能替她开始或完成一件事。
 - moodEffects 只能写带 durationMinutes（至少 15 分钟）的影响，靠 curve 自然衰减。setTo 一律留空：不能把任何状态直接按到某个数值上，填了会被系统拒绝。
+- moodEffects 的 target 必须用上面那份指标 id 原样填写。想让她「性奋起来」就写 libido，想让她「情绪高涨」就写 moodValence，不要写 arousal、mood 这类表外的名字。
 - events 是此刻在她身上发生、她之后会提起来的事。
 - place 是她在哪个城市待几天，会连带改变她聊的天气。
 - shouldReply 决定她现在要不要就这事开口。突发的事给 true；只是往后几天排个安排给 false，不要去打扰对方。
