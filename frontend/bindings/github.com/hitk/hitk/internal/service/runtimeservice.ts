@@ -9,7 +9,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -30,9 +30,7 @@ export function CancelSkillEnvironment(name: string): $CancellablePromise<void> 
 }
 
 export function GetSkillEnvironment(name: string): $CancellablePromise<skillruntime$0.SkillEnvironmentStatus> {
-    return $Call.ByID(2536453410, name).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(2536453410, name);
 }
 
 /**
@@ -40,9 +38,7 @@ export function GetSkillEnvironment(name: string): $CancellablePromise<skillrunt
  * returns an empty plan without triggering network or filesystem changes.
  */
 export function GetSkillPlan(name: string): $CancellablePromise<skillmodel$0.ResolvedPlan> {
-    return $Call.ByID(3515406986, name).then(($result: any) => {
-        return $$createType1($result);
-    });
+    return $Call.ByID(3515406986, name);
 }
 
 /**
@@ -53,19 +49,15 @@ export function InstallSkill(request: skillcatalog$0.InstallRequest): $Cancellab
     return $Call.ByID(1610093812, request);
 }
 
-export function ListRuntimes(): $CancellablePromise<skillruntime$0.RuntimeStatus[]> {
-    return $Call.ByID(140894473).then(($result: any) => {
-        return $$createType3($result);
-    });
+export function ListRuntimes(): $CancellablePromise<skillruntime$0.RuntimeStatus[] | null> {
+    return $Call.ByID(140894473);
 }
 
 /**
  * ListSkills returns the merged compatibility catalog.
  */
-export function ListSkills(): $CancellablePromise<skillmodel$0.SkillSummary[]> {
-    return $Call.ByID(3685789206).then(($result: any) => {
-        return $$createType5($result);
-    });
+export function ListSkills(): $CancellablePromise<skillmodel$0.SkillSummary[] | null> {
+    return $Call.ByID(3685789206);
 }
 
 /**
@@ -73,15 +65,11 @@ export function ListSkills(): $CancellablePromise<skillmodel$0.SkillSummary[]> {
  * environment. allowNetwork must come from an explicit UI confirmation.
  */
 export function PrepareResolvedSkill(name: string, allowNetwork: boolean): $CancellablePromise<skillmodel$0.SkillEnvironmentStatus> {
-    return $Call.ByID(1075506940, name, allowNetwork).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(1075506940, name, allowNetwork);
 }
 
 export function PrepareSkillEnvironment(name: string, allowNetwork: boolean): $CancellablePromise<skillruntime$0.SkillEnvironmentStatus> {
-    return $Call.ByID(1419783381, name, allowNetwork).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(1419783381, name, allowNetwork);
 }
 
 export function PruneSkill(name: string): $CancellablePromise<void> {
@@ -100,9 +88,7 @@ export function RemoveSkillEnvironment(name: string): $CancellablePromise<void> 
 }
 
 export function RepairSkillEnvironment(name: string, allowNetwork: boolean): $CancellablePromise<skillruntime$0.SkillEnvironmentStatus> {
-    return $Call.ByID(4283423159, name, allowNetwork).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(4283423159, name, allowNetwork);
 }
 
 /**
@@ -110,9 +96,7 @@ export function RepairSkillEnvironment(name: string, allowNetwork: boolean): $Ca
  * inspection by the runtime settings UI.
  */
 export function ResolveSkill(name: string): $CancellablePromise<skillmodel$0.ResolvedPlan> {
-    return $Call.ByID(3688642669, name).then(($result: any) => {
-        return $$createType1($result);
-    });
+    return $Call.ByID(3688642669, name);
 }
 
 /**
@@ -120,20 +104,9 @@ export function ResolveSkill(name: string): $CancellablePromise<skillmodel$0.Res
  * remains a separate user action for each selected entry.
  */
 export function ResolveSkillHubFeed(url: string, allowNetwork: boolean): $CancellablePromise<skillcatalog$0.SkillHubFeed> {
-    return $Call.ByID(4236629792, url, allowNetwork).then(($result: any) => {
-        return $$createType6($result);
-    });
+    return $Call.ByID(4236629792, url, allowNetwork);
 }
 
 export function RollbackSkill(name: string): $CancellablePromise<void> {
     return $Call.ByID(3412689693, name);
 }
-
-// Private type creation functions
-const $$createType0 = skillmodel$0.SkillEnvironmentStatus.createFrom;
-const $$createType1 = skillmodel$0.ResolvedPlan.createFrom;
-const $$createType2 = skillmodel$0.RuntimeStatus.createFrom;
-const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = skillmodel$0.SkillSummary.createFrom;
-const $$createType5 = $Create.Array($$createType4);
-const $$createType6 = skillcatalog$0.SkillHubFeed.createFrom;

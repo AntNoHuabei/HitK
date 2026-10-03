@@ -8,7 +8,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -18,9 +18,7 @@ import * as $models from "./models.js";
  * GetInfo returns a snapshot of application state for the shell UI.
  */
 export function GetInfo(): $CancellablePromise<$models.Info> {
-    return $Call.ByID(333584145).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(333584145);
 }
 
 /**
@@ -34,10 +32,8 @@ export function PickDirectory(title: string): $CancellablePromise<string> {
 /**
  * PickFiles opens the native file picker for knowledge-base import.
  */
-export function PickFiles(title: string): $CancellablePromise<string[]> {
-    return $Call.ByID(1753570357, title).then(($result: any) => {
-        return $$createType1($result);
-    });
+export function PickFiles(title: string): $CancellablePromise<string[] | null> {
+    return $Call.ByID(1753570357, title);
 }
 
 /**
@@ -45,9 +41,7 @@ export function PickFiles(title: string): $CancellablePromise<string[]> {
  * workspace. The UI never gets arbitrary local-file read access.
  */
 export function PreviewArtifact(path: string): $CancellablePromise<$models.ArtifactPreview> {
-    return $Call.ByID(3245006879, path).then(($result: any) => {
-        return $$createType2($result);
-    });
+    return $Call.ByID(3245006879, path);
 }
 
 /**
@@ -86,8 +80,3 @@ export function SetPolicy(policy: string): $CancellablePromise<void> {
 export function SetWorkspace(dir: string): $CancellablePromise<void> {
     return $Call.ByID(1081902054, dir);
 }
-
-// Private type creation functions
-const $$createType0 = $models.Info.createFrom;
-const $$createType1 = $Create.Array($Create.Any);
-const $$createType2 = $models.ArtifactPreview.createFrom;

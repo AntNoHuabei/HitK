@@ -156,7 +156,9 @@ func (m *Manager) forceReplyAt(taskID string, at time.Time) error {
 		return fmt.Errorf("%s正在睡觉，预计 %s 醒，叫不醒", profile.Name, wakeAt.Format("15:04"))
 	}
 	task.Forced = true
-	task.NotBefore = time.Now().UnixMilli()
+	// 用调用方给的时刻，不用 time.Now()。检查睡没睡读的是 at，写回却写真实时钟，
+	// 两个时钟不一致时强制回复会落到错误的一刻。
+	task.NotBefore = at.UnixMilli()
 	task.AvailabilityReason = ""
 	task.Blocked = false
 	if err := m.store.SaveTurnTask(task); err != nil {
@@ -640,6 +642,20 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 	if err != nil {
 		return TurnResolution{}, err
 	}
+	profile, err := m.store.Profile(m.id)
+	if err != nil {
+		return TurnResolution{}, err
+	}
+	// 睡着的时候不能给她立一个场景。settleConsciousness 会在下一个 tick 把它清掉，
+	// 但只守那一侧不够：对齐模型完全可能在她睡着的这一轮里回一个 active 场景，
+	// 于是 evaluate 读到「场景活着」就放行，而 CanForceReply 读意识说「不行」。
+	// I4 和 I6 要在源头就一致，不能靠可用性那边排序兜。
+	consciousness, wakeAt := m.consciousnessNow(profile, state, now)
+	asleep := consciousness == ConsciousAsleep
+	if asleep {
+		brief.Resolution.SceneStage = "none"
+		brief.Resolution.ConsentState = "not_applicable"
+	}
 	effects, _ := m.store.ActiveEffects()
 	outcome := ConversationOutcome{
 		SceneStage: brief.Resolution.SceneStage, ConsentState: brief.Resolution.ConsentState,
@@ -652,9 +668,12 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 		now,
 		task.Trigger == TriggerUser,
 	))
-	// 导演指令不是「有人出现了」。她世界里下了场雨不等于有人陪她，
-	// 所以既不算用户在场，也不刷新上次互动时间，思念和孤独照原样走。
-	if task.Trigger != TriggerDirector {
+	// 只有他真的出现了才算「上次联系」。导演指令不算，她自己的主动消息同样
+	// 不算 —— relationship.absenceHours 就是读这个字段的，她一开口就把这个钟
+	// 拨回零，等于替他答了「我在」：思念和孤独再也长不起来，下一轮对齐还会
+	// 拿到「自然延续上次话题，不要说好久不见」。她主动找他而他没有回，恰恰是
+	// absence 该继续涨的那种情况。
+	if task.Trigger == TriggerUser {
 		state.LastUserAt = task.LastMessageAt
 	}
 	// Only he himself clears the unanswered count. A proactive turn of her own
@@ -749,11 +768,6 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 		if brief.Resolution.World != nil {
 			draft = *brief.Resolution.World
 		}
-		profile, profileErr := m.store.Profile(m.id)
-		if profileErr != nil {
-			return TurnResolution{}, profileErr
-		}
-		consciousness, wakeAt := m.consciousnessNow(profile, state, now)
 		directiveID := task.DirectiveID
 		if directiveID == "" {
 			directiveID = newDirectiveID()
@@ -761,7 +775,7 @@ func (m *Manager) applyTurnBrief(task *TurnTask, brief TurnBrief, now time.Time)
 		compiled := compileDirective(directiveInput{
 			CharacterID: m.id, ThreadID: task.ThreadID, TaskID: task.ID,
 			DirectiveID: directiveID, Text: task.InputText(), Draft: draft,
-			Asleep:  consciousness == ConsciousAsleep,
+			Asleep:  asleep,
 			WakeAt:  wakeAt,
 			Now:     now,
 			Metrics: m.knownMetrics(),

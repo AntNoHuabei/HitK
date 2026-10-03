@@ -3,47 +3,23 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Create as $Create } from "@wailsio/runtime";
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
 import * as kb$0 from "../kb/models.js";
 
 /**
  * ArtifactPreview is a bounded, workspace-confined file preview for the chat UI.
  */
-export class ArtifactPreview {
+export interface ArtifactPreview {
     "path": string;
     "mime": string;
     "content"?: string;
     "data"?: string;
     "truncated"?: boolean;
-
-    /** Creates a new ArtifactPreview instance. */
-    constructor($$source: Partial<ArtifactPreview> = {}) {
-        if (!("path" in $$source)) {
-            this["path"] = "";
-        }
-        if (!("mime" in $$source)) {
-            this["mime"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ArtifactPreview instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ArtifactPreview {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new ArtifactPreview($$parsedSource as Partial<ArtifactPreview>);
-    }
 }
 
 /**
  * CatalogModelView is one preset model from the built-in catalog.
  */
-export class CatalogModelView {
+export interface CatalogModelView {
     "id": string;
     "label": string;
     "context"?: number;
@@ -51,32 +27,12 @@ export class CatalogModelView {
     "vision"?: boolean;
     "tools"?: boolean;
     "embedding"?: boolean;
-
-    /** Creates a new CatalogModelView instance. */
-    constructor($$source: Partial<CatalogModelView> = {}) {
-        if (!("id" in $$source)) {
-            this["id"] = "";
-        }
-        if (!("label" in $$source)) {
-            this["label"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new CatalogModelView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): CatalogModelView {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new CatalogModelView($$parsedSource as Partial<CatalogModelView>);
-    }
 }
 
 /**
  * CatalogProviderView is a built-in provider the user can configure.
  */
-export class CatalogProviderView {
+export interface CatalogProviderView {
     /**
      * Kind doubles as the catalog id: it is what a ProviderInput.CatalogID
      * refers back to, so built-in providers need no separate identifier.
@@ -90,49 +46,13 @@ export class CatalogProviderView {
     "docsUrl"?: string;
     "apiKeyUrl"?: string;
     "note"?: string;
-    "models": CatalogModelView[];
-
-    /** Creates a new CatalogProviderView instance. */
-    constructor($$source: Partial<CatalogProviderView> = {}) {
-        if (!("kind" in $$source)) {
-            this["kind"] = "";
-        }
-        if (!("name" in $$source)) {
-            this["name"] = "";
-        }
-        if (!("label" in $$source)) {
-            this["label"] = "";
-        }
-        if (!("baseUrl" in $$source)) {
-            this["baseUrl"] = "";
-        }
-        if (!("region" in $$source)) {
-            this["region"] = "";
-        }
-        if (!("models" in $$source)) {
-            this["models"] = [];
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new CatalogProviderView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): CatalogProviderView {
-        const $$createField9_0 = $$createType1;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("models" in $$parsedSource) {
-            $$parsedSource["models"] = $$createField9_0($$parsedSource["models"]);
-        }
-        return new CatalogProviderView($$parsedSource as Partial<CatalogProviderView>);
-    }
+    "models": CatalogModelView[] | null;
 }
 
 /**
  * DiscoveredModelView is one model returned by a provider's listing endpoint.
  */
-export class DiscoveredModelView {
+export interface DiscoveredModelView {
     "id": string;
 
     /**
@@ -145,72 +65,22 @@ export class DiscoveredModelView {
     "vision"?: boolean;
     "tools"?: boolean;
     "context"?: number;
-
-    /** Creates a new DiscoveredModelView instance. */
-    constructor($$source: Partial<DiscoveredModelView> = {}) {
-        if (!("id" in $$source)) {
-            this["id"] = "";
-        }
-        if (!("label" in $$source)) {
-            this["label"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new DiscoveredModelView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): DiscoveredModelView {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new DiscoveredModelView($$parsedSource as Partial<DiscoveredModelView>);
-    }
 }
 
 /**
  * ImportResult reports what an ingest run did.
  */
-export class ImportResult {
+export interface ImportResult {
     "added": number;
-    "failed": string[];
+    "failed": string[] | null;
     "skipped": number;
     "message": string;
-
-    /** Creates a new ImportResult instance. */
-    constructor($$source: Partial<ImportResult> = {}) {
-        if (!("added" in $$source)) {
-            this["added"] = 0;
-        }
-        if (!("failed" in $$source)) {
-            this["failed"] = [];
-        }
-        if (!("skipped" in $$source)) {
-            this["skipped"] = 0;
-        }
-        if (!("message" in $$source)) {
-            this["message"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ImportResult instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ImportResult {
-        const $$createField1_0 = $$createType2;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("failed" in $$parsedSource) {
-            $$parsedSource["failed"] = $$createField1_0($$parsedSource["failed"]);
-        }
-        return new ImportResult($$parsedSource as Partial<ImportResult>);
-    }
 }
 
 /**
  * Info describes the running application.
  */
-export class Info {
+export interface Info {
     "version": string;
     "dataDir": string;
     "workspace": string;
@@ -221,176 +91,43 @@ export class Info {
     "policy": string;
     "kbStats": kb$0.Stats;
     "threadCount": number;
-
-    /** Creates a new Info instance. */
-    constructor($$source: Partial<Info> = {}) {
-        if (!("version" in $$source)) {
-            this["version"] = "";
-        }
-        if (!("dataDir" in $$source)) {
-            this["dataDir"] = "";
-        }
-        if (!("workspace" in $$source)) {
-            this["workspace"] = "";
-        }
-        if (!("os" in $$source)) {
-            this["os"] = "";
-        }
-        if (!("arch" in $$source)) {
-            this["arch"] = "";
-        }
-        if (!("goVersion" in $$source)) {
-            this["goVersion"] = "";
-        }
-        if (!("mode" in $$source)) {
-            this["mode"] = "";
-        }
-        if (!("policy" in $$source)) {
-            this["policy"] = "";
-        }
-        if (!("kbStats" in $$source)) {
-            this["kbStats"] = (new kb$0.Stats());
-        }
-        if (!("threadCount" in $$source)) {
-            this["threadCount"] = 0;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new Info instance from a string or object.
-     */
-    static createFrom($$source: any = {}): Info {
-        const $$createField8_0 = $$createType3;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("kbStats" in $$parsedSource) {
-            $$parsedSource["kbStats"] = $$createField8_0($$parsedSource["kbStats"]);
-        }
-        return new Info($$parsedSource as Partial<Info>);
-    }
 }
 
 /**
  * ModeDefaultView is the model one agent mode starts with.
  */
-export class ModeDefaultView {
+export interface ModeDefaultView {
     "provider": string;
     "model": string;
-
-    /** Creates a new ModeDefaultView instance. */
-    constructor($$source: Partial<ModeDefaultView> = {}) {
-        if (!("provider" in $$source)) {
-            this["provider"] = "";
-        }
-        if (!("model" in $$source)) {
-            this["model"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ModeDefaultView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ModeDefaultView {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new ModeDefaultView($$parsedSource as Partial<ModeDefaultView>);
-    }
 }
 
 /**
  * ModeDefaultsView carries the Work, Coding and Companion selections.
  */
-export class ModeDefaultsView {
+export interface ModeDefaultsView {
     "work": ModeDefaultView;
     "coding": ModeDefaultView;
     "companion": ModeDefaultView;
-
-    /** Creates a new ModeDefaultsView instance. */
-    constructor($$source: Partial<ModeDefaultsView> = {}) {
-        if (!("work" in $$source)) {
-            this["work"] = (new ModeDefaultView());
-        }
-        if (!("coding" in $$source)) {
-            this["coding"] = (new ModeDefaultView());
-        }
-        if (!("companion" in $$source)) {
-            this["companion"] = (new ModeDefaultView());
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ModeDefaultsView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ModeDefaultsView {
-        const $$createField0_0 = $$createType4;
-        const $$createField1_0 = $$createType4;
-        const $$createField2_0 = $$createType4;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("work" in $$parsedSource) {
-            $$parsedSource["work"] = $$createField0_0($$parsedSource["work"]);
-        }
-        if ("coding" in $$parsedSource) {
-            $$parsedSource["coding"] = $$createField1_0($$parsedSource["coding"]);
-        }
-        if ("companion" in $$parsedSource) {
-            $$parsedSource["companion"] = $$createField2_0($$parsedSource["companion"]);
-        }
-        return new ModeDefaultsView($$parsedSource as Partial<ModeDefaultsView>);
-    }
 }
 
 /**
  * ModelOptionView is one selectable model, flattened across providers.
  */
-export class ModelOptionView {
+export interface ModelOptionView {
     "provider": string;
     "providerName": string;
     "model": string;
     "label": string;
     "vision"?: boolean;
     "tools"?: boolean;
-    "reasoning"?: string[];
+    "reasoning"?: string[] | null;
     "context"?: number;
-
-    /** Creates a new ModelOptionView instance. */
-    constructor($$source: Partial<ModelOptionView> = {}) {
-        if (!("provider" in $$source)) {
-            this["provider"] = "";
-        }
-        if (!("providerName" in $$source)) {
-            this["providerName"] = "";
-        }
-        if (!("model" in $$source)) {
-            this["model"] = "";
-        }
-        if (!("label" in $$source)) {
-            this["label"] = "";
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ModelOptionView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ModelOptionView {
-        const $$createField6_0 = $$createType2;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("reasoning" in $$parsedSource) {
-            $$parsedSource["reasoning"] = $$createField6_0($$parsedSource["reasoning"]);
-        }
-        return new ModelOptionView($$parsedSource as Partial<ModelOptionView>);
-    }
 }
 
 /**
  * ProviderInput is what the settings dialog submits.
  */
-export class ProviderInput {
+export interface ProviderInput {
     /**
      * ID is the existing provider id, empty when adding.
      */
@@ -410,55 +147,13 @@ export class ProviderInput {
     "baseUrl": string;
     "apiKey": string;
     "model": string;
-    "models": ProviderModelView[];
-
-    /** Creates a new ProviderInput instance. */
-    constructor($$source: Partial<ProviderInput> = {}) {
-        if (!("id" in $$source)) {
-            this["id"] = "";
-        }
-        if (!("catalogId" in $$source)) {
-            this["catalogId"] = "";
-        }
-        if (!("name" in $$source)) {
-            this["name"] = "";
-        }
-        if (!("kind" in $$source)) {
-            this["kind"] = "";
-        }
-        if (!("baseUrl" in $$source)) {
-            this["baseUrl"] = "";
-        }
-        if (!("apiKey" in $$source)) {
-            this["apiKey"] = "";
-        }
-        if (!("model" in $$source)) {
-            this["model"] = "";
-        }
-        if (!("models" in $$source)) {
-            this["models"] = [];
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ProviderInput instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ProviderInput {
-        const $$createField7_0 = $$createType6;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("models" in $$parsedSource) {
-            $$parsedSource["models"] = $$createField7_0($$parsedSource["models"]);
-        }
-        return new ProviderInput($$parsedSource as Partial<ProviderInput>);
-    }
+    "models": ProviderModelView[] | null;
 }
 
 /**
  * ProviderModelView is a model that is currently enabled on a provider.
  */
-export class ProviderModelView {
+export interface ProviderModelView {
     "model": string;
     "label": string;
     "custom": boolean;
@@ -466,35 +161,12 @@ export class ProviderModelView {
     "vision"?: boolean;
     "tools"?: boolean;
     "context"?: number;
-
-    /** Creates a new ProviderModelView instance. */
-    constructor($$source: Partial<ProviderModelView> = {}) {
-        if (!("model" in $$source)) {
-            this["model"] = "";
-        }
-        if (!("label" in $$source)) {
-            this["label"] = "";
-        }
-        if (!("custom" in $$source)) {
-            this["custom"] = false;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ProviderModelView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ProviderModelView {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new ProviderModelView($$parsedSource as Partial<ProviderModelView>);
-    }
 }
 
 /**
  * ProviderView is a configured provider plus its enabled models.
  */
-export class ProviderView {
+export interface ProviderView {
     "id": string;
     "name": string;
     "kind": string;
@@ -509,61 +181,13 @@ export class ProviderView {
     "ready": boolean;
     "hasKey": boolean;
     "maskedKey"?: string;
-    "models": ProviderModelView[];
-
-    /** Creates a new ProviderView instance. */
-    constructor($$source: Partial<ProviderView> = {}) {
-        if (!("id" in $$source)) {
-            this["id"] = "";
-        }
-        if (!("name" in $$source)) {
-            this["name"] = "";
-        }
-        if (!("kind" in $$source)) {
-            this["kind"] = "";
-        }
-        if (!("baseUrl" in $$source)) {
-            this["baseUrl"] = "";
-        }
-        if (!("model" in $$source)) {
-            this["model"] = "";
-        }
-        if (!("region" in $$source)) {
-            this["region"] = "";
-        }
-        if (!("custom" in $$source)) {
-            this["custom"] = false;
-        }
-        if (!("ready" in $$source)) {
-            this["ready"] = false;
-        }
-        if (!("hasKey" in $$source)) {
-            this["hasKey"] = false;
-        }
-        if (!("models" in $$source)) {
-            this["models"] = [];
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new ProviderView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): ProviderView {
-        const $$createField10_0 = $$createType6;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("models" in $$parsedSource) {
-            $$parsedSource["models"] = $$createField10_0($$parsedSource["models"]);
-        }
-        return new ProviderView($$parsedSource as Partial<ProviderView>);
-    }
+    "models": ProviderModelView[] | null;
 }
 
 /**
  * SearchHitView is a search result shaped for the UI.
  */
-export class SearchHitView {
+export interface SearchHitView {
     "chunkId": string;
     "documentId": string;
     "docTitle": string;
@@ -574,54 +198,13 @@ export class SearchHitView {
     "score": number;
     "lexical": number;
     "vector": number;
-
-    /** Creates a new SearchHitView instance. */
-    constructor($$source: Partial<SearchHitView> = {}) {
-        if (!("chunkId" in $$source)) {
-            this["chunkId"] = "";
-        }
-        if (!("documentId" in $$source)) {
-            this["documentId"] = "";
-        }
-        if (!("docTitle" in $$source)) {
-            this["docTitle"] = "";
-        }
-        if (!("collection" in $$source)) {
-            this["collection"] = "";
-        }
-        if (!("source" in $$source)) {
-            this["source"] = "";
-        }
-        if (!("snippet" in $$source)) {
-            this["snippet"] = "";
-        }
-        if (!("score" in $$source)) {
-            this["score"] = 0;
-        }
-        if (!("lexical" in $$source)) {
-            this["lexical"] = 0;
-        }
-        if (!("vector" in $$source)) {
-            this["vector"] = 0;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new SearchHitView instance from a string or object.
-     */
-    static createFrom($$source: any = {}): SearchHitView {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new SearchHitView($$parsedSource as Partial<SearchHitView>);
-    }
 }
 
 /**
  * Settings is the app-level settings payload. Model providers live in
  * [ModelService] because they have their own deeper editing surface.
  */
-export class Settings {
+export interface Settings {
     "mode": string;
     "policy": string;
     "maxSteps": number;
@@ -629,115 +212,20 @@ export class Settings {
     "embeddingVendor": string;
     "embeddingModel": string;
     "workspace": string;
-    "recentWorkspaces": string[];
+    "recentWorkspaces": string[] | null;
     "onboarded": boolean;
-    "preferences": { [_ in string]?: string };
+    "preferences": { [_ in string]?: string } | null;
     "kbEmbedder": string;
-    "versions": { [_ in string]?: string };
-
-    /** Creates a new Settings instance. */
-    constructor($$source: Partial<Settings> = {}) {
-        if (!("mode" in $$source)) {
-            this["mode"] = "";
-        }
-        if (!("policy" in $$source)) {
-            this["policy"] = "";
-        }
-        if (!("maxSteps" in $$source)) {
-            this["maxSteps"] = 0;
-        }
-        if (!("contextLimit" in $$source)) {
-            this["contextLimit"] = 0;
-        }
-        if (!("embeddingVendor" in $$source)) {
-            this["embeddingVendor"] = "";
-        }
-        if (!("embeddingModel" in $$source)) {
-            this["embeddingModel"] = "";
-        }
-        if (!("workspace" in $$source)) {
-            this["workspace"] = "";
-        }
-        if (!("recentWorkspaces" in $$source)) {
-            this["recentWorkspaces"] = [];
-        }
-        if (!("onboarded" in $$source)) {
-            this["onboarded"] = false;
-        }
-        if (!("preferences" in $$source)) {
-            this["preferences"] = {};
-        }
-        if (!("kbEmbedder" in $$source)) {
-            this["kbEmbedder"] = "";
-        }
-        if (!("versions" in $$source)) {
-            this["versions"] = {};
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new Settings instance from a string or object.
-     */
-    static createFrom($$source: any = {}): Settings {
-        const $$createField7_0 = $$createType2;
-        const $$createField9_0 = $$createType7;
-        const $$createField11_0 = $$createType7;
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        if ("recentWorkspaces" in $$parsedSource) {
-            $$parsedSource["recentWorkspaces"] = $$createField7_0($$parsedSource["recentWorkspaces"]);
-        }
-        if ("preferences" in $$parsedSource) {
-            $$parsedSource["preferences"] = $$createField9_0($$parsedSource["preferences"]);
-        }
-        if ("versions" in $$parsedSource) {
-            $$parsedSource["versions"] = $$createField11_0($$parsedSource["versions"]);
-        }
-        return new Settings($$parsedSource as Partial<Settings>);
-    }
+    "versions": { [_ in string]?: string } | null;
 }
 
 /**
  * TestResult reports a connectivity probe outcome.
  */
-export class TestResult {
+export interface TestResult {
     "ok": boolean;
     "message": string;
     "latencyMs": number;
     "reply"?: string;
     "model"?: string;
-
-    /** Creates a new TestResult instance. */
-    constructor($$source: Partial<TestResult> = {}) {
-        if (!("ok" in $$source)) {
-            this["ok"] = false;
-        }
-        if (!("message" in $$source)) {
-            this["message"] = "";
-        }
-        if (!("latencyMs" in $$source)) {
-            this["latencyMs"] = 0;
-        }
-
-        Object.assign(this, $$source);
-    }
-
-    /**
-     * Creates a new TestResult instance from a string or object.
-     */
-    static createFrom($$source: any = {}): TestResult {
-        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new TestResult($$parsedSource as Partial<TestResult>);
-    }
 }
-
-// Private type creation functions
-const $$createType0 = CatalogModelView.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $Create.Array($Create.Any);
-const $$createType3 = kb$0.Stats.createFrom;
-const $$createType4 = ModeDefaultView.createFrom;
-const $$createType5 = ProviderModelView.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = $Create.Map($Create.Any, $Create.Any);

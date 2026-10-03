@@ -171,3 +171,28 @@ func TestReachableAvailabilityPointsAtNow(t *testing.T) {
 		t.Fatalf("NextFree = %v, want exactly at (%v)", a.NextFree, at)
 	}
 }
+
+// TestAvailabilitySaysTheSameActivityTheTickWrites pins P5. The header reads
+// state.CurrentActivity, which the tick sets through activityLabel, while
+// availability handed back block.Label for the very same moment. Two surfaces
+// disagreeing about what she is doing is the exact disease we just spent a round
+// killing; one question gets one function.
+func TestAvailabilitySaysTheSameActivityTheTickWrites(t *testing.T) {
+	cases := []struct {
+		name   string
+		kind   string
+		weight int
+	}{
+		{"stalling heavy work", "work", 8},
+		{"unstarted light errand", "errand", 2},
+	}
+	for _, tc := range cases {
+		at := time.Date(2026, 9, 28, 10, 0, 0, 0, time.Local)
+		plan := mustPlan(t, blockSpec{kind: tc.kind, label: "约好的事", start: "09:00", end: "17:00", weight: tc.weight})
+		a := evaluate(DefaultState(at.UnixMilli()), func(time.Time) DayPlan { return plan }, at)
+		want := activityLabel(plan.blockAt(at))
+		if a.Activity != want {
+			t.Fatalf("%s: availability says %q while the tick writes %q", tc.name, a.Activity, want)
+		}
+	}
+}

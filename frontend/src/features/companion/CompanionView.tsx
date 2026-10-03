@@ -57,6 +57,7 @@ import type { ComposerMode } from "./model/composerMode";
 import { useInspectorState, type InspectorTab } from "./model/inspectorState";
 import { notableMetrics } from "./model/metricSalience";
 import { useCompanionStore } from "./model/companionStore";
+import { useTranscriptWindow } from "./model/useTranscriptWindow";
 
 const { Text, Title } = Typography;
 const NOTICE_KEY = "hitk.companion.notice.v1";
@@ -82,6 +83,14 @@ export function CompanionView() {
   const [noticeOpen, setNoticeOpen] = useState(() => localStorage.getItem(NOTICE_KEY) !== "1");
   const [memoryEditor, setMemoryEditor] = useState<CompanionMemory | null>(null);
   const [memoryModalOpen, setMemoryModalOpen] = useState(false);
+
+  // 旁白不是消息，但要在转录里按时间占住它那一行，所以在这里并进同一份列表。
+  const transcript = useMemo(
+    () => mergeDirectives(store.items, directives),
+    [store.items, directives],
+  );
+  // 只渲染尾部一截，滚到顶再往前补。打开即贴底，往上翻时不再被新消息拽走。
+  const win = useTranscriptWindow(transcript, activeId ?? "", store.buffers);
 
   const refresh = useCallback(async () => {
     // 抓住发起时的角色，回来时若已切走就整批丢弃，避免旧角色数据盖到新角色上。
@@ -188,6 +197,8 @@ export function CompanionView() {
     setSending(true);
     useCompanionStore.getState().setError("");
     useCompanionStore.getState().setRunning(true);
+    // 自己刚发的话当然要看见，先把贴底打开，消息一落地就跟上去。
+    win.scrollToBottom();
     try {
       const task = await companionRepository.submitTurn(
         text,
@@ -203,13 +214,14 @@ export function CompanionView() {
       useCompanionStore.getState().setRunning(false);
       useCompanionStore.getState().setError(errorText(err));
     }
-  }, [models.active, profile?.reasoningEffort]);
+  }, [models.active, profile?.reasoningEffort, win]);
 
   // 导演模式不往对话里塞用户消息，只写台账。旁白行是台账合成出来的，
   // 所以这里发完只要把台账拉回来一次，剩下的交给 task.updated。
   const sendDirective = useCallback(async (text: string) => {
     setSending(true);
     useCompanionStore.getState().setError("");
+    win.scrollToBottom();
     try {
       await companionRepository.submitDirective(
         text,
@@ -337,11 +349,6 @@ export function CompanionView() {
   );
 
   const onlyOneCharacter = characters.length <= 1;
-  // 旁白不是消息，但要在转录里按时间占住它那一行，所以在这里并进同一份列表。
-  const transcript = useMemo(
-    () => mergeDirectives(store.items, directives),
-    [store.items, directives],
-  );
   const deleteDisabled = onlyOneCharacter || sending;
   const deleteTooltip = onlyOneCharacter
     ? "至少保留一个角色"
@@ -462,7 +469,11 @@ export function CompanionView() {
 
       <div className={`hitk-companion-body${inspector.collapsed ? " is-collapsed" : ""}`}>
         <section className="hitk-companion-conversation" aria-label={`与${profile.name}的对话`}>
-          <div className="hitk-companion-messages">
+          <div
+            className="hitk-companion-messages"
+            ref={win.scrollRef}
+            onScroll={win.onScroll}
+          >
             {transcript.length === 0 ? (
               <div className="hitk-companion-empty">
                 <span className="hitk-companion-empty-mark"><HeartOutlined /></span>
@@ -471,7 +482,7 @@ export function CompanionView() {
               </div>
             ) : (
               <ConversationMessages
-                items={transcript}
+                items={win.visible}
                 buffers={store.buffers}
                 running={store.running || sending}
                 modelLabel={models.activeLabel}

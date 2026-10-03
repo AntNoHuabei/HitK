@@ -43,6 +43,19 @@
 **I6 · 睡着会清掉场景。**
 `settleConsciousness` 在置入睡 latch 的同时把 `SceneStage`/`ConsentState` 归零。人不可能在睡着的同时还在对话场景里。
 
+**I44 · 睡眠的"已开始"只能由上一天传递过来，不许在写计划时预置。**
+`buildDayPlan` 的头睡块必须 `StartedAt == 0`。跨午夜是否仍在睡，唯一由 `carrySleepFrom(prev)` 决定 —— 它只在**昨天的最后一个块是已开始的睡眠块**时才把 `StartedAt` 传过来。
+写计划时预置 `StartedAt = 当日零点` 会让每一天都从"她在睡"开始：熬夜聊天的她约二十分钟后被读成睡着，手机硬拦到早上，而 `updateSleepLedger` 看见"已开始的睡眠"开始**还债**，熬夜反而治好了困。这条一破，`NoteSleepStart` 也永远不触发，晚睡连击形同虚设。
+
+**I45 · 醒来时刻从"下一天的计划"读，不许把 1440 当闹钟。**
+尾睡块 `→ 1440`，`minuteInDay(at, 1440)` 就是当天午夜。直接返回它会在忙线卡上印出「预计 00:00 醒」，并把消息停在一个说出口就假的承诺上。`nextWakeAt` 遇到 `EndMinute >= 1440` 必须拿 `resolve(tomorrow)` 里那个开天睡眠块的 `EndMinute`。
+
+**I49 · 睡眠账本跟着意识走，不跟着 `StartedAt` 走。**
+只有 `consciousnessAt(...) == ConsciousAsleep` 才还债。睡块开始了不等于她睡着了 —— 躺下睡不着（正是 `ReasonBed`）的那几个小时必须继续记账，否则失眠在账面上不存在，她第二天精神好是假的。判据现算，不读 `state.Consciousness`（那个字段晚一个 tick）。
+
+**I50 · 睡眠排在场景之前。**
+`evaluate` 里意识检查必须在 `sceneLive` 之前。I6 只守住了 tick 那一侧的 `settleConsciousness`，而 `applyTurnBrief` 能在她睡着的这一轮里写进一个 `SceneStage`。场景优先的写法会让屏幕变成：头部显示睡眠中、忙线卡不出、强制按钮灰着（`CanForceReply` 读意识），但新消息她照样回。生理事实排在叙事前面。源头也守：她睡着时 `applyTurnBrief` 直接把 `SceneStage` 压成 `none`。
+
 ### 可达性三问
 
 **I39 · 「能不能收到」「隔多久回」「能回成什么样」是三个问题，必须分开答。**
@@ -66,6 +79,9 @@
 **I43 · 冷消息与已承诺消息的规则必须读同一份 `evaluate`。**
 `admitNew`（宽松：未开始的重块正是找得着她的时侯）与 `releaseEarly`（严格：只认场景、轻块、床上没睡）是同一份事实的两个投影，不许再各自手写一份规则。以前它们是两处独立代码，靠人肉保持不漂移 —— 那正是 bug 的产地。
 
+**I51 · 「她在做什么」只由 `activityLabel(block)` 产出。**
+tick 写 `state.CurrentActivity` 用它，`evaluate` 的 light / stalling 分支也用它。以前可用性返回 `block.Label`，于是同一个未开始的重块，头部说「还没开始，先拖着」、可用性说「上班」—— 刚花一轮治掉的病换了个字段又长回来。
+
 ### 日程与力
 
 **I7 · 不存在"非去不可"的行程。**
@@ -73,6 +89,25 @@
 
 **I8 · 触发公式固定为 `need - reluctance >= 60 - weight*3`。**
 见 `fireThreshold`。权重 10 → 阈值 30；权重 6 → 阈值 42。改这个数字等于改她的性格，必须同步改测试。
+
+**I47 · 每一个块类型都必须有 `driveSpec`。**
+查不到 spec 时 `ShouldStart` 返回 `true`（fail-open：宁可让她做，也别冻住一整天）。这意味着漏配一个 kind 不会报错，只会把它**静默变成"一定做"**，权重旋钮对它彻底失效。`commitment.Kind` 是从承诺直通到块的、没有归一化，所以承诺白名单里每一个 kind 都算数。`TestEveryNamedBlockKindHasADriveSpec` 枚举全部词表（承诺白名单 ∪ 身体模板 ∪ 规则词表）钉住这条，加新 kind 时它先响。
+
+**I48 · 睡眠窗口只从计划读。**
+`sleepWindowOf(plan)` 从当天那两个睡眠块取上床点和闹钟点，它们已经带了日历偏移与每日 jitter。不许再留一份硬编码的 23:30 / 07:30：那会让账本在她计划上床之前一小时就开始计债，让一个合法睡到 00:30 的周末被记成晚睡、连着几天把 `moodValence` 压下去。晚睡连击同理走 `minutesLateForBlock` —— 量的是她对自己上床点的迟到，不是对 23:30 的迟到。
+
+**I52 · 亲密的沉浸度只从场景来，不从块来。**
+亲密不是日程块：计划生成器不产 `intimacy` 块，承诺白名单里也没有它。它是 `SceneStage` / `SceneStartedAt`，由对话推进、由 `advanceSceneByWallClock` 衰减。所以 `flowBoost` 里**不许**出现 `case "intimacy"` —— 那是一条没有代码路径能到达的"活源"声明，正是它让整张表变得不可信。沉浸度走 `sceneFlow(state, at)`。
+`driveSpecs["intimacy"]` 保留是防御性的：词表里有这个名字，漏 spec 会 fail-open（I47）。但它今天没有生产者，别把它当成"她日程里有个亲密时段"。
+
+**I53 · 场景时间窗只有 `sceneHorizon` 一份。**
+`active` / `climax` / `aftercare` 是 3 小时，`flirt` 是 6 小时，只写在 `sceneHorizon(stage)` 里。`sceneLive`（可达性）、`advanceSceneByWallClock`（衰减）、`sceneFlow`（沉浸度）三个都读它。之前 3 小时在两个函数里各写一遍，改一处忘一处就会让同一个阶段对一个是过期的、对另一个还是当前的。
+
+**I54 · 沉浸取最大值，不相加。**
+一个场景压在一个已启动的 work 块上，是一个人处在一个状态里，不是两股沉浸叠加。`UpdateDrives` 取 `max(flowBoost(block.Kind), sceneFlow(state, at))`。相加会让"边上班边调情"比真正投入一件事还上头。
+
+**I55 · flirt 有沉浸度，但永远不可达。**
+调情是一条敞着的线，不是扣住她的人 —— 她可以一边调情一边做饭。`sceneFlow` 给它 8（active 的四分之一），`sceneLive` 明确把它排除。别为了"让她回消息慢一点"把 flirt 塞进 `sceneLive`：那是可达性语义，不是沉浸度语义，混起来会让她在明明能回的时候演出忙线卡。
 
 **I9 · 计划是记录，不是查询。**
 `DayPlan` 第一次被碰到时物化落盘，之后由 `ApplyDrift` 就地编辑。`Revision` 递增表示"今天被现实改过"。不要每 tick 重建当天的 plan，那会让已开始的块被读成未开始。
@@ -113,6 +148,9 @@
 
 **I20 · 相对时间必须在模型侧换算成绝对日期。**
 Go 侧只接受 `YYYY-MM-DD`，解不出来就丢弃。对齐 prompt 必须带上今天与后续若干天的日历条，模型才解得动「初六」「节前」「下周三」。
+
+**I46 · `LastUserAt` 只有 `TriggerUser` 能写。**
+`relationship.absenceHours` 直接读这个字段。她自己的主动消息（`TriggerProactive`）把它拨回零，等于替他答了「我在」：思念和孤独再也长不起来，下一轮对齐还会拿到「自然延续上次话题，不要说好久不见」，而他其实一天多没回。导演指令同理不算（I32）。她找他而他没有回，恰恰是 absence 该继续涨的那种情况。
 
 ### 多角色
 
@@ -377,7 +415,7 @@ Key 规则：
 
 ### `buildDayPlan` 的落块顺序（顺序即优先级，不要重排）
 
-1. **头睡** `0 → wake`，`StartedAt = 当日零点`。跨午夜的睡眠在写下的那一刻就已经在进行，不预置会被读成"整夜赖床没睡"，既可达又欠债不还。
+1. **头睡** `0 → wake`，**`StartedAt` 留空**（I44）。跨午夜是否仍在睡交给 `carrySleepFrom` 从昨天传过来，不在这里预置。
 2. **承诺**，按开始时间排序逐条落：
    - `takesPrecedence` + `carve`：严格更重的块抢下这个时段并把一天劈开（考试 11:30 穿过工作日，而不是被推到工作日之后）。
    - 被压过的排在已有块后面（`start = max(start, cursor)`）。
@@ -426,21 +464,39 @@ fire      = need - reluctance
 | meal | `40 + hunger*0.6` | `anxiety*0.6 + cognitiveLoad*0.4` |
 | work | `dutyFromBlock * 100` | `(100-motivation)*0.5 + cognitiveLoad*0.5` |
 | social | `30 + loneliness*0.7` | `100 - socialEnergy` |
-| intimacy | `libido` | `fatigue` |
+| intimacy † | `libido` | `fatigue` |
 | open | `boredom` | `flow` |
+| commute | `75` | `fatigue*0.5 + anxiety*0.3` |
+| exam | `85 + dutyFromBlock*15` | `anxiety*0.6 + fatigue*0.4` |
+| dinner | `60 + hunger*0.6` | `anxiety*0.6 + cognitiveLoad*0.4` |
+| trip | `80 + dutyFromBlock*15` | `fatigue*0.4 + anxiety*0.4` |
+| errand | `74` | `fatigue*0.5 + anxiety*0.2` |
+| user | `85` | `flow*0.4 + fatigue*0.3` |
+| morning | `70` | `fatigue*0.5` |
+| break | `60 + boredom*0.3` | `flow*0.5` |
+| hobby / game | `65 + boredom*0.5` | `fatigue*0.3` |
+| rest | `70` | `fatigue*0.4` |
 
 **注意那些常数下限。** `meal` 的 40 和 `social` 的 30 是"到点坐下"的习惯。纯靠原始指标过不了权重 6 的门槛，会让她永久不出门、不吃午饭。
 
-**没有 `driveSpec` 的块类型 `ShouldStart` 返回 `true`**（无条件开始）。加新块类型必须同时加驱动，否则它会无条件触发。
+**`user` 和 `exam` 是"大概率做"，不是"一定做"。** 前者常驻需求最高（他亲口约的），唯一能把她拉走的是正陷在别的事里；后者重到几乎跳不掉，但焦虑和疲惫拉满时照样告吹。这正是权重模型的本意（I7）。
+
+**漏配 `driveSpec` 会静默 fail-open，见 I47。** 守它的是 `TestEveryNamedBlockKindHasADriveSpec`。
+
+**† `intimacy` 今天没有生产者。** 亲密走场景不走块，这一行留着只是防 fail-open（I52）。
 
 ### 两个专用指标
 
-- **`flow`（沉浸度）** 半衰期 90 分钟（`flowDecayPerHour = 0.46`），由当前已启动块的 `flowBoost` 喂（hobby 26 / intimacy 30 / social 18 / work 10 / meal 6）。
+- **`flow`（沉浸度）** 半衰期 90 分钟（`flowDecayPerHour = 0.46`）。15 分钟 tick 下稳态 ≈ `boost × 2.3`。两个来源，取较大者（I54）：
+  - **已启动的块** `flowBoost`：hobby / game 26 · social 18 · work 10 · meal 6
+  - **活着的场景** `sceneFlow`：active / climax 30 · aftercare 14 · flirt 8
+
+  这两个数字的落差很要紧。**块这一侧最高只有 work 的 10，稳态约 23，而权重 10 的睡觉阈值是 30 —— 单靠日程永远拦不住她睡觉。** "我们正聊到兴头上，一看已经一点了"这种 P2 最想要的场景，只有场景那一路能到。场景本身受墙钟约束（I53），所以它买到的是"晚睡"，不是"不用睡"。
 - **`boredom`（无聊）** 空白期以 38/小时涨，一旦有事做按 60%/小时掉。
 
 ### 睡眠账本
 
-`SleepDebtMinutes` 过了锚点（23:30）还没睡就继续累积；睡着时按 `sleepRepayCap = 4h` 单次封顶偿还。
+"该睡的时段"从计划读（`sleepWindowOf(plan)`：当天尾睡块的 `StartMinute` 到当天头睡块的 `EndMinute`），不是硬编码的 23:30 / 07:30（I48）。"睡着"判的是 `consciousnessAt(...) == ConsciousAsleep`，不是 `StartedAt > 0`（I49）—— 躺下睡不着的那几个小时必须继续计债，否则失眠在账面上不存在，她第二天精神好是假的。
 
 **关键在于 flow 会衰减，欠债不会。** 熬到凌晨三点 flow 掉了债务还在涨，某一 tick 突然越过阈值当场崩倒。欠得多了可能一觉十三小时把第二天一起毁掉。`SleepStreak` 记连续晚睡，连续三天后额外压 `moodValence`。
 
@@ -465,6 +521,8 @@ consciousnessAt(state, plan, at):
 
 `sleepOnset = 18min + flow * 0.9`。
 
+`evaluate` 的分支顺序是**意识 → 场景 → 块规则**（I50）。意识排在场景之前不是可选项：睡着的人不会因为场景还挂着就能收到消息。
+
 latch 存在 `State` 上，但**是否仍算睡着每次现算**。latch 已置时只要她睡的那个块还没到 `EndMinute` 就还是睡，块一过立刻算醒。
 
 ### 三态可达性
@@ -475,7 +533,7 @@ latch 存在 `State` 上，但**是否仍算睡着每次现算**。latch 已置�
 | 躺床上还没睡着 | 是（刷手机时间） | 是 |
 | 睡着 | 否，消息排队到她醒 | **否，后端直接拒绝** |
 
-`nextWakeAt` 从 `asleepBlockID` 那块读 `EndMinute`；块被 drift 吃掉时退回当天 wake anchor。这个值就是忙线卡上「预计 HH:MM 醒」的来源。
+`nextWakeAt(state, plan, resolve, at)` 先用 `sleepBlockUnder` 找到她所属的睡眠块（眼下这块优先，找不到退回 `asleepBlockID` 那块），再读 `EndMinute`。`EndMinute >= 1440` 时**必须**用 `resolve(tomorrow)` 的开天睡眠块（I45）。这个值就是忙线卡上「预计 HH:MM 醒」的来源，也是 parked 消息等待的时刻。
 
 `settleConsciousness` 是意识字段的**唯一写入者**，在力更新之后跑，好让入睡检查读到本 tick 刚产生的 flow。
 
@@ -546,7 +604,7 @@ value 夹到 [min, max]
 
 按"改了会坏什么"排。
 
-1. **加新块类型** → 必须同时加 `driveSpecs` 条目。没有驱动的块 `ShouldStart` 返回 `true`，会无条件触发。
+1. **加新块类型** → 必须同时加 `driveSpecs` 条目，否则 `ShouldStart` fail-open 把它变成"一定做"，权重彻底失效（I47）。承诺白名单里的 kind 直通到块，加进白名单就得配驱动。
 2. **加指标** → 必须同时进 catalog 和 weights 两个 YAML，否则启动报错。若要进规则条件，还要加进 `validate()` 的 `validInputs`。
 3. **加日历效应** → 写在 `holidays.yaml` 的 `sleep_shift` / `mood` 里，不要在 Go 里硬编码数值。
 4. **不要把 `DayInfo` 缓存进 `State`。** 读现算（I2）。
@@ -568,6 +626,12 @@ value 夹到 [min, max]
 20. **清零 `UnrepliedProactive` 只认 `TriggerUser`。** 加新 trigger 时不要顺手清它，否则她自己的消息会把拦住自己的数抹掉。（I35）
 21. **加新 trigger 时必须回答「崩溃后它该不该重放」。** 在 `replayAfterCrash` 的 switch 里明确表态，别让它落到 `default` 悄悄退休，也别不加闸就重放。（I37）
 22. **前端别再用一个 `busy` 同时表达「回不了」和「正在回」。** 锁动作用 `turnInFlight`，说状态用 `parked` / `replying`。（I38）
+23. **不要在 `buildDayPlan` 里给头睡块写 `StartedAt`。** 跨午夜的睡眠只能由 `carrySleepFrom` 从昨天传过来，而且要对着**已存过的**计划也补传一次（明天计划常比她入睡早写好）。（I44）
+24. **`nextWakeAt` 不许把 `EndMinute == 1440` 直接换算成时刻。** 那是当天午夜，不是闹钟，必须查下一天的开天睡眠块。（I45）
+25. **加新 trigger 时不要顺手写 `LastUserAt`。** 只有他真的出现了才算，她自己的主动消息和导演指令都不算。（I46）
+26. **不要把亲密当成一种日程块。** 沉浸度走 `sceneFlow`，`flowBoost` 里不许出现 `intimacy`。（I52）
+27. **改场景时长只改 `sceneHorizon`。** 在 `sceneLive` / `advanceSceneByWallClock` / `sceneFlow` 里各写一份小时数，迟早会分叉。（I53）
+28. **别把 flirt 加进 `sceneLive`。** 它可以有沉浸度，但不可以让她不可达。（I55）
 
 ---
 
@@ -576,6 +640,19 @@ value 夹到 [min, max]
 | 不变量 | 守它的测试 |
 |---|---|
 | I4/I5/I6 意识硬闸 | [consciousness_test.go](../internal/companion/consciousness_test.go) |
+| I44 头睡不预置 / 跨午夜不误睡 | `TestOpeningSleepStartsUnclaimed` / `TestFreshPlanAfterMidnightKeepsHerReachable` / `TestMidnightAloneDoesNotKnockHerOut` |
+| I45 醒来时刻不落在午夜 | `TestAsleepBlocksReplyAndNamesTheWakeTime` / `TestSleepCarriedIntoTheNewDayWakesTomorrow` / `TestWakesInsideTheDayFromTheOpeningBlock` |
+| I46 absence 只由用户 turn 推进 | `TestProactiveTurnIsNotSomeoneShowingUp` / `TestUserTurnStillCountsAsSomeoneShowingUp` |
+| I47 每个 kind 都有驱动 / fail-open 不再静默 | `TestEveryNamedBlockKindHasADriveSpec` / `TestExamIsHeavyButNotUnmissable` / `TestUserRequestedPlanStillYieldsToImmersion` |
+| I48 睡眠窗口与晚睡量都跟计划走 | `TestLateStreakFollowsHerOwnBedtime` |
+| I49 躺着没睡不还债 | `TestLyingAwakeInBedStillAccruesDebt` / `TestSleepDebtGrowsWhileAwakeInTheWindow` |
+| I50 睡眠排在场景之前 | `TestSleepBeatsALiveScene` / `TestTurnCannotOpenASceneWhileSheIsAsleep` |
+| I51 活动名只有一个来源 | `TestAvailabilitySaysTheSameActivityTheTickWrites` |
+| I52 亲密只从场景喂沉浸度 | `TestIntimacyIsNotAFlowBoostingBlockKind` / `TestSceneReachesImmersionNoBlockCan` |
+| I53 场景时间窗单一来源 | `TestSceneFlowDiesWithTheSceneClock` |
+| I54 沉浸取最大不相加 | `TestSceneDoesNotStackOnTopOfAStartedBlock` |
+| I55 flirt 有沉浸但不可达 | `TestFlirtFeedsFlowWithoutEverHoldingHer` |
+| 沉浸拦得住觉，但欠债照样赢 | `TestSceneReachesImmersionNoBlockCan` / `TestDebtStillWinsMidScene` |
 | I8 触发公式 / 三股力 | [drives_test.go](../internal/companion/drives_test.go) |
 | I9/I10 计划记录与忙线承诺 | [schedule_test.go](../internal/companion/schedule_test.go) |
 | I12/I13/I14/I15/I16 日历 | [calendar_test.go](../internal/companion/calendar_test.go) |

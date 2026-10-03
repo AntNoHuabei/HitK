@@ -3,17 +3,10 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Create as $Create } from "@wailsio/runtime";
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
 import * as skillmodel$0 from "../skillmodel/models.js";
 
-export const RuntimeProgress = skillmodel$0.RuntimeProgress;
 export type RuntimeProgress = skillmodel$0.RuntimeProgress;
 
-export const RuntimeStatus = skillmodel$0.RuntimeStatus;
 export type RuntimeStatus = skillmodel$0.RuntimeStatus;
 
-export const SkillEnvironmentStatus = skillmodel$0.SkillEnvironmentStatus;
 export type SkillEnvironmentStatus = skillmodel$0.SkillEnvironmentStatus;

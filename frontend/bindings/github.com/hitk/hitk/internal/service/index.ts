@@ -18,7 +18,7 @@ export {
     SettingsService
 };
 
-export {
+export type {
     ArtifactPreview,
     CatalogModelView,
     CatalogProviderView,

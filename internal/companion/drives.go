@@ -27,6 +27,24 @@ const (
 	// boredomRisePerHour fills an empty stretch in roughly the same window.
 	boredomRisePerHour = 38.0
 
+	// Scene immersion. A scene is not a scheduled block, it is a live
+	// conversation state with its own stages, so it feeds flow from the side
+	// rather than through the block table in flowBoost.
+	//
+	// Without this the deepest immersion she can reach comes from work (+10) and
+	// meals (+6), which settles around 23 against a weight 10 bedtime bar of 30.
+	// Nothing could ever talk her out of sleep, and "we were in the middle of
+	// something and it is one in the morning", the case the force model was
+	// built for, could not happen at all.
+	//
+	// Steady state is boost x 2.3 (flow decays 0.46/hour on a 15 minute tick), so
+	// active/climax lands near 69: enough to hold off a scheduled bedtime, not
+	// enough to survive hours of accumulated debt. Scenes are wall-clock bounded
+	// anyway, so this buys a late night rather than a night without sleep.
+	sceneFlowActive    = 30.0
+	sceneFlowAftercare = 14.0
+	sceneFlowFlirt     = 8.0
+
 	sleepNeedMinutes = 8 * 60
 	sleepRepayCap    = 4 * 60
 	// sleepAnchorMinute is 23:30 and wakeAnchorMinute is 07:30. Between them is the
@@ -89,6 +107,10 @@ var driveSpecs = map[string]driveSpec{
 		},
 	},
 	"intimacy": {
+		// Coverage rather than a live source. Nothing in the plan builder produces
+		// an intimacy block, but the kind is named in the vocabulary and a kind
+		// with no spec fails open into "always happens", so the shape stays here
+		// ready: libido pushes, fatigue pulls.
 		need: func(state State, _ scheduleBlock, _ time.Time) float64 {
 			return state.Metric(MetricLibido)
 		},
@@ -102,6 +124,109 @@ var driveSpecs = map[string]driveSpec{
 		},
 		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
 			return state.Metric(MetricFlow)
+		},
+	},
+	// Everything below was missing. A kind with no entry here makes ShouldStart
+	// return true, which silently turns a weighted thing into a thing that always
+	// happens. These are the kinds the plan builder can actually produce: the
+	// commitment whitelist (commitments.go) passes its Kind straight through to the
+	// block, and the body template adds the rest.
+	"commute": {
+		// Getting across town is pressing in the moment but not unmissable: dead
+		// tired and wound up, she stays home.
+		need: func(State, scheduleBlock, time.Time) float64 {
+			return 75
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFatigue)*0.5 + state.Metric(MetricAnxiety)*0.3
+		},
+	},
+	"exam": {
+		// The case the whole weight model was argued over. An exam is about as
+		// heavy as anything gets, and it still loses to a bad enough day. That is
+		// the difference between "certain to happen" and "important enough to
+		// usually happen".
+		need: func(_ State, block scheduleBlock, at time.Time) float64 {
+			return 85 + dutyFromBlock(block, at)*15
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricAnxiety)*0.6 + state.Metric(MetricFatigue)*0.4
+		},
+	},
+	"dinner": {
+		// A dinner is a meal with someone booked, so the floor sits above a plain
+		// one: she goes even without an appetite. A rough day still ruins it.
+		need: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return 60 + state.Metric(MetricHunger)*0.6
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricAnxiety)*0.6 + state.Metric(MetricCognitiveLoad)*0.4
+		},
+	},
+	"trip": {
+		need: func(_ State, block scheduleBlock, at time.Time) float64 {
+			return 80 + dutyFromBlock(block, at)*15
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFatigue)*0.4 + state.Metric(MetricAnxiety)*0.4
+		},
+	},
+	"errand": {
+		need: func(State, scheduleBlock, time.Time) float64 {
+			return 74
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFatigue)*0.5 + state.Metric(MetricAnxiety)*0.2
+		},
+	},
+	"user": {
+		// Something he asked her to do carries the highest standing need there is.
+		// The only thing that pulls her off it is being deep inside something else.
+		need: func(State, scheduleBlock, time.Time) float64 {
+			return 85
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFlow)*0.4 + state.Metric(MetricFatigue)*0.3
+		},
+	},
+	"morning": {
+		need: func(State, scheduleBlock, time.Time) float64 {
+			return 70
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFatigue) * 0.5
+		},
+	},
+	"break": {
+		need: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return 60 + state.Metric(MetricBoredom)*0.3
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFlow) * 0.5
+		},
+	},
+	"hobby": {
+		need: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return 65 + state.Metric(MetricBoredom)*0.5
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFatigue) * 0.3
+		},
+	},
+	"game": {
+		need: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return 65 + state.Metric(MetricBoredom)*0.5
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFatigue) * 0.3
+		},
+	},
+	"rest": {
+		need: func(State, scheduleBlock, time.Time) float64 {
+			return 70
+		},
+		reluctance: func(state State, _ scheduleBlock, _ time.Time) float64 {
+			return state.Metric(MetricFatigue) * 0.4
 		},
 	},
 }
@@ -165,14 +290,18 @@ func mealNeed(state State, _ scheduleBlock, _ time.Time) float64 {
 	return 40 + state.Metric(MetricHunger)*0.6
 }
 
-// flowBoost is how much a started block feeds immersion, which is what keeps her up
-// past her bedtime and keeps her out of boredom.
+// flowBoost is how much a started *block* feeds immersion, which is what keeps
+// her up past her bedtime and keeps her out of boredom.
+//
+// Intimacy is deliberately absent. It is not a block kind: the plan builder never
+// produces one and the commitment whitelist has no entry for it. Intimacy is a
+// scene, and scenes feed immersion through sceneFlow. Leaving a case for it here
+// would read as a live source of immersion that no code path can reach, which is
+// exactly the kind of dead claim that made this table hard to trust.
 func flowBoost(kind string) (float64, bool) {
 	switch kind {
 	case "hobby", "game":
 		return 26, true
-	case "intimacy":
-		return 30, true
 	case "social":
 		return 18, true
 	case "work":
@@ -184,20 +313,59 @@ func flowBoost(kind string) (float64, bool) {
 	}
 }
 
+// sceneFlow is the immersion a live scene puts on her. It reads the scene rather
+// than the schedule because that is where intimacy actually lives:
+// SceneStage and SceneStartedAt, moved by the conversation and by
+// advanceSceneByWallClock, never by the plan builder.
+//
+// Flirt runs at a quarter of the active rate. It is a thread left open rather
+// than a hold on her, she can flirt and cook dinner at once, so it nudges bedtime
+// without ever making her unreachable the way sceneLive draws that line.
+func sceneFlow(state State, at time.Time) float64 {
+	if state.SceneStartedAt <= 0 {
+		return 0
+	}
+	horizon, live := sceneHorizon(state.SceneStage)
+	if !live || at.Sub(time.UnixMilli(state.SceneStartedAt)) >= horizon {
+		return 0
+	}
+	switch state.SceneStage {
+	case "active", "climax":
+		return sceneFlowActive
+	case "aftercare":
+		return sceneFlowAftercare
+	case "flirt":
+		return sceneFlowFlirt
+	}
+	return 0
+}
+
 // UpdateDrives advances the two drive metrics and the sleep ledger by one tick. It
 // runs before the fire check so the tick reads the freshest forces.
-func UpdateDrives(state *State, block scheduleBlock, at time.Time) {
+//
+// It takes the plan as well as the block because the ledger has to ask whether she
+// is actually under, and that answer lives in the plan rather than in the block
+// alone. Without the plan the only proxy for "sleeping" is "the sleep block has
+// started", which is wrong for every hour she lies there unable to go under.
+func UpdateDrives(state *State, plan DayPlan, block scheduleBlock, at time.Time) {
 	if state.Metrics == nil {
 		return
 	}
 	hours := tickInterval.Hours()
 
 	flow := state.Metric(MetricFlow) * math.Exp(-flowDecayPerHour*hours)
+	// Whichever has her more absorbed wins. A scene on top of a work block is one
+	// person in one state, not two immersions summed.
+	boost := 0.0
 	if block.StartedAt > 0 {
-		if boost, ok := flowBoost(block.Kind); ok {
-			flow += boost * hours
+		if value, ok := flowBoost(block.Kind); ok && value > boost {
+			boost = value
 		}
 	}
+	if value := sceneFlow(*state, at); value > boost {
+		boost = value
+	}
+	flow += boost * hours
 	state.Metrics[MetricFlow] = clampFloat(flow, 0, 100)
 
 	// Boredom only climbs while nothing has her, and drains fast once something does.
@@ -209,14 +377,19 @@ func UpdateDrives(state *State, block scheduleBlock, at time.Time) {
 	}
 	state.Metrics[MetricBoredom] = clampFloat(boredom, 0, 100)
 
-	updateSleepLedger(state, block, at)
+	updateSleepLedger(state, plan, block, at)
 }
 
 // updateSleepLedger keeps the debt honest: sleeping pays it down at a capped rate,
 // staying up inside the sleep window keeps adding to it.
-func updateSleepLedger(state *State, block scheduleBlock, at time.Time) {
+func updateSleepLedger(state *State, plan DayPlan, block scheduleBlock, at time.Time) {
 	step := int(tickInterval / time.Minute)
-	if block.Kind == "sleep" && block.StartedAt > 0 {
+	// A started sleep block is not sleep. She can be inside one, having gotten into
+	// bed on schedule, and still be staring at the ceiling because flow will not let
+	// her go under. Paying the debt down through those hours is what makes
+	// "could not sleep" invisible and hands her a good morning she did not earn.
+	// Repayment follows consciousness, never the block's StartedAt.
+	if isSleepBlock(block) && consciousnessAt(*state, plan, at) == ConsciousAsleep {
 		room := sleepRepayCap - state.SleepRepaidMinutes
 		if room > 0 {
 			if step > room {
@@ -230,38 +403,63 @@ func updateSleepLedger(state *State, block scheduleBlock, at time.Time) {
 		}
 		return
 	}
-	if inSleepWindow(at) {
+	if inSleepWindow(plan, at) {
 		state.SleepDebtMinutes += step
 	}
 }
 
 func minuteOfDay(at time.Time) int { return at.Hour()*60 + at.Minute() }
 
-func inSleepWindow(at time.Time) bool {
-	minute := minuteOfDay(at)
-	return minute >= sleepAnchorMinute || minute < wakeAnchorMinute
+// sleepWindowOf reads the hours she is supposed to be asleep out of the plan
+// itself: the evening side is today's tail bedtime, the morning side is today's
+// alarm. Both already carry the calendar shift and the per-day jitter, so a 调休
+// Saturday and a 除夕 each get their own numbers instead of the constant the
+// template started from. Keeping a second, hardcoded definition of "should be
+// asleep" next to the one the schedule is built from is exactly the two-answers
+// disease I1 forbids: the ledger would start charging an hour before her planned
+// bedtime, and a weekend that legitimately runs to 00:30 would read as a late
+// night and quietly drag her mood down for days.
+func sleepWindowOf(plan DayPlan) (bed int, wake int) {
+	bed, wake = sleepAnchorMinute, wakeAnchorMinute
+	for _, block := range plan.Blocks {
+		if !isSleepBlock(block) {
+			continue
+		}
+		if block.StartMinute > 0 && block.EndMinute >= 1440 {
+			bed = block.StartMinute
+		}
+		if block.StartMinute == 0 && block.EndMinute > 0 {
+			wake = block.EndMinute
+		}
+	}
+	return bed, wake
 }
 
-// minutesPastSleepAnchor handles the wrap through midnight, so 01:30 reads as 120
-// minutes late. The other side of the anchor has to come back negative rather than
-// wrapping: 23:20 is early for bedtime, not 1430 minutes late, which is what a
-// blind wrap makes it.
-func minutesPastSleepAnchor(at time.Time) int {
+func inSleepWindow(plan DayPlan, at time.Time) bool {
+	bed, wake := sleepWindowOf(plan)
 	minute := minuteOfDay(at)
-	switch {
-	case minute >= sleepAnchorMinute:
-		return minute - sleepAnchorMinute
-	case minute < wakeAnchorMinute:
-		return (1440 - sleepAnchorMinute) + minute
-	default:
-		return minute - sleepAnchorMinute
+	return minute >= bed || minute < wake
+}
+
+// minutesLateForBlock is how far past the block's own planned start she actually
+// began it. Measuring against the block rather than a global anchor is what keeps
+// a weekend or a 除夕 from counting as a late night: she is late for her bedtime,
+// not for 23:30. The wrap covers the tail block that starts before midnight and
+// gets begun after it, so 01:30 against a 23:30 bedtime reads as 120. The other
+// side has to come back negative rather than wrapping: 23:20 is early for bed, not
+// 1430 minutes late, which is what a blind wrap makes it.
+func minutesLateForBlock(block scheduleBlock, at time.Time) int {
+	late := minuteOfDay(at) - block.StartMinute
+	if late < -720 {
+		late += 1440
 	}
+	return late
 }
 
 // NoteSleepStart records whether this night counts toward the late streak. Call it
-// once, when the sleep block actually begins.
-func NoteSleepStart(state *State, at time.Time) {
-	if minutesPastSleepAnchor(at) > sleepLateStreakMinute {
+// once, when the sleep block actually begins, with that block.
+func NoteSleepStart(state *State, block scheduleBlock, at time.Time) {
+	if minutesLateForBlock(block, at) > sleepLateStreakMinute {
 		state.SleepStreak++
 	} else {
 		state.SleepStreak = 0
@@ -316,19 +514,49 @@ func consciousnessAt(state State, plan DayPlan, at time.Time) Consciousness {
 	return ConsciousAwake
 }
 
+// sleepBlockUnder is the sleep block she belongs to at `at`: wherever the clock
+// says she is, falling back to the block she actually went under in. The fallback
+// keeps the answer meaningful after drift has moved the day around beneath her.
+func sleepBlockUnder(state State, plan DayPlan, at time.Time) (scheduleBlock, bool) {
+	if block := plan.blockAt(at); isSleepBlock(block) {
+		return block, true
+	}
+	return plan.blockByID(state.AsleepBlockID)
+}
+
+// planWakeTime reads the alarm out of a plan: the end of the sleep block that
+// opens the day.
+func planWakeTime(plan DayPlan, day time.Time) (time.Time, bool) {
+	for _, block := range plan.Blocks {
+		if isSleepBlock(block) && block.EndMinute > block.StartMinute {
+			return minuteInDay(day, block.EndMinute), true
+		}
+	}
+	return time.Time{}, false
+}
+
 // nextWakeAt is when she should surface, which is what the busy notice prints and
 // what a parked message waits on.
-func nextWakeAt(state State, plan DayPlan, at time.Time) time.Time {
-	block := plan.blockAt(at)
-	if isSleepBlock(block) {
+//
+// A bedtime that runs to the end of the day does not make midnight her alarm. The
+// night simply continues into tomorrow's plan, so the wake time has to be read
+// from there. Handing back minuteInDay(at, 1440) would print "预计 00:00 醒" and
+// park messages on a promise that is false the moment it is shown.
+func nextWakeAt(state State, plan DayPlan, resolve planResolver, at time.Time) time.Time {
+	block, ok := sleepBlockUnder(state, plan, at)
+	if !ok {
+		return minuteInDay(at, wakeAnchorMinute)
+	}
+	if block.EndMinute < 1440 {
 		return minuteInDay(at, block.EndMinute)
 	}
-	// Asleep with no sleep block under her means drift ate it. The block she went
-	// to sleep in still knows when it was going to end.
-	if asleep, ok := plan.blockByID(state.AsleepBlockID); ok {
-		return minuteInDay(at, asleep.EndMinute)
+	tomorrow := at.AddDate(0, 0, 1)
+	if resolve != nil {
+		if wake, ok := planWakeTime(resolve(tomorrow), tomorrow); ok && wake.After(at) {
+			return wake
+		}
 	}
-	return minuteInDay(at, wakeAnchorMinute)
+	return minuteInDay(tomorrow, wakeAnchorMinute)
 }
 
 // settleConsciousness owns the only writes to the consciousness fields. Falling

@@ -8,7 +8,7 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
+import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -22,54 +22,42 @@ import * as $models from "./models.js";
  * AddDirectory walks a folder and ingests every supported file.
  */
 export function AddDirectory(collectionID: string, dir: string, recursive: boolean): $CancellablePromise<$models.ImportResult> {
-    return $Call.ByID(1997745661, collectionID, dir, recursive).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(1997745661, collectionID, dir, recursive);
 }
 
 /**
  * AddFiles ingests an explicit list of file paths.
  */
-export function AddFiles(collectionID: string, paths: string[]): $CancellablePromise<$models.ImportResult> {
-    return $Call.ByID(1676794553, collectionID, paths).then(($result: any) => {
-        return $$createType0($result);
-    });
+export function AddFiles(collectionID: string, paths: string[] | null): $CancellablePromise<$models.ImportResult> {
+    return $Call.ByID(1676794553, collectionID, paths);
 }
 
 /**
  * AddText ingests pasted content.
  */
 export function AddText(collectionID: string, title: string, text: string): $CancellablePromise<$models.ImportResult> {
-    return $Call.ByID(57994629, collectionID, title, text).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(57994629, collectionID, title, text);
 }
 
 /**
  * AddURL ingests a web page.
  */
 export function AddURL(collectionID: string, url: string): $CancellablePromise<$models.ImportResult> {
-    return $Call.ByID(3446413159, collectionID, url).then(($result: any) => {
-        return $$createType0($result);
-    });
+    return $Call.ByID(3446413159, collectionID, url);
 }
 
 /**
  * Collections lists knowledge bases.
  */
-export function Collections(): $CancellablePromise<kb$0.Collection[]> {
-    return $Call.ByID(348026280).then(($result: any) => {
-        return $$createType2($result);
-    });
+export function Collections(): $CancellablePromise<kb$0.Collection[] | null> {
+    return $Call.ByID(348026280);
 }
 
 /**
  * CreateCollection adds a knowledge base.
  */
 export function CreateCollection(name: string, description: string): $CancellablePromise<kb$0.Collection> {
-    return $Call.ByID(2418757211, name, description).then(($result: any) => {
-        return $$createType1($result);
-    });
+    return $Call.ByID(2418757211, name, description);
 }
 
 /**
@@ -97,10 +85,8 @@ export function DocumentContent(documentID: string): $CancellablePromise<string>
 /**
  * Documents lists a knowledge base's documents.
  */
-export function Documents(collectionID: string): $CancellablePromise<kb$0.Document[]> {
-    return $Call.ByID(3841580399, collectionID).then(($result: any) => {
-        return $$createType4($result);
-    });
+export function Documents(collectionID: string): $CancellablePromise<kb$0.Document[] | null> {
+    return $Call.ByID(3841580399, collectionID);
 }
 
 /**
@@ -123,46 +109,27 @@ export function Reindex(): $CancellablePromise<void> {
  * exact same hybrid path the agent uses, so what a user sees here is what the
  * model will see.
  */
-export function Search(query: string, collectionID: string, limit: number): $CancellablePromise<$models.SearchHitView[]> {
-    return $Call.ByID(49576331, query, collectionID, limit).then(($result: any) => {
-        return $$createType6($result);
-    });
+export function Search(query: string, collectionID: string, limit: number): $CancellablePromise<$models.SearchHitView[] | null> {
+    return $Call.ByID(49576331, query, collectionID, limit);
 }
 
 /**
  * Stats summarizes the store for the sidebar footer.
  */
 export function Stats(): $CancellablePromise<kb$0.Stats> {
-    return $Call.ByID(174497070).then(($result: any) => {
-        return $$createType7($result);
-    });
+    return $Call.ByID(174497070);
 }
 
 /**
  * SupportedExtensions lists the ingestable file types for the import dialog.
  */
-export function SupportedExtensions(): $CancellablePromise<string[]> {
-    return $Call.ByID(1687041441).then(($result: any) => {
-        return $$createType8($result);
-    });
+export function SupportedExtensions(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(1687041441);
 }
 
 /**
  * UpdateCollection renames or re-describes a knowledge base.
  */
 export function UpdateCollection(id: string, name: string, description: string): $CancellablePromise<kb$0.Collection> {
-    return $Call.ByID(1539844066, id, name, description).then(($result: any) => {
-        return $$createType1($result);
-    });
+    return $Call.ByID(1539844066, id, name, description);
 }
-
-// Private type creation functions
-const $$createType0 = $models.ImportResult.createFrom;
-const $$createType1 = kb$0.Collection.createFrom;
-const $$createType2 = $Create.Array($$createType1);
-const $$createType3 = kb$0.Document.createFrom;
-const $$createType4 = $Create.Array($$createType3);
-const $$createType5 = $models.SearchHitView.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = kb$0.Stats.createFrom;
-const $$createType8 = $Create.Array($Create.Any);

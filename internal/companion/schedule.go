@@ -388,20 +388,22 @@ func (p *DayPlan) insertAt(i int, block scheduleBlock) {
 // carrySleepFrom marks this plan's opening sleep block as already running when the
 // day before it ended with her asleep. Without it, midnight silently resets a
 // started sleep back to "not begun", so she would appear to wake up every night at
-// exactly 00:00 and then have to fall asleep all over again.
-func (p *DayPlan) carrySleepFrom(prev DayPlan) {
+// exactly 00:00 and then have to fall asleep all over again. It reports whether it
+// changed anything, so the caller knows the plan on disk needs rewriting.
+func (p *DayPlan) carrySleepFrom(prev DayPlan) bool {
 	if len(p.Blocks) == 0 || len(prev.Blocks) == 0 {
-		return
+		return false
 	}
 	head := &p.Blocks[0]
 	if head.Kind != "sleep" || head.StartMinute != 0 || head.StartedAt > 0 {
-		return
+		return false
 	}
 	tail := prev.Blocks[len(prev.Blocks)-1]
 	if tail.Kind != "sleep" || tail.StartedAt == 0 {
-		return
+		return false
 	}
 	head.StartedAt = tail.StartedAt
+	return true
 }
 
 // clampDay keeps the plan inside one calendar day and drops anything that collapsed
@@ -683,15 +685,17 @@ func buildDayPlan(profile Profile, at time.Time, commitments []Commitment) DayPl
 	info := DayInfoAt(at)
 	kind := string(info.Kind)
 	wake, sleepStart := sleepWindow(profile, at, info)
-	midnight := time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, at.Location()).UnixMilli()
 
 	builder := &dayBuilder{}
-	// The sleep that spans midnight is already running when the day is written down,
-	// so it starts pre-claimed. Left unstarted it reads as "procrastinating in bed"
-	// all night: available to chat, and accruing debt instead of paying it off.
+	// The night that opens the day starts unclaimed. Whether she is really in it is
+	// carrySleepFrom's call, and it only hands a started sleep across when the day
+	// before ended with her asleep. Pre-claiming it here made every new day begin
+	// with her asleep from 00:00: chatting past midnight got her hard-blocked half
+	// an hour later, the ledger repaid debt instead of accruing it, and
+	// NoteSleepStart never fired, so late nights went uncounted.
 	builder.force(scheduleBlock{
 		Kind: "sleep", Label: "还在睡", Weight: 10, Origin: "body",
-		StartMinute: 0, EndMinute: wake, StartedAt: midnight,
+		StartMinute: 0, EndMinute: wake,
 	})
 
 	cursor := wake

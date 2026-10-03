@@ -320,17 +320,30 @@ func earlyRelease(state State, resolve planResolver, at time.Time) (bool, string
 	return releaseEarly(evaluate(state, resolve, at))
 }
 
+// sceneHorizon 是一个阶段从 SceneStartedAt 起还能算活着多久。这两个窗口只有这一份：
+// sceneLive 的可达性、advanceSceneByWallClock 的衰减、sceneFlow 喂给沉浸度的量，
+// 全都读它。之前 3 小时在两个函数里各写一遍，改一处忘一处就会让同一个阶段对一个是
+// 过期的、对另一个还是当前的，正是 I1 禁的那种病。
+func sceneHorizon(stage string) (time.Duration, bool) {
+	switch stage {
+	case "active", "climax", "aftercare":
+		return 3 * time.Hour, true
+	case "flirt":
+		return 6 * time.Hour, true
+	}
+	return 0, false
+}
+
 // sceneLive 报告场景是否仍在进行。时间边界写在这里而不是依赖 sceneStage 已被衰减，
 // 所以就算持久化的 stage 还没被 tick 更新过也不会误判成「还在进行中」。
+// flirt 不算 live：调情是一条敞着的线，不是扣住她的人，她可以一边调情一边做饭，
+// 所以它永远不该让她变得不可达。
 func sceneLive(state State, at time.Time) bool {
-	if state.SceneStartedAt <= 0 {
+	if state.SceneStartedAt <= 0 || state.SceneStage == "flirt" {
 		return false
 	}
-	switch state.SceneStage {
-	case "active", "climax", "aftercare":
-		return at.Sub(time.UnixMilli(state.SceneStartedAt)) < 3*time.Hour
-	}
-	return false
+	horizon, live := sceneHorizon(state.SceneStage)
+	return live && at.Sub(time.UnixMilli(state.SceneStartedAt)) < horizon
 }
 
 func conservativeTurnBrief(state State, at time.Time, activity, availabilityNote string, available bool, nextAt int64, reason string) TurnBrief {
@@ -393,16 +406,20 @@ func advanceSceneByWallClock(state *State, at time.Time) bool {
 		return false
 	}
 	elapsed := at.Sub(time.UnixMilli(state.SceneStartedAt))
+	horizon, live := sceneHorizon(state.SceneStage)
+	if !live {
+		return false
+	}
 	changed := false
 	switch state.SceneStage {
 	case "flirt":
-		if elapsed >= 6*time.Hour {
+		if elapsed >= horizon {
 			state.SceneStage = "none"
 			state.ConsentState = "not_applicable"
 			changed = true
 		}
 	case "active", "climax":
-		if elapsed >= 3*time.Hour {
+		if elapsed >= horizon {
 			state.SceneStage = "none"
 			state.ConsentState = "not_applicable"
 			changed = true
@@ -411,7 +428,7 @@ func advanceSceneByWallClock(state *State, at time.Time) bool {
 			changed = true
 		}
 	case "aftercare":
-		if elapsed >= 3*time.Hour {
+		if elapsed >= horizon {
 			state.SceneStage = "none"
 			state.ConsentState = "not_applicable"
 			changed = true

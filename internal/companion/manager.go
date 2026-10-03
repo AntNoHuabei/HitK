@@ -190,18 +190,29 @@ func (m *Manager) logWarn(message string, args ...any) {
 // fresh lookup.
 func (m *Manager) planAt(profile Profile, at time.Time) DayPlan {
 	date := at.Format("2006-01-02")
-	if plan, ok, err := m.store.DayPlan(m.id, date); err == nil && ok {
-		return plan
+	plan, found, err := m.store.DayPlan(m.id, date)
+	if err != nil {
+		m.logWarn("companion day plan read failed", "date", date, "err", err.Error())
+		return m.dayPlanFor(profile, at)
 	}
-	plan := m.dayPlanFor(profile, at)
+	needsSave := !found
+	if !found {
+		plan = m.dayPlanFor(profile, at)
+	}
 	// A day that begins while she is still asleep inherits that sleep rather than
 	// starting a fresh unstarted one, so she does not wake at midnight and have to
-	// fall asleep again.
-	if prev, ok, err := m.store.DayPlan(m.id, at.AddDate(0, 0, -1).Format("2006-01-02")); err == nil && ok {
-		plan.carrySleepFrom(prev)
+	// fall asleep again. This has to run against stored plans too, not just freshly
+	// built ones: tomorrow's plan is often written down hours before she actually
+	// goes under in today's tail block, and a plan already on disk would otherwise
+	// never inherit the sleep and would read as "awake, not yet started" all night.
+	prevDate := at.AddDate(0, 0, -1).Format("2006-01-02")
+	if prev, ok, prevErr := m.store.DayPlan(m.id, prevDate); prevErr == nil && ok && plan.carrySleepFrom(prev) {
+		needsSave = true
 	}
-	if err := m.store.SaveDayPlan(m.id, plan); err != nil {
-		m.logWarn("companion day plan persist failed", "date", date, "err", err.Error())
+	if needsSave {
+		if err := m.store.SaveDayPlan(m.id, plan); err != nil {
+			m.logWarn("companion day plan persist failed", "date", date, "err", err.Error())
+		}
 	}
 	return plan
 }
@@ -283,7 +294,7 @@ func (m *Manager) knownMetrics() map[MetricID]bool {
 func (m *Manager) consciousnessNow(profile Profile, state State, at time.Time) (Consciousness, time.Time) {
 	plan := m.planAt(profile, at)
 	if consciousnessAt(state, plan, at) == ConsciousAsleep {
-		return ConsciousAsleep, nextWakeAt(state, plan, at)
+		return ConsciousAsleep, nextWakeAt(state, plan, m.resolver(profile), at)
 	}
 	return ConsciousAwake, time.Time{}
 }
@@ -725,11 +736,11 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		effects = mergeEffects(effects, MoodEffectsAt(stepTime))
 		// Forces are advanced before the fire check so this step reads the freshest
 		// need and reluctance rather than the ones it walked in with.
-		UpdateDrives(&state, block, stepTime)
+		UpdateDrives(&state, plan, block, stepTime)
 		if block.StartedAt == 0 && !block.Missed && ShouldStart(state, block, stepTime) {
 			if plan.markStarted(block.ID, stepTime) {
-				if block.Kind == "sleep" {
-					NoteSleepStart(&state, stepTime)
+				if isSleepBlock(block) {
+					NoteSleepStart(&state, block, stepTime)
 				}
 				plans[plan.Date] = plan
 				block = plan.blockAt(stepTime)

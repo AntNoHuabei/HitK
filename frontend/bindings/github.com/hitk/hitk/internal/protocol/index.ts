@@ -3,20 +3,23 @@
 
 export {
     ApprovalPolicy,
+    EventKind,
+    ItemStatus,
+    ItemType,
+    Mode,
+    OpKind
+} from "./models.js";
+
+export type {
     ApprovalRequest,
     Artifact,
     Attachment,
     CompanionReply,
     Delta,
     Event,
-    EventKind,
     InputPart,
     Item,
-    ItemStatus,
-    ItemType,
-    Mode,
     Op,
-    OpKind,
     Reference,
     Thread,
     ThreadSummary,

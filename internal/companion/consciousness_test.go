@@ -130,7 +130,20 @@ func TestWakingClearsTheLatch(t *testing.T) {
 func TestAsleepBlocksReplyAndNamesTheWakeTime(t *testing.T) {
 	at := time.Date(2030, 9, 30, 23, 30, 0, 0, time.Local)
 	plan := nightPlan(t, at.Add(-40*time.Minute))
-	resolve := func(time.Time) DayPlan { return plan }
+	// Her bedtime runs to the end of the day, so midnight is not her alarm. The
+	// night continues into tomorrow's plan and the alarm lives in that opening
+	// sleep block. Printing 00:00 would park a message on a promise that is false
+	// the moment it is shown.
+	tomorrow := mustPlan(t,
+		blockSpec{kind: "sleep", label: "还在睡", start: "00:00", end: "07:30", weight: 10},
+		blockSpec{kind: "open", label: "早上空着", start: "07:30", end: "12:00", weight: 1},
+	)
+	resolve := func(day time.Time) DayPlan {
+		if day.Day() == at.Day() {
+			return plan
+		}
+		return tomorrow
+	}
 
 	available, activity, notBefore := taskAvailability(DefaultState(at.UnixMilli()), resolve, at)
 	if available {
@@ -139,10 +152,178 @@ func TestAsleepBlocksReplyAndNamesTheWakeTime(t *testing.T) {
 	if activity != "她在睡觉" {
 		t.Fatalf("activity = %q, want 她在睡觉", activity)
 	}
-	want := time.Date(2030, 9, 30, 24, 0, 0, 0, time.Local).UnixMilli()
+	want := time.Date(2030, 10, 1, 7, 30, 0, 0, time.Local).UnixMilli()
 	if notBefore != want {
-		t.Fatalf("wake time = %v, want the block end %v",
-			time.UnixMilli(notBefore).Format("15:04"), time.UnixMilli(want).Format("15:04"))
+		t.Fatalf("wake time = %v, want tomorrow's alarm %v",
+			time.UnixMilli(notBefore).Format("01-02 15:04"), time.UnixMilli(want).Format("01-02 15:04"))
+	}
+}
+
+// TestWakesInsideTheDayFromTheOpeningBlock covers the other half: when the sleep
+// block ends before midnight the alarm is same-day, no lookup into tomorrow.
+func TestWakesInsideTheDayFromTheOpeningBlock(t *testing.T) {
+	at := time.Date(2030, 10, 1, 2, 0, 0, 0, time.Local)
+	plan := mustPlan(t,
+		blockSpec{kind: "sleep", label: "还在睡", start: "00:00", end: "07:30", weight: 10},
+		blockSpec{kind: "open", label: "早上空着", start: "07:30", end: "12:00", weight: 1},
+	)
+	plan.markStarted("b_0", at.Add(-2*time.Hour))
+
+	_, _, notBefore := taskAvailability(DefaultState(at.UnixMilli()), func(time.Time) DayPlan { return plan }, at)
+	want := time.Date(2030, 10, 1, 7, 30, 0, 0, time.Local).UnixMilli()
+	if notBefore != want {
+		t.Fatalf("wake time = %v, want %v",
+			time.UnixMilli(notBefore).Format("01-02 15:04"), time.UnixMilli(want).Format("01-02 15:04"))
+	}
+}
+
+// TestOpeningSleepStartsUnclaimed is the root of the midnight bug: a freshly built
+// day used to come with its opening sleep already started, so every new day began
+// with her "asleep" from 00:00 whether she was or not. Only carrySleepFrom, which
+// reads how the day before actually ended, gets to start it.
+func TestOpeningSleepStartsUnclaimed(t *testing.T) {
+	now := time.Date(2030, 9, 30, 21, 0, 0, 0, time.Local)
+	profile := DefaultProfile(now.UnixMilli())
+	plan := buildDayPlan(profile, now, defaultCommitments(profile))
+	if len(plan.Blocks) == 0 {
+		t.Fatal("empty plan")
+	}
+	head := plan.Blocks[0]
+	if head.Kind != "sleep" {
+		t.Fatalf("head block kind = %q, want sleep", head.Kind)
+	}
+	if head.StartedAt != 0 {
+		t.Fatalf("opening sleep came pre-started at %d; only carrySleepFrom may start it", head.StartedAt)
+	}
+}
+
+// TestMidnightAloneDoesNotKnockHerOut is the failure a user actually sees: she is
+// still awake chatting when the day rolls over, and crossing 00:00 must not turn
+// into "她在睡觉" half an hour later with the phone hard-blocked until morning.
+func TestMidnightAloneDoesNotKnockHerOut(t *testing.T) {
+	manager := openTestManager(t)
+	profile, err := manager.store.Profile(manager.ID())
+	if err != nil {
+		t.Fatalf("profile: %v", err)
+	}
+
+	prev := mustPlan(t,
+		blockSpec{kind: "open", label: "晚上空着", start: "18:00", end: "23:00", weight: 1},
+		blockSpec{kind: "sleep", label: "该睡了", start: "23:00", end: "24:00", weight: 10},
+	)
+	prev.Date = "2030-09-30"
+	if err := manager.store.SaveDayPlan(manager.ID(), prev); err != nil {
+		t.Fatalf("save prev: %v", err)
+	}
+	today := mustPlan(t,
+		blockSpec{kind: "sleep", label: "还在睡", start: "00:00", end: "07:30", weight: 10},
+		blockSpec{kind: "open", label: "早上空着", start: "07:30", end: "12:00", weight: 1},
+	)
+	today.Date = "2030-10-01"
+	if err := manager.store.SaveDayPlan(manager.ID(), today); err != nil {
+		t.Fatalf("save today: %v", err)
+	}
+
+	at := time.Date(2030, 10, 1, 0, 40, 0, 0, time.Local)
+	state := DefaultState(at.UnixMilli())
+	// She is not sleepy yet and she is busy talking, which is exactly the case the
+	// pre-started block used to steamroll.
+	state.Metrics[MetricSleepPressure] = 30
+	state.Metrics[MetricFlow] = 60
+
+	if got, _ := manager.consciousnessNow(profile, state, at); got != ConsciousAwake {
+		t.Fatalf("consciousness = %s; crossing midnight alone must not put her to sleep", got)
+	}
+	if available, activity, _ := taskAvailability(state, manager.resolver(profile), at); !available {
+		t.Fatalf("blocked at %q after midnight without ever starting bedtime", activity)
+	}
+}
+
+// TestFreshPlanAfterMidnightKeepsHerReachable runs the whole path rather than a
+// hand-built plan: nothing is stored, so planAt builds today from the template, and
+// a low-flow, low-pressure state at 00:40 must leave her awake and reachable. The
+// pre-started opening block made this exact state read as asleep twenty minutes
+// after midnight, and worse, updateSleepLedger saw a started sleep and paid debt
+// down instead of charging it, so staying up cured her of being tired.
+func TestFreshPlanAfterMidnightKeepsHerReachable(t *testing.T) {
+	manager := openTestManager(t)
+	profile, err := manager.store.Profile(manager.ID())
+	if err != nil {
+		t.Fatalf("profile: %v", err)
+	}
+	at := time.Date(2030, 10, 1, 0, 40, 0, 0, time.Local)
+	state := DefaultState(at.UnixMilli())
+	state.Metrics[MetricSleepPressure] = 20
+	state.Metrics[MetricFatigue] = 15
+	state.Metrics[MetricFlow] = 5
+	state.LastTickAt = at.Add(-15 * time.Minute).UnixMilli()
+	if err := manager.store.SaveState(manager.ID(), state); err != nil {
+		t.Fatalf("save state: %v", err)
+	}
+
+	if got, _ := manager.consciousnessNow(profile, state, at); got != ConsciousAwake {
+		t.Fatalf("consciousness = %s; she never started bedtime", got)
+	}
+	if available, activity, _ := taskAvailability(state, manager.resolver(profile), at); !available {
+		t.Fatalf("blocked at %q while still awake after midnight", activity)
+	}
+
+	if err := manager.TickNow(context.Background(), at); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+	after, err := manager.store.State(manager.ID())
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if after.SleepDebtMinutes <= 0 {
+		t.Fatalf("sleep debt = %d; being awake past midnight should charge it, not repay it", after.SleepDebtMinutes)
+	}
+}
+
+// TestSleepCarriedIntoTheNewDayWakesTomorrow is the mirror case: she really did
+// start bedtime before midnight, so the new day inherits it and the alarm is read
+// from the carried block rather than from 00:00.
+func TestSleepCarriedIntoTheNewDayWakesTomorrow(t *testing.T) {
+	manager := openTestManager(t)
+	profile, err := manager.store.Profile(manager.ID())
+	if err != nil {
+		t.Fatalf("profile: %v", err)
+	}
+
+	prev := mustPlan(t,
+		blockSpec{kind: "open", label: "晚上空着", start: "18:00", end: "23:00", weight: 1},
+		blockSpec{kind: "sleep", label: "该睡了", start: "23:00", end: "24:00", weight: 10},
+	)
+	prev.Date = "2030-09-30"
+	prev.markStarted("b_1", time.Date(2030, 9, 30, 23, 40, 0, 0, time.Local))
+	if err := manager.store.SaveDayPlan(manager.ID(), prev); err != nil {
+		t.Fatalf("save prev: %v", err)
+	}
+	today := mustPlan(t,
+		blockSpec{kind: "sleep", label: "还在睡", start: "00:00", end: "07:30", weight: 10},
+		blockSpec{kind: "open", label: "早上空着", start: "07:30", end: "12:00", weight: 1},
+	)
+	today.Date = "2030-10-01"
+	if err := manager.store.SaveDayPlan(manager.ID(), today); err != nil {
+		t.Fatalf("save today: %v", err)
+	}
+
+	at := time.Date(2030, 10, 1, 0, 40, 0, 0, time.Local)
+	got, wakeAt := manager.consciousnessNow(profile, DefaultState(at.UnixMilli()), at)
+	if got != ConsciousAsleep {
+		t.Fatalf("consciousness = %s, want asleep", got)
+	}
+	if wakeAt.Format("01-02 15:04") != "10-01 07:30" {
+		t.Fatalf("wake = %s, want the carried block end 10-01 07:30", wakeAt.Format("01-02 15:04"))
+	}
+
+	// The carry has to land on disk, otherwise the next read forgets it again.
+	stored, ok, err := manager.store.DayPlan(manager.ID(), "2030-10-01")
+	if err != nil || !ok {
+		t.Fatalf("reload today: ok=%v err=%v", ok, err)
+	}
+	if stored.Blocks[0].StartedAt == 0 {
+		t.Fatal("carried sleep was not persisted")
 	}
 }
 
@@ -169,6 +350,63 @@ func TestAsleepNeverReleasedEarly(t *testing.T) {
 
 	if released, _ := earlyRelease(DefaultState(at.UnixMilli()), resolve, at); released {
 		t.Fatal("a parked message must not escape a sleeping character")
+	}
+}
+
+// TestSleepBeatsALiveScene closes the gap I6 leaves open. settleConsciousness clears
+// the scene when a tick puts her under, but a scene can still be staged while she is
+// asleep, and if availability read scene-first the screen would show her asleep, no
+// busy card, a greyed force button -- and still answer him. Unconscious beats
+// narrative, every time.
+func TestSleepBeatsALiveScene(t *testing.T) {
+	at := time.Date(2030, 9, 30, 23, 30, 0, 0, time.Local)
+	plan := nightPlan(t, at.Add(-40*time.Minute))
+	resolve := func(time.Time) DayPlan { return plan }
+
+	state := DefaultState(at.UnixMilli())
+	state.SceneStage = "active"
+	state.SceneStartedAt = at.Add(-10 * time.Minute).UnixMilli()
+	if !sceneLive(state, at) {
+		t.Fatal("setup: the scene should read as live")
+	}
+
+	a := evaluate(state, resolve, at)
+	if a.Reason != ReasonAsleep {
+		t.Fatalf("reason = %s; a live scene must not outrank being unconscious", a.Reason)
+	}
+	if a.Reachable || !a.Blocked {
+		t.Fatalf("reachable=%v blocked=%v while she is asleep", a.Reachable, a.Blocked)
+	}
+}
+
+// TestTurnCannotOpenASceneWhileSheIsAsleep guards the same invariant at its source:
+// the alignment model must not get to stage a scene into an unconscious character.
+func TestTurnCannotOpenASceneWhileSheIsAsleep(t *testing.T) {
+	manager := openTestManager(t)
+	at := time.Date(2030, 10, 1, 1, 0, 0, 0, time.Local)
+	plan := mustPlan(t,
+		blockSpec{kind: "sleep", label: "还在睡", start: "00:00", end: "08:00", weight: 10},
+	)
+	plan.Date = "2030-10-01"
+	plan.markStarted("b_0", at.Add(-time.Hour))
+	if err := manager.store.SaveDayPlan(manager.ID(), plan); err != nil {
+		t.Fatalf("save plan: %v", err)
+	}
+
+	task := &TurnTask{
+		ID: "task_asleep_scene", ThreadID: "thread_test", Trigger: TriggerDirector,
+		LastMessageAt: at.UnixMilli(), Inputs: []TurnTaskInput{{Text: "突然下起大雨", At: at.UnixMilli()}},
+	}
+	brief := TurnBrief{Resolution: ResolutionDraft{SceneStage: "active", ConsentState: "enthusiastic"}}
+	if _, err := manager.applyTurnBrief(task, brief, at); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	after, err := manager.store.State(manager.ID())
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if after.SceneStage != "" && after.SceneStage != "none" {
+		t.Fatalf("scene stage = %q; nothing gets staged while she is unconscious", after.SceneStage)
 	}
 }
 

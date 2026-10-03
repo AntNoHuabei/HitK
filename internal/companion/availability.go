@@ -62,6 +62,24 @@ type Availability struct {
 // evaluate 是三个问题的唯一真相源。taskAvailability 与 earlyRelease 都只是
 // 读它一份结果的投影，这样两条规则不可能各自漂移。
 func evaluate(state State, resolve planResolver, at time.Time) Availability {
+	plan := resolve(at)
+
+	// 睡眠排在场景之前。I6 说「睡着会清掉场景」，但那只守住了 tick 那一侧的
+	// settleConsciousness；applyTurnBrief 仍然能在她睡着时写进一个 SceneStage，
+	// 于是可用性读到「场景活着」就放行，而 CanForceReply 读意识说「不行」。
+	// 屏幕上的组合就成了：头部显示睡眠中、忙线卡不出、强制按钮灰着，但新消息
+	// 她照样回。生理事实排在叙事前面，这里和源头都要守。
+	if consciousnessAt(state, plan, at) == ConsciousAsleep {
+		wake := nextWakeAt(state, plan, resolve, at)
+		return Availability{
+			Blocked:  true,
+			Activity: "她在睡觉",
+			Reason:   ReasonAsleep,
+			Delay:    wake.Sub(at),
+			NextFree: wake,
+		}
+	}
+
 	// 场景还活着，人就在这段对话里，日程表上写什么都拦不住回消息。
 	if sceneLive(state, at) {
 		return Availability{
@@ -70,22 +88,6 @@ func evaluate(state State, resolve planResolver, at time.Time) Availability {
 			Reason:    ReasonScene,
 			NextFree:  at,
 			Shape:     sceneShape(state.SceneStage),
-		}
-	}
-
-	plan := resolve(at)
-
-	// 睡着是生理事实，不是日程偏好，所以走单独一条路，不往下过块权重规则。
-	// 「重块还没开始所以可达」对睡眠是反的：躺下没睡着是另一种可达状态，
-	// 真睡过去就谁也叫不醒。
-	if consciousnessAt(state, plan, at) == ConsciousAsleep {
-		wake := nextWakeAt(state, plan, at)
-		return Availability{
-			Blocked:  true,
-			Activity: "她在睡觉",
-			Reason:   ReasonAsleep,
-			Delay:    wake.Sub(at),
-			NextFree: wake,
 		}
 	}
 
@@ -108,16 +110,19 @@ func evaluate(state State, resolve planResolver, at time.Time) Availability {
 	if block.Weight <= replyWeightCeiling {
 		return Availability{
 			Reachable: true,
-			Activity:  block.Label,
-			Reason:    ReasonLight,
-			NextFree:  at,
-			Shape:     ReplyShape{MaxChars: 800, Delivery: "either", ToneFloor: "自然"},
+			// 活动名走 activityLabel，和 tick 写进 state.CurrentActivity 的是同一个
+			// 函数。头部和可用性各说一个字符串，正是上一轮刚治过的那类病换了个
+			// 字段又长回来。
+			Activity: activityLabel(block),
+			Reason:   ReasonLight,
+			NextFree: at,
+			Shape:    ReplyShape{MaxChars: 800, Delivery: "either", ToneFloor: "自然"},
 		}
 	}
 	if block.StartedAt == 0 {
 		return Availability{
 			Reachable: true,
-			Activity:  block.Label,
+			Activity:  activityLabel(block),
 			Reason:    ReasonStalling,
 			NextFree:  at,
 			Shape:     ReplyShape{MaxChars: 400, Delivery: "either", ToneFloor: "有点心虚，知道自己该做事"},

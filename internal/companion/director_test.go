@@ -581,6 +581,40 @@ func TestUserTurnStillCountsAsSomeoneShowingUp(t *testing.T) {
 		t.Fatalf("LastUserAt = %d, want the user turn to land", after.LastUserAt)
 	}
 }
+
+// TestProactiveTurnIsNotSomeoneShowingUp closes the third hole in the same field.
+// Her own message must not move lastUserAt either: relationship.absenceHours reads
+// it, so a proactive ping that resets the clock makes it as if he had answered.
+// Loneliness and missing stop climbing, and the next alignment gets briefed with
+// "自然延续上次话题，不要说好久不见" while he has not replied for over a day.
+func TestProactiveTurnIsNotSomeoneShowingUp(t *testing.T) {
+	now := time.Date(2026, 10, 2, 15, 0, 0, 0, time.Local)
+	manager := directorTestManager(t)
+	state, err := manager.store.State(manager.ID())
+	if err != nil {
+		t.Fatalf("state: %v", err)
+	}
+	lastUser := now.Add(-30 * time.Hour).UnixMilli()
+	state.LastUserAt = lastUser
+	if err := manager.store.SaveState(manager.ID(), state); err != nil {
+		t.Fatalf("save state: %v", err)
+	}
+
+	task := &TurnTask{
+		ID: "task_proactive_absence", ThreadID: "thread_test", Trigger: TriggerProactive,
+		LastMessageAt: now.UnixMilli(),
+	}
+	if _, err := manager.applyTurnBrief(task, TurnBrief{}, now); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	after, err := manager.store.State(manager.ID())
+	if err != nil {
+		t.Fatalf("reload state: %v", err)
+	}
+	if after.LastUserAt != lastUser {
+		t.Fatalf("LastUserAt moved to %d; she writing to him is not him showing up", after.LastUserAt)
+	}
+}
 func planHasBlockLabel(plan DayPlan, label string) bool {
 	for _, block := range plan.Blocks {
 		if block.Label == label {
