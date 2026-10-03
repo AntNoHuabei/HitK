@@ -672,20 +672,29 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		from = now.Add(-catchupLimit)
 	}
 
-	// 场景时钟只认墙上时钟，跟这一步要不要跑无关。以前它只在 TickNow 里衰减，
-	// 而 startup 直接调 advance 会整个跳过，于是关掉一两小时再打开，
-	// 旧场景还被当成正在进行。
-	if advanceSceneByWallClock(&state, now) {
-		state.UpdatedAt = now.UnixMilli()
-		if err := m.store.SaveState(m.id, state); err != nil {
-			return err
-		}
-	}
-
 	// 四舍五入而不是向下取整：漏掉一次 ticker（机器休眠）后，floor 会把余下的
 	// 十几分钟永久丢掉，模拟时钟就固定滞后十几二十几分钟，活动切换跟着迟到。
 	steps := int((now.Sub(from) + tickInterval/2) / tickInterval)
 	if steps <= 0 {
+		// 一步都不用跑，但场景不能因此挂在脸上。收场排在墙钟衰减之前：顺序反了
+		// 的话，他两小时前走掉的那个 active 会先被墙钟按「他们还在聊」的规则滑
+		// 进 aftercare，于是 FromStage 报的不是他离开时的阶段，收场事件也没了。
+		if _, windDown := collapseIdleScene(&state, now); windDown != nil {
+			windEvent := sceneWindDownEvent(*windDown, now)
+			state.UpdatedAt = now.UnixMilli()
+			if err := m.store.CommitTick(TickCommit{ID: m.id, State: state, Event: &windEvent}); err != nil {
+				return err
+			}
+		}
+		// 场景时钟只认墙上时钟，跟这一步要不要跑无关。以前它只在 TickNow 里衰减，
+		// 而 startup 直接调 advance 会整个跳过，于是关掉一两小时再打开，
+		// 旧场景还被当成正在进行。
+		if advanceSceneByWallClock(&state, now) {
+			state.UpdatedAt = now.UnixMilli()
+			if err := m.store.SaveState(m.id, state); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 	m.logInfo("companion tick advance start",
@@ -751,10 +760,22 @@ func (m *Manager) advance(ctx context.Context, now time.Time) error {
 		// flow this step just produced rather than the one it walked in with.
 		settleConsciousness(&state, plan, stepTime)
 
+		// 收场先跑，墙钟衰减跟在后面。顺序不能反：collapse 的 FromStage 必须是
+		// 他离开时那个真实阶段，墙钟先动的话就先被它改写了，事件会讲成另一个故事。
+		_, windDown := collapseIdleScene(&state, stepTime)
+		// 场景时钟只认墙上时钟，跟这一步要不要跑无关，所以逐 step 都要衰减一次。
+		advanceSceneByWallClock(&state, stepTime)
+
 		triggerEvents, nextTriggers := m.engine.EvaluateTriggers(state, triggerStates, stepTime)
 		triggerStates = nextTriggers
 		var event *LifeEvent
-		if len(triggerEvents) > 0 {
+		// 空转收场排在 trigger 和随机规则之前。它是这一步刚刚真实发生的一件事，
+		// 不是可以留到下一步再说的事；而且收场必须留下事件，否则他回来时中间就是
+		// 一个洞（I60）。
+		if windDown != nil {
+			windEvent := sceneWindDownEvent(*windDown, stepTime)
+			event = &windEvent
+		} else if len(triggerEvents) > 0 {
 			event = &triggerEvents[0]
 		} else if rule, ok := m.engine.ChooseEvent(state, profile, block, stepTime, recent); ok {
 			lifeEvent := m.engine.lifeEvent(rule, stepTime.UnixMilli(), "")

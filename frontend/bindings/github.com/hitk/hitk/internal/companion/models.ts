@@ -518,6 +518,25 @@ export interface State {
     "consentState": string;
     "sceneStartedAt": number;
     "sceneUpdatedAt": number;
+
+    /**
+     * SceneTouchedAt is the last time a turn actually put him in the scene. It is
+     * deliberately not SceneUpdatedAt: decay also updates that, so measuring idle
+     * against it means a wall-clock step taken after he leaves resets the silence
+     * clock to now and the wind-down never fires -- which is precisely the
+     * longest absence, the one where the record matters most. Only a turn touches
+     * this field; no decay path writes it.
+     */
+    "sceneTouchedAt": number;
+
+    /**
+     * SceneCheckInAt is when she is due to gently check whether he is still there.
+     * Every turn that touches a live scene pushes it further out, so a warm
+     * exchange never triggers it, and it is zero whenever there is no scene to
+     * check in on. One field, self-resetting: a second "pending check" field
+     * would just be a second answer to the same question.
+     */
+    "sceneCheckInAt": number;
     "activityStartedAt": number;
     "activityEndsAt": number;
     "updatedAt": number;

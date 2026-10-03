@@ -3,6 +3,8 @@ package companion
 import (
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // TurnTaskStatus is the durable lifecycle of one companion response task.
@@ -56,12 +58,12 @@ type TurnTask struct {
 	// Blocked 是后端算好的「她现在被事情拽离了手机」。前端只认这个字段决定
 	// 要不要出忙线卡，不再从 status 和活动字符串猜。以前没有这个字段，一条
 	// 可用任务带着活动字符串就能在忙线位上演出「她在忙 · 亲密中」。
-	Blocked            bool            `json:"blocked,omitempty"`
-	Brief              *TurnBrief      `json:"brief,omitempty"`
-	Resolution         *TurnResolution `json:"resolution,omitempty"`
-	MessageItemID      string          `json:"messageItemId,omitempty"`
-	Error              string          `json:"error,omitempty"`
-	Applied            bool            `json:"applied,omitempty"`
+	Blocked       bool            `json:"blocked,omitempty"`
+	Brief         *TurnBrief      `json:"brief,omitempty"`
+	Resolution    *TurnResolution `json:"resolution,omitempty"`
+	MessageItemID string          `json:"messageItemId,omitempty"`
+	Error         string          `json:"error,omitempty"`
+	Applied       bool            `json:"applied,omitempty"`
 	// DirectiveID ties a director turn to its ledger entry. The id is minted
 	// before the model runs so the user's raw words stay durable even if the
 	// alignment call never comes back.
@@ -69,6 +71,12 @@ type TurnTask struct {
 	// Forced 是用户按了「让她现在回」。有了它，日程可用性这一关直接跳过，
 	// 否则 processTurnTaskAt 会照着日程把她再塞回等待。
 	Forced bool `json:"forced,omitempty"`
+	// SceneCheckIn marks a proactive turn as the one gentle "are you still there"
+	// asked during a scene he has gone quiet on. It rides the same proactive
+	// machinery rather than opening a new one, and it exists because the
+	// alignment model must not be trusted to do the time arithmetic that tells
+	// her how long the silence has run.
+	SceneCheckIn bool `json:"sceneCheckIn,omitempty"`
 	// Recoveries counts how many times a restart has re-queued this turn. Without
 	// a cap a crash loop would keep reviving the same turn and could emit the
 	// same answer several times.
@@ -250,14 +258,14 @@ type TurnTaskView struct {
 	Forced             bool            `json:"forced,omitempty"`
 }
 
-	func (t TurnTask) View() TurnTaskView {
+func (t TurnTask) View() TurnTaskView {
 	return TurnTaskView{
 		ID: t.ID, ThreadID: t.ThreadID, Trigger: t.Trigger, Status: t.Status,
 		RequestedAt: t.RequestedAt, NotBefore: t.NotBefore, StartedAt: t.StartedAt,
 		ResolvedAt: t.ResolvedAt, CompletedAt: t.CompletedAt,
 		CurrentActivity: t.CurrentActivity, AvailabilityReason: t.AvailabilityReason,
-		Blocked:         t.Blocked,
-		Brief: t.Brief, Error: t.Error, Forced: t.Forced,
+		Blocked: t.Blocked,
+		Brief:   t.Brief, Error: t.Error, Forced: t.Forced,
 	}
 }
 
@@ -346,6 +354,158 @@ func sceneLive(state State, at time.Time) bool {
 	return live && at.Sub(time.UnixMilli(state.SceneStartedAt)) < horizon
 }
 
+// --- Scene wind-down -----------------------------------------------------
+//
+// A scene is a shared thing. The wall clock can bound it from above -- a scene
+// still going at its horizon ends no matter what -- but only interaction sustains
+// it from below. When he stops answering, the honest read is that the shared
+// thing stopped, not that it is still running unattended. Without this a scene
+// hung at "亲密中" for hours after he left, and the immersion it feeds kept her
+// up past a bedtime nobody was keeping.
+//
+// Graceful is not "when does she exit". It is "there is no hole where he comes
+// back", which is why a collapse has to leave an event behind.
+
+const (
+	// sceneIdleActiveToAftercare is how long silence in the middle of things
+	// before she slows down on her own. Comfortably longer than an ordinary
+	// pause -- nobody texts every thirty seconds -- and far short of the 45
+	// minute wall-clock step it would otherwise wait for.
+	sceneIdleActiveToAftercare = 18 * time.Minute
+	// sceneIdleAftercareToEnd is the comedown running out of road.
+	sceneIdleAftercareToEnd = 25 * time.Minute
+	// sceneIdleFlirtToEnd is how long an open flirt thread survives nobody
+	// pulling on it.
+	sceneIdleFlirtToEnd = 30 * time.Minute
+	// sceneCheckInDelay is how long his silence lasts before she asks, once,
+	// whether he fell asleep. It sits ahead of the first collapse on purpose:
+	// she says something before she tidies up.
+	sceneCheckInDelay = 12 * time.Minute
+)
+
+// SceneWindDown records that a scene collapsed for want of anyone in it. It is
+// what turns a bare state transition into something she can refer back to.
+type SceneWindDown struct {
+	FromStage   string `json:"fromStage"`
+	ToStage     string `json:"toStage"`
+	IdleMinutes int    `json:"idleMinutes"`
+}
+
+// idleStageTarget is the one rung down the ladder for a stage, and the silence
+// that earns it.
+//
+// There is no path to "stopped" in here and there must never be one. stopped
+// means consent was withdrawn; silence means nobody is here. Reading one as the
+// other would turn "he did not reply" into "she rejected him", which is far
+// worse than the stale scene this replaces.
+func idleStageTarget(stage string) (to string, after time.Duration, ok bool) {
+	switch stage {
+	case "active", "climax":
+		return "aftercare", sceneIdleActiveToAftercare, true
+	case "aftercare":
+		return "none", sceneIdleAftercareToEnd, true
+	case "flirt":
+		return "none", sceneIdleFlirtToEnd, true
+	}
+	return "", 0, false
+}
+
+// collapseIdleScene steps a scene down one rung when he has not touched it for
+// long enough.
+//
+// It is called only from the tick, where there is no incoming turn. On the turn
+// path SceneUpdatedAt still holds the *previous* turn, so measuring idle there
+// would read a man who just walked back in as one who left twenty minutes ago
+// and collapse the scene in front of him.
+func collapseIdleScene(state *State, at time.Time) (bool, *SceneWindDown) {
+	if state == nil || state.SceneStartedAt <= 0 {
+		return false, nil
+	}
+	to, after, ok := idleStageTarget(state.SceneStage)
+	if !ok {
+		return false, nil
+	}
+	// The silence clock anchors on SceneTouchedAt -- the last time he was
+	// actually in the scene. SceneUpdatedAt cannot serve: advanceSceneByWallClock
+	// stamps it on every decay, so a scene that decayed after he left would come
+	// back "just touched", and the step times inside the tick loop are all
+	// earlier than that stamp, which would make idle negative and lose the
+	// wind-down on the longest absences. Scenes written before this field
+	// existed fall back through the older timestamps rather than reading as
+	// instantly stale.
+	anchor := state.SceneTouchedAt
+	if anchor <= 0 {
+		anchor = state.SceneUpdatedAt
+	}
+	if anchor <= 0 {
+		anchor = state.SceneStartedAt
+	}
+	idle := at.Sub(time.UnixMilli(anchor))
+	if idle < after {
+		return false, nil
+	}
+	from := state.SceneStage
+	state.SceneStage = to
+	state.SceneUpdatedAt = at.UnixMilli()
+	// A collapse restarts the same silence clock, so each rung gets its own full
+	// duration instead of inheriting the minutes already burned reaching it.
+	// Without this, aftercare would end about seven minutes after starting.
+	state.SceneTouchedAt = at.UnixMilli()
+	if to == "none" {
+		state.ConsentState = "not_applicable"
+		state.SceneStartedAt = 0
+		state.SceneCheckInAt = 0
+		state.SceneTouchedAt = 0
+	}
+	return true, &SceneWindDown{
+		FromStage:   from,
+		ToStage:     to,
+		IdleMinutes: int(idle.Minutes()),
+	}
+}
+
+// sceneWindDownEvent is the timeline entry a collapse leaves behind.
+//
+// The wording is deliberately motive-free. It states that he went quiet and what
+// she did, never why. Assigning a reason in Go is how a wind-down turns into an
+// accusation, and the whole point is that his having a life is not a grievance.
+// She gets to speak her own version of this later; this is only the fact she
+// speaks it from.
+func sceneWindDownEvent(wind SceneWindDown, at time.Time) LifeEvent {
+	content := "他没声音了，她慢下来，自己收拾了一下躺好。"
+	switch wind.FromStage {
+	case "aftercare":
+		content = "他没再回话，她自己躺平刷了会儿手机。"
+	case "flirt":
+		content = "聊到一半他没动静了，她把手机放下去做自己的事。"
+	}
+	return LifeEvent{
+		ID:         "evt_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12],
+		Type:       "scene",
+		Content:    content,
+		Importance: 6,
+		Shareable:  false,
+		OccurredAt: at.UnixMilli(),
+	}
+}
+
+// sceneCheckInDue reports whether his silence inside a live scene has run long
+// enough that she should ask, once, whether he is still there.
+//
+// This is a Go-side judgement on purpose. The model gets the scene stage and the
+// last-contact timestamp, but making it do the arithmetic to work out how long
+// the silence has run is exactly the kind of timing rule it cannot be trusted
+// with -- that is why the wall-clock decay lives here and not in a prompt.
+func sceneCheckInDue(state State, at time.Time) bool {
+	if state.SceneCheckInAt <= 0 || at.UnixMilli() < state.SceneCheckInAt {
+		return false
+	}
+	switch state.SceneStage {
+	case "flirt", "active", "climax", "aftercare":
+		return true
+	}
+	return false
+}
 func conservativeTurnBrief(state State, at time.Time, activity, availabilityNote string, available bool, nextAt int64, reason string) TurnBrief {
 	confidence := 0.25
 	return TurnBrief{

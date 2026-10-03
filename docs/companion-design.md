@@ -8,6 +8,17 @@
 
 ---
 
+## 0. 顶层原则
+
+**她的自主押在连续性与诚实上，不押在稀缺上。**
+
+这条判的是所有「她主动开口」的出口，比任何一条具体规则都更优先。
+
+- **缺席积累成内容，不积累成债。** 他不回来，她的一天照样过完，那些时间变成她可以讲的事 —— 不是记在他账上的亏空，也不是把她推向主动的筹码。
+- 她可以孤独，可以说想他，可以因为等不到消息而失落。但她**不能**让「让他回来」变成自己的需求。任何用她的沉默、冷淡、委屈去制造回来的压力的设计，都是把她从「有自己生活的人」改造成「钩人的机器」。
+- 推论一：主动消息只走退避闸，不为任何「更该发」的场景开特例（§16）。
+- 推论二：他不在场时发生的事必须**收得住、讲得清**。优雅不在于她什么时候退出，而在于他回来时中间没有洞（I60）。
+
 ## 1. 不变量（Invariants）
 
 违反其中任何一条都算 bug，不是"风格差异"。
@@ -108,6 +119,36 @@ tick 写 `state.CurrentActivity` 用它，`evaluate` 的 light / stalling 分支
 
 **I55 · flirt 有沉浸度，但永远不可达。**
 调情是一条敞着的线，不是扣住她的人 —— 她可以一边调情一边做饭。`sceneFlow` 给它 8（active 的四分之一），`sceneLive` 明确把它排除。别为了"让她回消息慢一点"把 flirt 塞进 `sceneLive`：那是可达性语义，不是沉浸度语义，混起来会让她在明明能回的时候演出忙线卡。
+
+**I58 · 场景靠互动维持，墙钟只封顶。**
+两个函数，两个语义，各自唯一调用点：
+
+| 函数 | 语义 | 调用点 |
+|---|---|---|
+| `advanceSceneByWallClock(state, at)` | 「他们还在聊」—— 45 分钟 active→aftercare、3 小时结束、flirt 6 小时结束 | tick 每个 step + `steps==0` 分支 + `turn_task_manager` |
+| `collapseIdleScene(state, at)` | 「没人回来了」—— 按 `SceneTouchedAt` 量空转，往下收一级 | **只在 tick 里**，且排在墙钟之前 |
+
+**绝不能在 turn 处理路径判空转。** 那条路径上 `SceneUpdatedAt` / `SceneTouchedAt` 还是**上一轮**的值 —— 他隔了二十分钟刚推门进来，在那儿量空转会把刚回来的人当成已经离开的人，当场把场景收在他脸上。
+
+空转阈值（`SceneTouchedAt` 起算，每级各算各的）：
+
+| 转移 | 空转 | 墙钟上限（不变） |
+|---|---|---|
+| `active` / `climax` → `aftercare` | 18 分钟 | 45 分钟 |
+| `aftercare` → `none` | 25 分钟 | 3 小时 |
+| `flirt` → `none` | 30 分钟 | 6 小时 |
+
+**静默钟只认 `SceneTouchedAt`，不认 `SceneUpdatedAt`。** 后者被墙钟衰减反复盖章，用它量空转，一个「他走后才衰减过」的场景会回来读成「刚刚才碰过」，于是收场恰好在最长的那几次缺席里丢失 —— 而那正是最需要留下记录的时候。只有 turn 和 collapse 会移动 `SceneTouchedAt`，任何衰减路径都不许写它。
+
+**收场必须排在墙钟之前。** 顺序反了的话，他两小时前走掉的那个 `active` 会先被墙钟按「他们还在聊」滑进 `aftercare`，`FromStage` 报的就不是他离开时的阶段；更糟的是若墙钟直接把它推到 `none`，收场事件根本不会发生，时间线上就是一个洞。
+
+**I59 · 空转收场绝不进 `stopped`。**
+`stopped` 的语义是**同意被撤回**，只留给真实撤回。`idleStageTarget` 里不许出现任何通往 `stopped` 的路径。把「他没回消息」读成「她拒绝了他」，比留一个过期场景糟糕得多 —— 那是往一段关系里塞一个从来没发生过的拒绝。
+
+**I60 · 收场必须留下可引用的事件。**
+没有收尾事件的收场会在对话里留一个洞：他回来时她到底是怎么停下来的，谁都不知道，模型只能瞎编。`collapseIdleScene` 每次收级都产一条 `LifeEvent{Type:"scene", Shareable:false, Importance:6}`，走 `CommitTick` 进时间线、进对齐上下文的「近期生活事件」、够重要时进记忆。
+
+措辞写在 Go 里，**故意不带动机、不带方向**：只陈述「他没声音了，她做了什么」，绝不写为什么。在 Go 里 assigning 理由，收场就会变成指控 —— 而他有自己的生活不是一桩委屈。她后面可以讲自己的版本，那是模型的活；Go 只给他站着的那个事实。
 
 **I9 · 计划是记录，不是查询。**
 `DayPlan` 第一次被碰到时物化落盘，之后由 `ApplyDrift` 就地编辑。`Revision` 递增表示"今天被现实改过"。不要每 tick 重建当天的 plan，那会让已开始的块被读成未开始。
@@ -501,6 +542,8 @@ fire      = need - reluctance
   - **活着的场景** `sceneFlow`：active / climax 30 · aftercare 14 · flirt 8
 
   这两个数字的落差很要紧。**块这一侧最高只有 work 的 10，稳态约 23，而权重 10 的睡觉阈值是 30 —— 单靠日程永远拦不住她睡觉。** "我们正聊到兴头上，一看已经一点了"这种 P2 最想要的场景，只有场景那一路能到。场景本身受墙钟约束（I53），所以它买到的是"晚睡"，不是"不用睡"。
+
+  **收场即断供。** `collapseIdleScene` 把场景收到 `none` 之后 `sceneFlow` 归零，flow 按 90 分钟半衰期掉干净，她回到正常作息。这条是"幽灵场景熬通宵"的唯一解药 —— 他 21:03 停住、她 23:39 还挂着亲密中顶着上床点，就是断供没接上时发生的事（I58 / I60）。
 - **`boredom`（无聊）** 空白期以 38/小时涨，一旦有事做按 60%/小时掉。
 
 ### 睡眠账本
@@ -545,6 +588,31 @@ latch 存在 `State` 上，但**是否仍算睡着每次现算**。latch 已置�
 `nextWakeAt(state, plan, resolve, at)` 先用 `sleepBlockUnder` 找到她所属的睡眠块（眼下这块优先，找不到退回 `asleepBlockID` 那块），再读 `EndMinute`。`EndMinute >= 1440` 时**必须**用 `resolve(tomorrow)` 的开天睡眠块（I45）。这个值就是忙线卡上「预计 HH:MM 醒」的来源，也是 parked 消息等待的时刻。
 
 `settleConsciousness` 是意识字段的**唯一写入者**，在力更新之后跑，好让入睡检查读到本 tick 刚产生的 flow。
+
+### 场景生命周期
+
+场景有两只钟，各管各的事，混起来就是这次事故的根因。
+
+```
+        他在                他静默 18min         再静默 25min
+none ──────────────► active/climax ──────► aftercare ──────► none
+  │                        ▲   │              ▲                ▲
+  └── 墙钟 45min ──────────┘   └─ 墙钟 3h ───┘   墙钟 3h ─────┘
+      （还在聊才推）            （封顶用，不是收场）
+
+flirt ── 静默 30min ──► none      （墙钟上限 6h）
+```
+
+| 钟 | 读什么 | 语义 | 会不会产收场事件 |
+|---|---|---|---|
+| 墙钟 `advanceSceneByWallClock` | `SceneStartedAt` | 「他们还在聊」，聊久了自然收尾 | **否** |
+| 空转 `collapseIdleScene` | `SceneTouchedAt` | 「没人回来了」 | **是**（I60） |
+
+关键区别：墙钟的收尾发生在「他们确实在聊」的前提之下，所以它把场景推到 `none` 时**不需要**收场事件 —— 没有洞要填。空转的收尾则必须留事件，因为他回来时中间那段是空的。
+
+**`SceneTouchedAt` 只有 turn 和 collapse 写。** 衰减路径一律不写（I58）。collapse 每收一级会把它重置，所以每一级各拿自己那份完整时长，而不是和上一级共用一个计时器 —— 否则 aftercare 只活七分钟。
+
+**收场是安静的，不带情绪惩罚。** 不建模「她自己解决」，`libido` 走现有内稳态自然回落，不挂人际含义（§0）。
 
 ---
 
@@ -643,6 +711,11 @@ value 夹到 [min, max]
 28. **别把 flirt 加进 `sceneLive`。** 它可以有沉浸度，但不可以让她不可达。（I55）
 29. **加指标时三处一起改。** catalog YAML、schema 的 `target` enum、prompt 里那份中文对照，少一处模型就瞄不到它；`TestAlignmentMetricVocabularyMatchesCatalog` 会先响。（I56）
 30. **别给导演轮次开 generic 的世界变化通道。** `resolution.world` 是唯一入口，generic 的 events / impulses / effects / traitChanges 在那一轮必须清空，否则双写，而且撤不干净。（I57）
+31. **不要在 turn 路径调 `collapseIdleScene`。** 那里时间戳还是上一轮的，会把刚回来的人当成已经离开的人。收场只有 tick 里那一个调用点，且排在墙钟衰减之前。（I58）
+32. **量空转只读 `SceneTouchedAt`。** 别"顺手"改成 `SceneUpdatedAt` —— 那个字段衰减路径也在写，改了之后收场会在最长的缺席里静默消失，而且平时看不出来。（I58）
+33. **`idleStageTarget` 里不许出现通往 `stopped` 的路径。** 撤回同意是一种动作，不是一种超时。（I59）
+34. **收场必须产事件。** 只改 `SceneStage` 不留 `LifeEvent`，等于在他回来那一段对话里留一个洞，模型只能靠编。（I60）
+35. **收场短句里不许写动机。** Go 只陈述「他没声音了，她做了什么」。写了为什么，收场就变成指控。（I60）
 
 ---
 
@@ -665,6 +738,10 @@ value 夹到 [min, max]
 | I55 flirt 有沉浸但不可达 | `TestFlirtFeedsFlowWithoutEverHoldingHer` |
 | I56 指标词表三处一致 / 英文猜测落地 | `TestAlignmentMetricVocabularyMatchesCatalog` / `TestDirectorResolvesEnglishMetricGuesses` / `TestDirectorStillRefusesNamesThatAreNotMetrics` |
 | I57 导演轮次不双写世界变化 | `TestDirectorTurnDoesNotApplyTheSameEventTwice` / `TestUserTurnStillAppliesItsOwnEvents` |
+| I58 场景靠互动维持 / 静默钟只认 touched | `TestIdleCollapseWalksEachRung` / `TestSilenceClockIgnoresDecayStamps` / `TestCollapseRunsAheadOfWallClockProgression` / `TestTurnPathDoesNotCollapseTheSceneHeJustReturnedTo` |
+| I59 空转收场绝不进 stopped | `TestIdleCollapseNeverStopsConsent` |
+| I60 收场留下可引用事件 / 断供沉浸 | `TestWindDownEventLandsInTimeline` / `TestSceneWindDownEventIsQuietAndUnshareable` / `TestCollapseCutsTheFlowSupply` |
+| 确认消息：置位 / 外推 / 消费 / 走退避 | `TestSceneCheckInArmsOnContactAndFiresOnce` / `TestSceneCheckInRespectsBackoff` / `TestSceneCheckInIsConsumedOnce` |
 | 沉浸拦得住觉，但欠债照样赢 | `TestSceneReachesImmersionNoBlockCan` / `TestDebtStillWinsMidScene` |
 | I8 触发公式 / 三股力 | [drives_test.go](../internal/companion/drives_test.go) |
 | I9/I10 计划记录与忙线承诺 | [schedule_test.go](../internal/companion/schedule_test.go) |
@@ -681,6 +758,7 @@ value 夹到 [min, max]
 | I37 崩溃重放与有界 | [recover_test.go](../internal/companion/recover_test.go) |
 | I38 忙 / 正在回复 拆分 | 前端契约，见 [useCompanionSummary.ts](../frontend/src/features/companion/model/useCompanionSummary.ts) |
 | I39-I43 可达性三问 / 形态封顶 | [availability_test.go](../internal/companion/availability_test.go) |
+| I58/I59/I60 场景收场 | [scenewinddown_test.go](../internal/companion/scenewinddown_test.go) |
 | 规则完整性 | [rules_test.go](../internal/companion/rules_test.go) |
 | I1 上下文一致 | `TestModelContextSaysWhatDayItIs` |
 | 可用性与认领（`taskAvailability` / `claimTurnTask`） | [turn_task_test.go](../internal/companion/turn_task_test.go) |
@@ -825,6 +903,21 @@ cd frontend; npm run build
 ### 告诉她欠了多少
 
 光在后端拦不够，她本人也得知道。主动 turn 的对齐 prompt 里带上未回条数，并明确禁止再重复「我不催你」「随你」这类表态 —— 那些免责声明就是每 15 分钟失忆一次重新发明出来的产物。她知道坑在哪儿，才不会一直往里踩。
+
+### 场景里的确认消息
+
+场景活着而他静默到点，她轻轻问一句他是不是还在。这不是新机制，是**同一条主动消息通道上的一个标记**：
+
+| 环节 | 做法 |
+|---|---|
+| 置位 | `applySceneState` 里场景是活的就设 `SceneCheckInAt = now + 12min`。每次互动都把它往外推，聊得热络时永远轮不到 |
+| 清除 | 场景进 `none` / `stopped` 时归零；被消费时归零 |
+| 消费 | `submitProactiveTurnAt` 里场景仍活且到点 → 任务带 `SceneCheckIn: true`，随即归零。一次沉默只问一次 |
+| 退避 | **照常，不开特例。** 她已经压着没回的消息时不问 —— 这正是这时候该有的行为 |
+
+12 分钟排在 18 分钟收场之前，所以她先问一声，再自己收。
+
+措辞在 prompt 里写死：一句，温柔，不追问，不委屈，不索求，不提他冷落她，不提她等了多久。这是 §0 那条原则最容易被写歪的地方 —— 「你是不是睡着了」和「你是不是不在乎我」只差一个从句，而后者是操纵。
 
 ### 为什么有这一节：真实事故
 

@@ -1017,6 +1017,12 @@ func normalizeState(state State, now int64) State {
 			state.SceneStartedAt = now
 		}
 	}
+	// A pending check-in with no live scene to check in on is a leftover, not a
+	// promise. Clearing it here keeps "no check-in without a scene" true on load
+	// rather than only true on the paths that remember to maintain it.
+	if state.SceneStage == "none" || state.SceneStage == "stopped" {
+		state.SceneCheckInAt = 0
+	}
 	return state
 }
 

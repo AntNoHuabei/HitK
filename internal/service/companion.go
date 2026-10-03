@@ -512,6 +512,14 @@ func turnAlignmentUserPrompt(input companion.TurnAlignmentInput) string {
 			// like the first one and she keeps rediscovering that he is quiet.
 			fmt.Fprintf(&b, "你已经连发 %d 条消息，他一条都没回。这时候再多说一句是打扰，不是陪伴。除非有明确必须说的事（约好的时间地点、出了什么状况），本轮默认 reply.send=false，也不要再重复「我不催你」「随你」这类表态。\n", unanswered)
 		}
+		if input.Task.SceneCheckIn {
+			// This is the exception the rule above carves out: there is genuinely
+			// one thing to say. The wording is pinned in Go because "no grievance,
+			// no demands" is a line the model cannot be trusted to reach for on its
+			// own, and it is where "absence accumulates into content, not debt"
+			// lands on this particular channel.
+			fmt.Fprintf(&b, "本轮就是那件明确该说的事：他刚才没声音了，你们还在亲密场景里，轻轻问一句他是不是睡着了就好。一句，温柔，不追问，不委屈，不索求，不提他冷落你，不提你等了多久。reply.send=true。\n")
+		}
 	default:
 		fmt.Fprintf(&b, "本轮用户消息：%s\n", input.Task.InputText())
 	}

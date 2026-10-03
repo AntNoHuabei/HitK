@@ -292,6 +292,11 @@ func (m *Manager) submitProactiveTurnAt(ctx context.Context, now time.Time) (Tur
 	if allowed, _ := proactiveBackoff(state.UnrepliedProactive, state.LastProactiveAt, now); !allowed {
 		return TurnTask{}, false, nil
 	}
+	// The scene check-in rides this same channel and eats this same backoff, with
+	// no exception made for it. If she already has messages sitting unanswered,
+	// her not asking "are you still there" is exactly the right outcome rather
+	// than one more thing sent into a room nobody is in.
+	checkIn := sceneCheckInDue(state, now)
 	task := TurnTask{
 		ID:              "task_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12],
 		ThreadID:        threadID,
@@ -300,9 +305,19 @@ func (m *Manager) submitProactiveTurnAt(ctx context.Context, now time.Time) (Tur
 		RequestedAt:     now.UnixMilli(),
 		LastMessageAt:   now.UnixMilli(),
 		NotBefore:       now.UnixMilli(),
+		SceneCheckIn:    checkIn,
 	}
 	if err := m.store.SaveTurnTask(task); err != nil {
 		return TurnTask{}, false, err
+	}
+	if checkIn {
+		// Consumed. One gentle check per silence, not one per tick. The next
+		// turn that touches the scene arms it again.
+		state.SceneCheckInAt = 0
+		state.UpdatedAt = now.UnixMilli()
+		if err := m.store.SaveState(m.id, state); err != nil {
+			return task, false, err
+		}
 	}
 	m.emitTask(task)
 	m.kickTurnTask(ctx, task)

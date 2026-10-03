@@ -64,19 +64,32 @@ type State struct {
 	// AsleepSince latches when she actually goes under, and AsleepBlockID records
 	// which block she is sleeping in so the wake check reads the plan instead of
 	// trusting the latch to expire on its own.
-	AsleepSince       int64  `json:"asleepSince"`
-	AsleepBlockID     string `json:"asleepBlockId"`
-	SceneStage        string `json:"sceneStage"`
-	ConsentState      string `json:"consentState"`
-	SceneStartedAt    int64  `json:"sceneStartedAt"`
-	SceneUpdatedAt    int64  `json:"sceneUpdatedAt"`
-	ActivityStartedAt int64  `json:"activityStartedAt"`
-	ActivityEndsAt    int64  `json:"activityEndsAt"`
-	UpdatedAt         int64  `json:"updatedAt"`
-	LastTickAt        int64  `json:"lastTickAt"`
-	LastUserAt        int64  `json:"lastUserAt"`
-	LastProactiveAt   int64  `json:"lastProactiveAt"`
-	LastMemoryDecayAt int64  `json:"lastMemoryDecayAt"`
+	AsleepSince    int64  `json:"asleepSince"`
+	AsleepBlockID  string `json:"asleepBlockId"`
+	SceneStage     string `json:"sceneStage"`
+	ConsentState   string `json:"consentState"`
+	SceneStartedAt int64  `json:"sceneStartedAt"`
+	SceneUpdatedAt int64  `json:"sceneUpdatedAt"`
+	// SceneTouchedAt is the last time a turn actually put him in the scene. It is
+	// deliberately not SceneUpdatedAt: decay also updates that, so measuring idle
+	// against it means a wall-clock step taken after he leaves resets the silence
+	// clock to now and the wind-down never fires -- which is precisely the
+	// longest absence, the one where the record matters most. Only a turn touches
+	// this field; no decay path writes it.
+	SceneTouchedAt int64 `json:"sceneTouchedAt"`
+	// SceneCheckInAt is when she is due to gently check whether he is still there.
+	// Every turn that touches a live scene pushes it further out, so a warm
+	// exchange never triggers it, and it is zero whenever there is no scene to
+	// check in on. One field, self-resetting: a second "pending check" field
+	// would just be a second answer to the same question.
+	SceneCheckInAt    int64 `json:"sceneCheckInAt"`
+	ActivityStartedAt int64 `json:"activityStartedAt"`
+	ActivityEndsAt    int64 `json:"activityEndsAt"`
+	UpdatedAt         int64 `json:"updatedAt"`
+	LastTickAt        int64 `json:"lastTickAt"`
+	LastUserAt        int64 `json:"lastUserAt"`
+	LastProactiveAt   int64 `json:"lastProactiveAt"`
+	LastMemoryDecayAt int64 `json:"lastMemoryDecayAt"`
 	// UnrepliedProactive counts the proactive messages she has sent that the
 	// user has not answered. It is the backoff signal: every unanswered message
 	// raises the bar for the next one, because talking to someone who is not

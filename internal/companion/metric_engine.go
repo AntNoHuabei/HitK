@@ -344,6 +344,25 @@ func applySceneState(state *State, outcome ConversationOutcome, now time.Time) {
 		state.SceneStartedAt = now.UnixMilli()
 	}
 	state.SceneUpdatedAt = now.UnixMilli()
+	// SceneTouchedAt is the silence clock's anchor, and only a turn may move it.
+	// The decay paths write SceneUpdatedAt constantly, so measuring idle against
+	// that would let a wall-clock step taken after he leaves reset the clock to
+	// now -- and the wind-down would go missing on exactly the longest absences.
+	// Every turn that leaves him inside a live scene pushes it out; a scene that
+	// is over has nothing left to touch.
+	if state.SceneStage == "none" || state.SceneStage == "stopped" {
+		state.SceneTouchedAt = 0
+	} else {
+		state.SceneTouchedAt = now.UnixMilli()
+	}
+	// Every turn that touches a live scene pushes the check-in further out, so a
+	// warm exchange never fires it and only real silence lets it arrive. Once the
+	// scene is over there is nothing to check in on.
+	if state.SceneStage == "none" || state.SceneStage == "stopped" {
+		state.SceneCheckInAt = 0
+	} else {
+		state.SceneCheckInAt = now.Add(sceneCheckInDelay).UnixMilli()
+	}
 }
 
 func (e *MetricEngine) applyConsentWithdrawalFloor(state *State, before map[MetricID]float64) {
