@@ -270,10 +270,10 @@ func (e *MetricEngine) ApplyConversationOutcome(
 	state *State,
 	outcome ConversationOutcome,
 	now time.Time,
-	enforceWithdrawalFloor bool,
+	heSpoke bool,
 ) []ActiveEffect {
 	outcome = canonicalizeConversationOutcome(outcome)
-	applySceneState(state, outcome, now)
+	applySceneState(state, outcome, now, heSpoke)
 	start := cloneMetricDeltas(state.Metrics)
 	for id, delta := range outcome.Impulses {
 		rule, ok := e.rules.Metrics[id]
@@ -287,7 +287,7 @@ func (e *MetricEngine) ApplyConversationOutcome(
 		delta = clampFloat(delta, -cap, cap)
 		state.Metrics[id] = clampFloat(state.Metric(id)+delta, rule.Min, rule.Max)
 	}
-	if enforceWithdrawalFloor && outcome.ConsentState == "withdrawn" {
+	if heSpoke && outcome.ConsentState == "withdrawn" {
 		e.applyConsentWithdrawalFloor(state, start)
 	}
 	for id, delta := range outcome.TraitChanges {
@@ -325,7 +325,23 @@ func (e *MetricEngine) ApplyConversationOutcome(
 	return effects
 }
 
-func applySceneState(state *State, outcome ConversationOutcome, now time.Time) {
+// applySceneState moves the scene from a turn's alignment outcome.
+//
+// heSpoke is the gate, and it is the whole fix for "she is still running last
+// night's scene with nobody there". A scene is a thing that happens between two
+// people. When he did not speak, her own proactive message cannot start one,
+// escalate one, cool one down, or end one -- and it absolutely cannot count as
+// his being in it. The scene still moves: by his turns, by wall-clock
+// progression, and by idle collapse. What it can no longer do is move itself.
+//
+// Without this gate the alignment model, handed last night's memories on a quiet
+// morning, will type "active" and Go will build a brand new scene out of it, or
+// type "stopped" and fire a consent-withdrawal penalty for a refusal that never
+// happened. Both were observed in live data.
+func applySceneState(state *State, outcome ConversationOutcome, now time.Time, heSpoke bool) {
+	if !heSpoke {
+		return
+	}
 	stage := outcome.SceneStage
 	consent := outcome.ConsentState
 	if consent == "withdrawn" {

@@ -150,6 +150,17 @@ tick 写 `state.CurrentActivity` 用它，`evaluate` 的 light / stalling 分支
 
 措辞写在 Go 里，**故意不带动机、不带方向**：只陈述「他没声音了，她做了什么」，绝不写为什么。在 Go 里 assigning 理由，收场就会变成指控 —— 而他有自己的生活不是一桩委屈。她后面可以讲自己的版本，那是模型的活；Go 只给他站着的那个事实。
 
+**I61 · 只有他真的出现，场景才能动。**
+场景是两个人之间发生的事。`applySceneState(state, outcome, now, heSpoke)` 里 `heSpoke == false` 时**整段直接返回**：她自己的 turn 不能开启场景、不能升级（flirt→active）、不能降温、不能结束，也不能给它计时。场景照旧会动 —— 由他的 turn、由墙钟 progression、由空转 collapse —— 只是不再会**自己动**。
+
+这条是昨天那场收场改造的续集，也是从线上数据里挖出来的：收场机制本身在正常工作，但上游漏了一个更大的洞。他 21:52 之后就没说过话，第二天早上对齐模型拿着昨晚的记忆，在主动 turn 里连着敲出 `active`，Go 就凭空造了一个 10:20 开始的新场景，房间里根本没有人。同一个模型还在 09:20 和 09:50 敲出过 `stopped` —— 那是让模型在一个安静的早晨凭空撤回同意。
+
+顺带修掉两个同源问题：
+- `SceneTouchedAt` 从此**只由 user turn 写**。她自己的消息重置静默钟，等于她的话在替她把场景续下去。
+- `SceneCheckInAt` 从此**不由她的 turn 重新上弦**。原来收场消费掉之后，结算路径又把它 `now + 12min` 装回去，她会每十二分钟问一次「你睡着了吗」问到永远。
+
+这是 I46（absence 只由用户 turn 推进）换了个字段又长回来，和 I59（沉默不等于撤回）是同一个病根：**凡是「他在那儿」的含义，都不能由「她写了点什么」来推断。**
+
 **I9 · 计划是记录，不是查询。**
 `DayPlan` 第一次被碰到时物化落盘，之后由 `ApplyDrift` 就地编辑。`Revision` 递增表示"今天被现实改过"。不要每 tick 重建当天的 plan，那会让已开始的块被读成未开始。
 
@@ -608,9 +619,18 @@ flirt ── 静默 30min ──► none      （墙钟上限 6h）
 | 墙钟 `advanceSceneByWallClock` | `SceneStartedAt` | 「他们还在聊」，聊久了自然收尾 | **否** |
 | 空转 `collapseIdleScene` | `SceneTouchedAt` | 「没人回来了」 | **是**（I60） |
 
+**谁能移动场景**（I61）：
+
+| 谁 | 能做什么 |
+|---|---|
+| 他的 turn（`TriggerUser`） | 开启 / 推进 / 降温 / 结束，并重置静默钟 |
+| 墙钟 progression | 只按时间自然收尾，不算收场 |
+| 空转 collapse | 逐级往下收，产收场事件 |
+| 她的主动 turn、导演指令 | **什么都不能做**（`heSpoke == false` 直接 return） |
+
 关键区别：墙钟的收尾发生在「他们确实在聊」的前提之下，所以它把场景推到 `none` 时**不需要**收场事件 —— 没有洞要填。空转的收尾则必须留事件，因为他回来时中间那段是空的。
 
-**`SceneTouchedAt` 只有 turn 和 collapse 写。** 衰减路径一律不写（I58）。collapse 每收一级会把它重置，所以每一级各拿自己那份完整时长，而不是和上一级共用一个计时器 —— 否则 aftercare 只活七分钟。
+**`SceneTouchedAt` 只有 user turn 和 collapse 写。** 衰减路径一律不写（I58），她自己的 turn 也一律不写（I61）。collapse 每收一级会把它重置，所以每一级各拿自己那份完整时长，而不是和上一级共用一个计时器 —— 否则 aftercare 只活七分钟。
 
 **收场是安静的，不带情绪惩罚。** 不建模「她自己解决」，`libido` 走现有内稳态自然回落，不挂人际含义（§0）。
 
@@ -716,6 +736,8 @@ value 夹到 [min, max]
 33. **`idleStageTarget` 里不许出现通往 `stopped` 的路径。** 撤回同意是一种动作，不是一种超时。（I59）
 34. **收场必须产事件。** 只改 `SceneStage` 不留 `LifeEvent`，等于在他回来那一段对话里留一个洞，模型只能靠编。（I60）
 35. **收场短句里不许写动机。** Go 只陈述「他没声音了，她做了什么」。写了为什么，收场就变成指控。（I60）
+36. **别让她自己的 turn 碰场景。** `applySceneState` 的 `heSpoke` 门不许放宽，也别在别处绕过它直接写 `SceneStage` / `SceneTouchedAt` / `SceneCheckInAt`。凡是「他在那儿」的含义，都不能由「她写了点什么」推断 —— 这条已经在三个不同字段上错过三次。（I61）
+37. **加新 trigger 时默认按 `heSpoke = false` 处理。** 只有 `TriggerUser` 算他真的出现。导演指令不算，她自己的主动消息不算。（I46 / I61）
 
 ---
 
@@ -759,6 +781,7 @@ value 夹到 [min, max]
 | I38 忙 / 正在回复 拆分 | 前端契约，见 [useCompanionSummary.ts](../frontend/src/features/companion/model/useCompanionSummary.ts) |
 | I39-I43 可达性三问 / 形态封顶 | [availability_test.go](../internal/companion/availability_test.go) |
 | I58/I59/I60 场景收场 | [scenewinddown_test.go](../internal/companion/scenewinddown_test.go) |
+| I61 只有他真的出现才能移动场景 | `TestTurnsWhereHeDidNotSpeakCannotMoveTheScene` / `TestProactiveTurnLeavesALiveSceneUntouched` / `TestUserTurnStillDrivesTheSceneAndItsClock` |
 | 规则完整性 | [rules_test.go](../internal/companion/rules_test.go) |
 | I1 上下文一致 | `TestModelContextSaysWhatDayItIs` |
 | 可用性与认领（`taskAvailability` / `claimTurnTask`） | [turn_task_test.go](../internal/companion/turn_task_test.go) |
@@ -914,6 +937,7 @@ cd frontend; npm run build
 | 清除 | 场景进 `none` / `stopped` 时归零；被消费时归零 |
 | 消费 | `submitProactiveTurnAt` 里场景仍活且到点 → 任务带 `SceneCheckIn: true`，随即归零。一次沉默只问一次 |
 | 退避 | **照常，不开特例。** 她已经压着没回的消息时不问 —— 这正是这时候该有的行为 |
+| 谁都不许重新上弦 | 她的 turn 走不到 `applySceneState` 的赋值段（I61），所以消费掉之后不会被结算路径重新装回 `now + 12min`。否则就是每十二分钟问一次，问到永远 |
 
 12 分钟排在 18 分钟收场之前，所以她先问一声，再自己收。
 

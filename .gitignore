@@ -20,3 +20,6 @@ build/ios/xcode/overlay.json
 build/ios/xcode/gen/
 build/android/overlay.json
 build/android/gen/
+# Local scratch dumps (contain copies of the live companion DB)
+tmp_dump/
+tmp_scene/

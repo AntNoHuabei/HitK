@@ -260,7 +260,7 @@ func TestSceneCheckInArmsOnContactAndFiresOnce(t *testing.T) {
 
 	t.Run("a turn inside a live scene arms it", func(t *testing.T) {
 		state := DefaultState(now.UnixMilli())
-		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now)
+		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now, true)
 		if state.SceneTouchedAt != now.UnixMilli() {
 			t.Fatalf("touched = %d, want %d", state.SceneTouchedAt, now.UnixMilli())
 		}
@@ -274,7 +274,7 @@ func TestSceneCheckInArmsOnContactAndFiresOnce(t *testing.T) {
 		state := DefaultState(now.UnixMilli())
 		for i := 0; i < 10; i++ {
 			at := now.Add(time.Duration(i) * 5 * time.Minute)
-			applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, at)
+			applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, at, true)
 			if sceneCheckInDue(state, at) {
 				t.Fatalf("check-in came due during a warm exchange at round %d", i)
 			}
@@ -283,7 +283,7 @@ func TestSceneCheckInArmsOnContactAndFiresOnce(t *testing.T) {
 
 	t.Run("it comes due once the silence runs long enough", func(t *testing.T) {
 		state := DefaultState(now.UnixMilli())
-		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now)
+		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now, true)
 		if sceneCheckInDue(state, now.Add(sceneCheckInDelay-time.Minute)) {
 			t.Fatal("due early")
 		}
@@ -303,8 +303,8 @@ func TestSceneCheckInArmsOnContactAndFiresOnce(t *testing.T) {
 
 	t.Run("ending the scene clears the pending check", func(t *testing.T) {
 		state := DefaultState(now.UnixMilli())
-		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now)
-		applySceneState(&state, ConversationOutcome{SceneStage: "none", ConsentState: "not_applicable"}, now.Add(time.Hour))
+		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now, true)
+		applySceneState(&state, ConversationOutcome{SceneStage: "none", ConsentState: "not_applicable"}, now.Add(time.Hour), true)
 		if state.SceneCheckInAt != 0 || state.SceneTouchedAt != 0 {
 			t.Fatalf("leftovers: checkIn=%d touched=%d", state.SceneCheckInAt, state.SceneTouchedAt)
 		}
@@ -379,5 +379,162 @@ func TestSceneCheckInIsConsumedOnce(t *testing.T) {
 	}
 	if after.SceneCheckInAt != 0 {
 		t.Fatalf("check-in not consumed: %d", after.SceneCheckInAt)
+	}
+}
+
+// A scene is a thing that happens between two people. These tests hold that line:
+// when he did not speak, her own turn must not be able to move the scene at all.
+// Every one of these was observed happening in live data -- the alignment model,
+// handed last night's memories on a quiet morning, typed "active" and Go built a
+// brand new scene out of it with nobody in the room.
+func TestTurnsWhereHeDidNotSpeakCannotMoveTheScene(t *testing.T) {
+	now := time.Date(2030, 10, 4, 10, 20, 0, 0, time.Local)
+
+	t.Run("cannot open a scene that is not running", func(t *testing.T) {
+		state := DefaultState(now.UnixMilli())
+		state.SceneStage = "none"
+		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now, false)
+		if state.SceneStage != "none" {
+			t.Fatalf("a proactive turn opened a scene: %q", state.SceneStage)
+		}
+		if state.SceneStartedAt != 0 {
+			t.Fatalf("a scene start was minted from nothing: %d", state.SceneStartedAt)
+		}
+	})
+
+	t.Run("cannot escalate flirt into active", func(t *testing.T) {
+		state := windDownScene("flirt", now.Add(-time.Hour))
+		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now, false)
+		if state.SceneStage != "flirt" {
+			t.Fatalf("a proactive turn escalated the scene: %q", state.SceneStage)
+		}
+	})
+
+	t.Run("cannot withdraw consent on his behalf", func(t *testing.T) {
+		state := windDownScene("active", now.Add(-time.Hour))
+		applySceneState(&state, ConversationOutcome{SceneStage: "stopped", ConsentState: "withdrawn"}, now, false)
+		if state.SceneStage == "stopped" || state.ConsentState == "withdrawn" {
+			t.Fatalf("a turn with nobody there recorded a withdrawal: %s/%s", state.SceneStage, state.ConsentState)
+		}
+	})
+
+	t.Run("cannot end a live scene either", func(t *testing.T) {
+		state := windDownScene("active", now.Add(-time.Hour))
+		applySceneState(&state, ConversationOutcome{SceneStage: "none", ConsentState: "not_applicable"}, now, false)
+		if state.SceneStage != "active" {
+			t.Fatalf("a proactive turn ended the scene; collapse owns that, not this: %q", state.SceneStage)
+		}
+	})
+
+	t.Run("does not move the silence clock or re-arm the check-in", func(t *testing.T) {
+		touched := now.Add(-40 * time.Minute)
+		state := windDownScene("active", touched)
+		state.SceneCheckInAt = now.Add(3 * time.Minute).UnixMilli()
+		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now, false)
+		if state.SceneTouchedAt != touched.UnixMilli() {
+			t.Fatalf("her own turn reset the silence clock: %d", state.SceneTouchedAt)
+		}
+		if state.SceneCheckInAt != now.Add(3*time.Minute).UnixMilli() {
+			t.Fatalf("her own turn re-armed the check-in: %d", state.SceneCheckInAt)
+		}
+	})
+
+	t.Run("a user turn still moves all of it", func(t *testing.T) {
+		state := DefaultState(now.UnixMilli())
+		applySceneState(&state, ConversationOutcome{SceneStage: "active", ConsentState: "affirmed"}, now, true)
+		if state.SceneStage != "active" || state.SceneTouchedAt != now.UnixMilli() {
+			t.Fatalf("user turn did not open and time the scene: %q touched=%d", state.SceneStage, state.SceneTouchedAt)
+		}
+	})
+}
+
+// End to end through the turn settlement: a proactive turn must leave a live scene
+// exactly as it found it, so the check-in still has its scene and the collapse
+// clock still reads the last time he was actually here.
+func TestProactiveTurnLeavesALiveSceneUntouched(t *testing.T) {
+	manager := openTestManager(t)
+	conversation := &fakeConversation{threadID: "th_companion"}
+	var aligned TurnBrief
+	aligned.Scene = SceneAlignment{Stage: "active", ConsentState: "affirmed"}
+	aligned.Resolution = ResolutionDraft{SceneStage: "active", ConsentState: "affirmed"}
+	aligned.Reply = ReplyBrief{Send: true, Goal: "确认他是不是还在"}
+	manager.SetPorts(&fakeModel{brief: aligned}, conversation)
+	now := fixedMorning
+	pinClock(t, manager, now)
+
+	touched := now.Add(-40 * time.Minute)
+	state, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SceneStage = "active"
+	state.ConsentState = "affirmed"
+	state.SceneStartedAt = touched.Add(-20 * time.Minute).UnixMilli()
+	state.SceneTouchedAt = touched.UnixMilli()
+	if err := manager.store.SaveState(manager.id, state); err != nil {
+		t.Fatal(err)
+	}
+
+	task := &TurnTask{
+		ID:          "task_proactive_scene",
+		ThreadID:    "th_companion",
+		Trigger:     TriggerProactive,
+		Status:      TaskGenerating,
+		RequestedAt: now.UnixMilli(),
+	}
+	if _, err := manager.applyTurnBrief(task, aligned, now); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	after, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.SceneTouchedAt != touched.UnixMilli() {
+		t.Fatalf("proactive turn moved the silence clock to %d, want %d", after.SceneTouchedAt, touched.UnixMilli())
+	}
+	if after.SceneStage != "active" {
+		t.Fatalf("the live scene should have been left alone for the check-in, got %q", after.SceneStage)
+	}
+}
+
+// The mirror case: when he does speak, the scene and its clock both follow.
+func TestUserTurnStillDrivesTheSceneAndItsClock(t *testing.T) {
+	manager := openTestManager(t)
+	conversation := &fakeConversation{threadID: "th_companion"}
+	var aligned TurnBrief
+	aligned.Scene = SceneAlignment{Stage: "active", ConsentState: "affirmed"}
+	aligned.Resolution = ResolutionDraft{SceneStage: "active", ConsentState: "affirmed"}
+	aligned.Reply = ReplyBrief{Send: true, Goal: "回应他"}
+	manager.SetPorts(&fakeModel{brief: aligned}, conversation)
+	now := fixedMorning
+	pinClock(t, manager, now)
+
+	state, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SceneStage = "none"
+	state.ConsentState = "not_applicable"
+	if err := manager.store.SaveState(manager.id, state); err != nil {
+		t.Fatal(err)
+	}
+
+	task := &TurnTask{
+		ID:            "task_user_scene",
+		ThreadID:      "th_companion",
+		Trigger:       TriggerUser,
+		Status:        TaskGenerating,
+		RequestedAt:   now.UnixMilli(),
+		LastMessageAt: now.UnixMilli(),
+	}
+	if _, err := manager.applyTurnBrief(task, aligned, now); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	after, err := manager.store.State(manager.id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.SceneStage != "active" || after.SceneTouchedAt != now.UnixMilli() {
+		t.Fatalf("user turn did not open and time the scene: %q touched=%d", after.SceneStage, after.SceneTouchedAt)
 	}
 }

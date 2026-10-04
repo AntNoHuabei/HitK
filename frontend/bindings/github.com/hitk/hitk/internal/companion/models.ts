@@ -520,21 +520,22 @@ export interface State {
     "sceneUpdatedAt": number;
 
     /**
-     * SceneTouchedAt is the last time a turn actually put him in the scene. It is
-     * deliberately not SceneUpdatedAt: decay also updates that, so measuring idle
-     * against it means a wall-clock step taken after he leaves resets the silence
-     * clock to now and the wind-down never fires -- which is precisely the
-     * longest absence, the one where the record matters most. Only a turn touches
-     * this field; no decay path writes it.
+     * SceneTouchedAt is the last time *he* was in the scene. Two things may never
+     * move it, and both were learned from live data. Decay may not: it stamps
+     * SceneUpdatedAt, so measuring idle against that makes a scene which decayed
+     * after he left read as "just touched", and the wind-down goes missing on
+     * exactly the longest absences. Her own proactive turns may not either: she
+     * writing to an empty room is not him showing up, and letting it reset the
+     * clock means her own messages keep her scene alive. Only a user turn writes
+     * this field.
      */
     "sceneTouchedAt": number;
 
     /**
      * SceneCheckInAt is when she is due to gently check whether he is still there.
-     * Every turn that touches a live scene pushes it further out, so a warm
-     * exchange never triggers it, and it is zero whenever there is no scene to
-     * check in on. One field, self-resetting: a second "pending check" field
-     * would just be a second answer to the same question.
+     * His turns push it further out, so a warm exchange never triggers it; her own
+     * turns never re-arm it, so the question is asked once per silence rather than
+     * every twelve minutes forever. Zero whenever there is no scene to check in on.
      */
     "sceneCheckInAt": number;
     "activityStartedAt": number;
